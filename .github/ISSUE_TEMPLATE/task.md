@@ -8,19 +8,19 @@ assignees: ''
 
 ---
 
-# Summary
+## Summary
 
 Briefly describe the task.
 
 ---
 
-# Description
+## Description
 
 Explain what needs to be completed.
 
 ---
 
-# Deliverables
+## Deliverables
 
 - [ ]
 - [ ]
@@ -28,21 +28,21 @@ Explain what needs to be completed.
 
 ---
 
-# Testing Strategy
+## Testing Strategy
 
 Describe how the task should be verified.
 
-Verification
+### Verification
 
 - [ ]
 
-Manual Validation
+### Manual Validation
 
 - [ ]
 
 ---
 
-# Definition of Done
+## Definition of Done
 
 - [ ] Deliverables completed
 - [ ] Build succeeds
@@ -50,7 +50,7 @@ Manual Validation
 
 ---
 
-# Suggested Labels
+## Suggested Labels
 
 Common labels
 
