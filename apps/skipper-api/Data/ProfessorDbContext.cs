@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using skipper_api.Domain.Animals;
 using skipper_api.Domain.Enclosures;
 
 namespace skipper_api.Data;
@@ -13,6 +14,8 @@ public class ProfessorDbContext : DbContext
         : base(options)
     {
     }
+
+    public DbSet<Animal> Animals => Set<Animal>();
 
     public DbSet<Enclosure> Enclosures => Set<Enclosure>();
 

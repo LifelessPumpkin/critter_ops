@@ -1,6 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using skipper_api.Data;
 
+if (Environment.GetEnvironmentVariable("CRITTEROPS_EF_DESIGN_TIME") == "true")
+{
+    return;
+}
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
