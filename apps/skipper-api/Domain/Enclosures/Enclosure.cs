@@ -1,3 +1,5 @@
+using skipper_api.Domain.Animals;
+
 namespace skipper_api.Domain.Enclosures;
 
 /// <summary>
@@ -80,6 +82,9 @@ public class Enclosure
 
     /// <summary>Free-form notes about the enclosure.</summary>
     public string? Notes { get; set; }
+
+    /// <summary>Animals currently associated with this enclosure.</summary>
+    public ICollection<Animal> Animals { get; set; } = [];
 
     /// <summary>UTC timestamp when this record was created.</summary>
     public required DateTime CreatedDate { get; set; }
