@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using skipper_api.Domain.Enclosures;
 
 namespace skipper_api.Data;
 
@@ -13,11 +14,13 @@ public class ProfessorDbContext : DbContext
     {
     }
 
+    public DbSet<Enclosure> Enclosures => Set<Enclosure>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
-        // Domain entity configurations will be registered here as the schema evolves.
-        // Example: modelBuilder.ApplyConfigurationsFromAssembly(typeof(ProfessorDbContext).Assembly);
+        // Automatically applies all IEntityTypeConfiguration<T> implementations in this assembly.
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(ProfessorDbContext).Assembly);
     }
 }
