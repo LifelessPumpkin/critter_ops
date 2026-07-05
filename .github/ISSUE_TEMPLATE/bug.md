@@ -7,25 +7,25 @@ assignees: ''
 
 ---
 
-# Summary
+## Summary
 
 Describe the bug.
 
 ---
 
-# Expected Behavior
+## Expected Behavior
 
 What should happen?
 
 ---
 
-# Actual Behavior
+## Actual Behavior
 
 What currently happens?
 
 ---
 
-# Steps to Reproduce
+## Steps to Reproduce
 
 1.
 2.
@@ -33,7 +33,7 @@ What currently happens?
 
 ---
 
-# Environment
+## Environment
 
 Application Version:
 
@@ -45,7 +45,7 @@ Additional Notes:
 
 ---
 
-# Testing Strategy
+## Testing Strategy
 
 How should this bug be verified once fixed?
 
@@ -59,7 +59,7 @@ Manual Testing
 
 ---
 
-# Definition of Done
+## Definition of Done
 
 - [ ] Bug no longer reproducible
 - [ ] Regression testing completed
@@ -68,7 +68,7 @@ Manual Testing
 
 ---
 
-# Suggested Labels
+## Suggested Labels
 
 Assign labels based on the affected area.
 

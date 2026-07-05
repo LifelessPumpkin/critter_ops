@@ -1,40 +1,40 @@
-Summary
+# Summary
 
 Provide a brief overview of the changes made in this Pull Request.
 
 ⸻
 
-Related Issue
+## Related Issue
 
 Closes #
 
 ⸻
 
-Changes Made
+## Changes Made
 
-* [ ]
-* [ ]
-* [ ]
+*
+*
+*
 
 ⸻
 
-Testing
+## Testing
 
 Describe how this change was verified.
 
-Manual Testing
+### Manual Testing
 
 * Application builds successfully
 * Feature behaves as expected
 * Existing functionality still works
 
-Additional Testing
+### Additional Testing
 
 Describe any additional testing performed.
 
 ⸻
 
-Documentation
+## Documentation
 
 * No documentation changes required
 * Documentation updated
@@ -43,13 +43,13 @@ If documentation was updated, describe what changed.
 
 ⸻
 
-Notes
+## Notes
 
 Include any implementation details, trade-offs, assumptions, or follow-up work that future development should be aware of.
 
 ⸻
 
-Definition of Done Checklist
+## Definition of Done Checklist
 
 * Acceptance criteria satisfied
 * Issue linked

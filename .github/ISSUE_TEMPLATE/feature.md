@@ -7,19 +7,19 @@ assignees: ''
 
 ---
 
-# Summary
+## Summary
 
 Provide a concise description of the feature.
 
 ---
 
-# Description
+## Description
 
 Describe what functionality should be implemented and why it is needed.
 
 ---
 
-# Acceptance Criteria
+## Acceptance Criteria
 
 - [ ]
 - [ ]
@@ -27,13 +27,13 @@ Describe what functionality should be implemented and why it is needed.
 
 ---
 
-# Technical Notes
+## Technical Notes
 
 Optional implementation notes, architectural considerations, or dependencies.
 
 ---
 
-# Testing Strategy
+## Testing Strategy
 
 Describe how this feature should be validated.
 
@@ -51,7 +51,7 @@ Edge Cases
 
 ---
 
-# Definition of Done
+## Definition of Done
 
 - [ ] Acceptance criteria satisfied
 - [ ] Feature builds successfully
@@ -61,7 +61,7 @@ Edge Cases
 
 ---
 
-# Suggested Labels
+## Suggested Labels
 
 - skipper
 - gilligan

@@ -98,4 +98,3 @@ Using `psql` from the command line:
 ```bash
 psql "postgresql://postgres:postgres@localhost:5432/critterops_dev"
 ```
-

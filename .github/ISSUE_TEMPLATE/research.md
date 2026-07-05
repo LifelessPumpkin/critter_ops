@@ -8,19 +8,20 @@ assignees: ''
 ---
 
 ---
-# Objective
+
+## Objective
 
 What question should this research answer?
 
 ---
 
-# Background
+## Background
 
 Provide any context.
 
 ---
 
-# Success Criteria
+## Success Criteria
 
 The research should conclude with:
 
@@ -31,7 +32,7 @@ The research should conclude with:
 
 ---
 
-# Deliverables
+## Deliverables
 
 - Architecture notes
 - Decision summary
@@ -39,7 +40,7 @@ The research should conclude with:
 
 ---
 
-# Definition of Done
+## Definition of Done
 
 - [ ] Research completed
 - [ ] Recommendation documented
