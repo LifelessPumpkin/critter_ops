@@ -1,6 +1,7 @@
 using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
 using skipper_api.Data;
+using skipper_api.Services.Animals;
 using skipper_api.Services.Enclosures;
 
 if (Environment.GetEnvironmentVariable("CRITTEROPS_EF_DESIGN_TIME") == "true")
@@ -24,6 +25,7 @@ builder.Services.AddDbContext<ProfessorDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("ProfessorDb")));
 
 builder.Services.AddScoped<IEnclosureService, EnclosureService>();
+builder.Services.AddScoped<IAnimalService, AnimalService>();
 
 // Health checks — DB check is tagged "db" so it can be filtered independently
 builder.Services.AddHealthChecks()
