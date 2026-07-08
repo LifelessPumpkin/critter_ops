@@ -91,6 +91,7 @@ body::after {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  text-decoration: none;
 }
 
 .logo-icon {
@@ -125,6 +126,7 @@ body::after {
   color: var(--text-secondary);
   font-size: 0.875rem;
   font-weight: 500;
+  text-decoration: none;
   transition: all 0.2s ease;
   position: relative;
   padding: 0.25rem 0;
@@ -198,6 +200,24 @@ body::after {
   max-width: 600px;
   margin: 0 auto;
   line-height: 1.6;
+}
+
+.page-heading {
+  margin-bottom: 2rem;
+}
+
+.page-title {
+  font-size: 2.5rem;
+  font-weight: 800;
+  margin-bottom: 0.75rem;
+  line-height: 1.15;
+}
+
+.page-subtitle {
+  color: var(--text-secondary);
+  font-size: 1rem;
+  line-height: 1.6;
+  max-width: 640px;
 }
 
 /* Dashboard Cards Grid */
@@ -300,6 +320,86 @@ body::after {
   transform: translateX(4px);
 }
 
+.enclosure-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  width: 100%;
+}
+
+.enclosure-card {
+  min-height: 220px;
+}
+
+.enclosure-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.eyebrow-text {
+  color: var(--accent-teal);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+}
+
+.status-pill {
+  border: 1px solid rgba(20, 184, 166, 0.25);
+  border-radius: 9999px;
+  color: #99f6e4;
+  background: rgba(20, 184, 166, 0.08);
+  flex: 0 0 auto;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.375rem 0.625rem;
+}
+
+.enclosure-details {
+  display: grid;
+  gap: 1rem;
+}
+
+.enclosure-details div {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.enclosure-details dt {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.enclosure-details dd {
+  color: var(--text-primary);
+  font-size: 0.95rem;
+}
+
+.state-message,
+.state-panel {
+  color: var(--text-secondary);
+  font-size: 1rem;
+}
+
+.state-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 1rem;
+  padding: 2rem;
+}
+
+.state-panel h2 {
+  color: var(--text-primary);
+  font-size: 1.25rem;
+  margin-bottom: 0.5rem;
+}
+
 /* Footer */
 .app-footer {
   padding: 2.5rem 2rem;
@@ -337,5 +437,11 @@ body::after {
   }
   .app-main {
     padding: 2rem 1rem;
+  }
+  .header-nav {
+    gap: 1rem;
+  }
+  .page-title {
+    font-size: 2rem;
   }
 }
