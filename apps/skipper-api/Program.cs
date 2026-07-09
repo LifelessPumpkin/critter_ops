@@ -10,6 +10,7 @@ if (Environment.GetEnvironmentVariable("CRITTEROPS_EF_DESIGN_TIME") == "true")
 }
 
 var builder = WebApplication.CreateBuilder(args);
+const string GilliganWebCorsPolicy = "GilliganWeb";
 
 // Add services to the container.
 
@@ -19,6 +20,21 @@ builder.Services.AddControllers()
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+var allowedOrigins = builder.Configuration
+    .GetSection("Cors:AllowedOrigins")
+    .Get<string[]>() ?? [];
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy(GilliganWebCorsPolicy, policy =>
+    {
+        policy
+            .WithOrigins(allowedOrigins)
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+});
 
 // Database — EF Core with Npgsql (PostgreSQL)
 builder.Services.AddDbContext<ProfessorDbContext>(options =>
@@ -41,6 +57,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+app.UseCors(GilliganWebCorsPolicy);
 
 app.UseAuthorization();
 

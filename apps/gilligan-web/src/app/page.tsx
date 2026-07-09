@@ -12,6 +12,9 @@ export default function Home() {
           <span className="logo-text">CritterOps</span>
         </div>
         <nav className="header-nav">
+          <Link href="/enclosures" className="nav-link">
+            Enclosures
+          </Link>
           <a
             href="https://github.com/LifelessPumpkin/critter_ops"
             target="_blank"
