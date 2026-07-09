@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { EnclosureOverview } from "@/components/enclosures/EnclosureOverview";
+import { AnimalOverview } from "@/components/animals/AnimalOverview";
 
-export default function EnclosuresPage() {
+export default function AnimalsPage() {
   return (
     <div className="app-shell">
       <header className="app-header">
@@ -29,14 +29,26 @@ export default function EnclosuresPage() {
 
       <main className="app-main">
         <section className="page-heading animated-fade-in">
-          <span className="hero-badge">Habitats</span>
-          <h1 className="page-title">Enclosures</h1>
+          <span className="hero-badge">Collection</span>
+          <h1 className="page-title">Animals</h1>
           <p className="page-subtitle">
-            Browse tanks, cages, habitats, and other managed spaces in CritterOps.
+            Review every animal currently tracked in CritterOps.
           </p>
         </section>
 
-        <EnclosureOverview />
+        <div className="toolbar-row">
+          <label className="search-label" htmlFor="animal-search">
+            Search animals
+          </label>
+          <input
+            id="animal-search"
+            className="search-input"
+            placeholder="Search animals..."
+            type="search"
+          />
+        </div>
+
+        <AnimalOverview />
       </main>
 
       <footer className="app-footer">
