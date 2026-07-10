@@ -1,13 +1,17 @@
 export type Animal = {
   id: number;
   enclosureId: number;
+  enclosureName: string;
   name: string;
   species: string;
   subspeciesOrMorph?: string | null;
   animalType: string;
   status: string;
   sex: string;
+  birthDate?: string | null;
   acquiredDate: string;
+  dispositionDate?: string | null;
+  dispositionReason?: string | null;
 };
 
 const apiBaseUrl = "http://localhost:5198";

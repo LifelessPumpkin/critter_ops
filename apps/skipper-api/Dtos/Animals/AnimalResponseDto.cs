@@ -11,6 +11,8 @@ public class AnimalResponseDto
 
     public int EnclosureId { get; set; }
 
+    public required string EnclosureName { get; set; }
+
     public required string Name { get; set; }
 
     public required string Species { get; set; }

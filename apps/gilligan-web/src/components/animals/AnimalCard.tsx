@@ -2,6 +2,7 @@ import type { Animal } from "@/lib/api/animals";
 
 type AnimalCardProps = {
   animal: Animal;
+  variant?: "active" | "deceased";
 };
 
 const dateFormatter = new Intl.DateTimeFormat("en", {
@@ -14,7 +15,9 @@ function formatDate(date: string) {
   return dateFormatter.format(new Date(`${date}T00:00:00`));
 }
 
-export function AnimalCard({ animal }: AnimalCardProps) {
+export function AnimalCard({ animal, variant = "active" }: AnimalCardProps) {
+  const isDeceased = variant === "deceased";
+
   return (
     <article className="dashboard-card animal-card">
       <div>
@@ -45,14 +48,39 @@ export function AnimalCard({ animal }: AnimalCardProps) {
           </div>
 
           <div>
-            <dt>Enclosure</dt>
-            <dd>#{animal.enclosureId}</dd>
+            <dt>{isDeceased ? "Former Enclosure" : "Enclosure"}</dt>
+            <dd>{animal.enclosureName}</dd>
           </div>
 
-          <div>
-            <dt>Acquired</dt>
-            <dd>{formatDate(animal.acquiredDate)}</dd>
-          </div>
+          {isDeceased ? (
+            <>
+              {animal.birthDate ? (
+                <div>
+                  <dt>Birth Date</dt>
+                  <dd>{formatDate(animal.birthDate)}</dd>
+                </div>
+              ) : null}
+
+              {animal.dispositionDate ? (
+                <div>
+                  <dt>Disposition Date</dt>
+                  <dd>{formatDate(animal.dispositionDate)}</dd>
+                </div>
+              ) : null}
+
+              {animal.dispositionReason ? (
+                <div>
+                  <dt>Disposition Reason</dt>
+                  <dd>{animal.dispositionReason}</dd>
+                </div>
+              ) : null}
+            </>
+          ) : (
+            <div>
+              <dt>Acquired</dt>
+              <dd>{formatDate(animal.acquiredDate)}</dd>
+            </div>
+          )}
         </dl>
       </div>
     </article>
