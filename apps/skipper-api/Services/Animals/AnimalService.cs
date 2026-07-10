@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using skipper_api.Data;
 using skipper_api.Domain.Animals;
@@ -19,7 +20,7 @@ public class AnimalService : IAnimalService
         return await _dbContext.Animals
             .AsNoTracking()
             .OrderBy(animal => animal.Name)
-            .Select(animal => ToResponseDto(animal))
+            .Select(ToResponseDtoProjection)
             .ToListAsync(cancellationToken);
     }
 
@@ -28,7 +29,7 @@ public class AnimalService : IAnimalService
         return await _dbContext.Animals
             .AsNoTracking()
             .Where(animal => animal.Id == id)
-            .Select(animal => ToResponseDto(animal))
+            .Select(ToResponseDtoProjection)
             .SingleOrDefaultAsync(cancellationToken);
     }
 
@@ -41,10 +42,12 @@ public class AnimalService : IAnimalService
             return CreateAnimalResult.EnclosureNotFound();
         }
 
-        var enclosureExists = await _dbContext.Enclosures
-            .AnyAsync(enclosure => enclosure.Id == enclosureId, cancellationToken);
+        var enclosureName = await _dbContext.Enclosures
+            .Where(enclosure => enclosure.Id == enclosureId)
+            .Select(enclosure => enclosure.Name)
+            .SingleOrDefaultAsync(cancellationToken);
 
-        if (!enclosureExists)
+        if (enclosureName is null)
         {
             return CreateAnimalResult.EnclosureNotFound();
         }
@@ -76,7 +79,7 @@ public class AnimalService : IAnimalService
         _dbContext.Animals.Add(animal);
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        return CreateAnimalResult.Created(ToResponseDto(animal));
+        return CreateAnimalResult.Created(ToResponseDto(animal, enclosureName));
     }
 
     public async Task<UpdateAnimalResult> UpdateAsync(
@@ -97,15 +100,14 @@ public class AnimalService : IAnimalService
             return UpdateAnimalResult.EnclosureNotFound();
         }
 
-        if (animal.EnclosureId != enclosureId)
-        {
-            var enclosureExists = await _dbContext.Enclosures
-                .AnyAsync(enclosure => enclosure.Id == enclosureId, cancellationToken);
+        var enclosureName = await _dbContext.Enclosures
+            .Where(enclosure => enclosure.Id == enclosureId)
+            .Select(enclosure => enclosure.Name)
+            .SingleOrDefaultAsync(cancellationToken);
 
-            if (!enclosureExists)
-            {
-                return UpdateAnimalResult.EnclosureNotFound();
-            }
+        if (enclosureName is null)
+        {
+            return UpdateAnimalResult.EnclosureNotFound();
         }
 
         animal.EnclosureId = enclosureId;
@@ -128,7 +130,7 @@ public class AnimalService : IAnimalService
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        return UpdateAnimalResult.Updated(ToResponseDto(animal));
+        return UpdateAnimalResult.Updated(ToResponseDto(animal, enclosureName));
     }
 
     public async Task<DeleteAnimalResult> DeleteAsync(int id, CancellationToken cancellationToken = default)
@@ -147,12 +149,38 @@ public class AnimalService : IAnimalService
         return DeleteAnimalResult.Deleted;
     }
 
-    private static AnimalResponseDto ToResponseDto(Animal animal)
+    private static readonly Expression<Func<Animal, AnimalResponseDto>> ToResponseDtoProjection = animal =>
+        new AnimalResponseDto
+        {
+            Id = animal.Id,
+            EnclosureId = animal.EnclosureId,
+            EnclosureName = animal.Enclosure.Name,
+            Name = animal.Name,
+            Species = animal.Species,
+            SubspeciesOrMorph = animal.SubspeciesOrMorph,
+            AnimalType = animal.AnimalType,
+            Status = animal.Status,
+            Sex = animal.Sex,
+            BirthDate = animal.BirthDate,
+            BirthDateIsEstimated = animal.BirthDateIsEstimated,
+            AcquiredDate = animal.AcquiredDate,
+            DispositionDate = animal.DispositionDate,
+            DispositionReason = animal.DispositionReason,
+            MicrochipNumber = animal.MicrochipNumber,
+            TagIdentifier = animal.TagIdentifier,
+            Source = animal.Source,
+            Notes = animal.Notes,
+            CreatedAt = animal.CreatedAt,
+            UpdatedAt = animal.UpdatedAt,
+        };
+
+    private static AnimalResponseDto ToResponseDto(Animal animal, string enclosureName)
     {
         return new AnimalResponseDto
         {
             Id = animal.Id,
             EnclosureId = animal.EnclosureId,
+            EnclosureName = enclosureName,
             Name = animal.Name,
             Species = animal.Species,
             SubspeciesOrMorph = animal.SubspeciesOrMorph,

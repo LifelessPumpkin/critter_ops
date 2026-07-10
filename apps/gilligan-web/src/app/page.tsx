@@ -12,6 +12,9 @@ export default function Home() {
           <span className="logo-text">CritterOps</span>
         </div>
         <nav className="header-nav">
+          <Link href="/animals" className="nav-link">
+            Animals
+          </Link>
           <Link href="/enclosures" className="nav-link">
             Enclosures
           </Link>
