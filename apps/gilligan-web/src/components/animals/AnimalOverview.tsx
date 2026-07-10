@@ -5,9 +5,10 @@ import { AnimalCard } from "@/components/animals/AnimalCard";
 import { type Animal, fetchAnimals } from "@/lib/api/animals";
 
 type LoadState = "loading" | "loaded" | "error";
-type AnimalTab = "active" | "deceased";
+type AnimalTab = "active" | "deceased" | "archived";
 
 const activeStatuses = new Set(["Active", "Quarantined", "Medical", "Breeding", "OnHold"]);
+const archivedStatuses = new Set(["Surrendered", "Transferred", "Sold", "Inactive", "Released"]);
 
 export function AnimalOverview() {
   const [animals, setAnimals] = useState<Animal[]>([]);
@@ -56,10 +57,9 @@ export function AnimalOverview() {
 
   const activeAnimals = animals.filter((animal) => activeStatuses.has(animal.status));
   const deceasedAnimals = animals.filter((animal) => animal.status === "Deceased");
-  const visibleAnimals = selectedTab === "active" ? activeAnimals : deceasedAnimals;
-  const emptyMessage = selectedTab === "active"
-    ? "No active animals found."
-    : "No deceased animal records found.";
+  const archivedAnimals = animals.filter((animal) => archivedStatuses.has(animal.status));
+  const visibleAnimals = getVisibleAnimals(selectedTab, activeAnimals, deceasedAnimals, archivedAnimals);
+  const emptyMessage = getEmptyMessage(selectedTab);
 
   if (animals.length === 0) {
     return (
@@ -67,6 +67,7 @@ export function AnimalOverview() {
         <AnimalTabs
           activeCount={0}
           deceasedCount={0}
+          archivedCount={0}
           selectedTab={selectedTab}
           onSelectTab={setSelectedTab}
         />
@@ -83,6 +84,7 @@ export function AnimalOverview() {
       <AnimalTabs
         activeCount={activeAnimals.length}
         deceasedCount={deceasedAnimals.length}
+        archivedCount={archivedAnimals.length}
         selectedTab={selectedTab}
         onSelectTab={setSelectedTab}
       />
@@ -92,7 +94,7 @@ export function AnimalOverview() {
           <h2>{emptyMessage}</h2>
         </div>
       ) : (
-        <section className="enclosure-grid" aria-label={selectedTab === "active" ? "Active animals" : "Deceased animals"}>
+        <section className="enclosure-grid" aria-label={getTabAriaLabel(selectedTab)}>
           {visibleAnimals.map((animal) => (
             <AnimalCard key={animal.id} animal={animal} variant={selectedTab} />
           ))}
@@ -105,11 +107,12 @@ export function AnimalOverview() {
 type AnimalTabsProps = {
   activeCount: number;
   deceasedCount: number;
+  archivedCount: number;
   selectedTab: AnimalTab;
   onSelectTab: (tab: AnimalTab) => void;
 };
 
-function AnimalTabs({ activeCount, deceasedCount, selectedTab, onSelectTab }: AnimalTabsProps) {
+function AnimalTabs({ activeCount, deceasedCount, archivedCount, selectedTab, onSelectTab }: AnimalTabsProps) {
   return (
     <div className="tab-list" role="tablist" aria-label="Animal status groups">
       <button
@@ -130,6 +133,56 @@ function AnimalTabs({ activeCount, deceasedCount, selectedTab, onSelectTab }: An
       >
         Deceased Animals <span>{deceasedCount}</span>
       </button>
+      <button
+        className={selectedTab === "archived" ? "tab-button tab-button-active" : "tab-button"}
+        type="button"
+        role="tab"
+        aria-selected={selectedTab === "archived"}
+        onClick={() => onSelectTab("archived")}
+      >
+        Archived Animals <span>{archivedCount}</span>
+      </button>
     </div>
   );
+}
+
+function getVisibleAnimals(
+  selectedTab: AnimalTab,
+  activeAnimals: Animal[],
+  deceasedAnimals: Animal[],
+  archivedAnimals: Animal[],
+) {
+  if (selectedTab === "deceased") {
+    return deceasedAnimals;
+  }
+
+  if (selectedTab === "archived") {
+    return archivedAnimals;
+  }
+
+  return activeAnimals;
+}
+
+function getEmptyMessage(selectedTab: AnimalTab) {
+  if (selectedTab === "deceased") {
+    return "No deceased animal records found.";
+  }
+
+  if (selectedTab === "archived") {
+    return "No archived animal records found.";
+  }
+
+  return "No active animals found.";
+}
+
+function getTabAriaLabel(selectedTab: AnimalTab) {
+  if (selectedTab === "deceased") {
+    return "Deceased animals";
+  }
+
+  if (selectedTab === "archived") {
+    return "Archived animals";
+  }
+
+  return "Active animals";
 }

@@ -2,7 +2,7 @@ import type { Animal } from "@/lib/api/animals";
 
 type AnimalCardProps = {
   animal: Animal;
-  variant?: "active" | "deceased";
+  variant?: "active" | "deceased" | "archived";
 };
 
 const dateFormatter = new Intl.DateTimeFormat("en", {
@@ -17,6 +17,7 @@ function formatDate(date: string) {
 
 export function AnimalCard({ animal, variant = "active" }: AnimalCardProps) {
   const isDeceased = variant === "deceased";
+  const isArchived = variant === "archived";
 
   return (
     <article className="dashboard-card animal-card">
@@ -48,11 +49,11 @@ export function AnimalCard({ animal, variant = "active" }: AnimalCardProps) {
           </div>
 
           <div>
-            <dt>{isDeceased ? "Former Enclosure" : "Enclosure"}</dt>
+            <dt>{isDeceased || isArchived ? "Former Enclosure" : "Enclosure"}</dt>
             <dd>{animal.enclosureName}</dd>
           </div>
 
-          {isDeceased ? (
+          {isDeceased || isArchived ? (
             <>
               {animal.birthDate ? (
                 <div>
