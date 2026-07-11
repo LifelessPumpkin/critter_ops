@@ -58,8 +58,8 @@ require that check before merging.
 
 ## Future Test Locations
 
-Add frontend tests inside `apps/gilligan-web` and update that app's `npm test`
-script to run the selected test runner.
+Add frontend tests inside `apps/gilligan-web`. Gilligan currently uses Vitest
+and React Testing Library through its `npm test` script.
 
 Add backend unit or integration test projects under `apps/` or `packages/` using
 project names that match `*Tests*.csproj` or `*.Tests.csproj`; the Skipper test

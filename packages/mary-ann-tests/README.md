@@ -42,7 +42,8 @@ Local test runs require:
 
 ## Current Test Wiring
 
-Gilligan runs its native npm test command:
+Gilligan runs its native npm test command. The current frontend test runner is
+Vitest with React Testing Library:
 
 ```sh
 npm test
