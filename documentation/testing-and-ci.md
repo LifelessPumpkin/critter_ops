@@ -61,9 +61,11 @@ require that check before merging.
 Add frontend tests inside `apps/gilligan-web`. Gilligan currently uses Vitest
 and React Testing Library through its `npm test` script.
 
-Add backend unit or integration test projects under `apps/` or `packages/` using
-project names that match `*Tests*.csproj` or `*.Tests.csproj`; the Skipper test
-script will discover and run them automatically.
+The first backend integration test project lives in
+`apps/skipper-api/tests/Skipper.Api.Tests`. Add future backend unit or
+integration test projects under `apps/` or `packages/` using project names that
+match `*Tests*.csproj` or `*.Tests.csproj`; the Skipper test script will
+discover and run them automatically.
 
 Do not put database-dependent integration tests into the default CI path until
 their service requirements are documented and provisioned in the workflow.

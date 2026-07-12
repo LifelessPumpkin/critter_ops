@@ -62,9 +62,11 @@ non-zero if either Gilligan or Skipper fails.
 Add frontend unit tests under `apps/gilligan-web` and update that app's native
 `npm test` script to run the chosen test runner.
 
-Add backend unit or integration test projects under `apps/` or `packages/` with
-project names matching `*Tests*.csproj` or `*.Tests.csproj`; Mary Ann will pick
-them up automatically.
+The first backend integration tests live in
+`apps/skipper-api/tests/Skipper.Api.Tests`. Add future backend unit or
+integration test projects under `apps/` or `packages/` with project names
+matching `*Tests*.csproj` or `*.Tests.csproj`; Mary Ann will pick them up
+automatically.
 
 Database integration tests should live in a dedicated test project and should
 document any required service dependencies before being added to CI.
