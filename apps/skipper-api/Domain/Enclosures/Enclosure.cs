@@ -1,4 +1,5 @@
 using skipper_api.Domain.Animals;
+using skipper_api.Domain.EnclosureTimeline;
 
 namespace skipper_api.Domain.Enclosures;
 
@@ -85,6 +86,9 @@ public class Enclosure
 
     /// <summary>Animals currently associated with this enclosure.</summary>
     public ICollection<Animal> Animals { get; set; } = [];
+
+    /// <summary>Historical activity associated with this enclosure.</summary>
+    public ICollection<EnclosureTimelineEvent> TimelineEvents { get; set; } = [];
 
     /// <summary>UTC timestamp when this record was created.</summary>
     public required DateTime CreatedDate { get; set; }

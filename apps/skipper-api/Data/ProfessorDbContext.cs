@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using skipper_api.Domain.Animals;
 using skipper_api.Domain.Enclosures;
+using skipper_api.Domain.EnclosureTimeline;
 
 namespace skipper_api.Data;
 
@@ -18,6 +19,8 @@ public class ProfessorDbContext : DbContext
     public DbSet<Animal> Animals => Set<Animal>();
 
     public DbSet<Enclosure> Enclosures => Set<Enclosure>();
+
+    public DbSet<EnclosureTimelineEvent> EnclosureTimelineEvents => Set<EnclosureTimelineEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
