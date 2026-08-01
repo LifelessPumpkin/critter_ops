@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using skipper_api.Data;
 using skipper_api.Services.Animals;
 using skipper_api.Services.Enclosures;
+using skipper_api.Services.EnclosureTimeline;
 
 if (Environment.GetEnvironmentVariable("CRITTEROPS_EF_DESIGN_TIME") == "true")
 {
@@ -42,6 +43,7 @@ builder.Services.AddDbContext<ProfessorDbContext>(options =>
 
 builder.Services.AddScoped<IEnclosureService, EnclosureService>();
 builder.Services.AddScoped<IAnimalService, AnimalService>();
+builder.Services.AddScoped<IEnclosureTimelineService, EnclosureTimelineService>();
 
 // Health checks — DB check is tagged "db" so it can be filtered independently
 builder.Services.AddHealthChecks()
