@@ -2,6 +2,7 @@ using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
 using skipper_api.Data;
 using skipper_api.Services.Animals;
+using skipper_api.Services.AnimalTimeline;
 using skipper_api.Services.Enclosures;
 using skipper_api.Services.EnclosureTimeline;
 
@@ -43,6 +44,7 @@ builder.Services.AddDbContext<ProfessorDbContext>(options =>
 
 builder.Services.AddScoped<IEnclosureService, EnclosureService>();
 builder.Services.AddScoped<IAnimalService, AnimalService>();
+builder.Services.AddScoped<IAnimalTimelineService, AnimalTimelineService>();
 builder.Services.AddScoped<IEnclosureTimelineService, EnclosureTimelineService>();
 
 // Health checks — DB check is tagged "db" so it can be filtered independently
