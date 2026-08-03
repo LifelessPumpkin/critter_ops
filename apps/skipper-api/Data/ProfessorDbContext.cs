@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using skipper_api.Domain.Animals;
+using skipper_api.Domain.AnimalTimeline;
 using skipper_api.Domain.Enclosures;
 using skipper_api.Domain.EnclosureTimeline;
 
@@ -17,6 +18,8 @@ public class ProfessorDbContext : DbContext
     }
 
     public DbSet<Animal> Animals => Set<Animal>();
+
+    public DbSet<AnimalTimelineEvent> AnimalTimelineEvents => Set<AnimalTimelineEvent>();
 
     public DbSet<Enclosure> Enclosures => Set<Enclosure>();
 
