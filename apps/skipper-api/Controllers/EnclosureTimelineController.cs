@@ -74,6 +74,10 @@ public class EnclosureTimelineController : ControllerBase
             {
                 message = "The provided enclosure does not exist.",
             }),
+            CreateTimelineEventResultStatus.UnsupportedEventType => BadRequest(new
+            {
+                message = "Structured activity events must be created through their dedicated endpoints.",
+            }),
             _ => StatusCode(StatusCodes.Status500InternalServerError),
         };
     }
@@ -101,6 +105,10 @@ public class EnclosureTimelineController : ControllerBase
         {
             UpdateTimelineEventResultStatus.Updated => Ok(result.TimelineEvent),
             UpdateTimelineEventResultStatus.NotFound => NotFound(),
+            UpdateTimelineEventResultStatus.UnsupportedEventType => BadRequest(new
+            {
+                message = "Structured activity events must be updated through their dedicated endpoints.",
+            }),
             _ => StatusCode(StatusCodes.Status500InternalServerError),
         };
     }

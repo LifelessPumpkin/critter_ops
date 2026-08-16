@@ -6,6 +6,7 @@ public enum CreateTimelineEventResultStatus
 {
     Created,
     EnclosureNotFound,
+    UnsupportedEventType,
 }
 
 public class CreateTimelineEventResult
@@ -28,6 +29,14 @@ public class CreateTimelineEventResult
         return new CreateTimelineEventResult
         {
             Status = CreateTimelineEventResultStatus.EnclosureNotFound,
+        };
+    }
+
+    public static CreateTimelineEventResult UnsupportedEventType()
+    {
+        return new CreateTimelineEventResult
+        {
+            Status = CreateTimelineEventResultStatus.UnsupportedEventType,
         };
     }
 }

@@ -2,17 +2,17 @@
 
 ## Purpose
 
-The Animal Timeline records historical events associated with a single animal.
+The Animal Timeline returns historical events associated with a single animal.
 
 It provides one chronological history surface for animal-specific activity such as feedings, treatments, notes, and tasks.
 
-The design goal is to preserve animal history even when the animal moves between enclosures. Each timeline event therefore stores both the animal and the enclosure context associated with the event at the time it occurred.
+The design goal is to preserve animal history even when the animal moves between enclosures. Animal timeline API routes remain animal-scoped, but the underlying source of truth is the shared Activity Ledger described in `activity-ledger-domain-design.md`.
 
 ## Design Philosophy
 
-The animal timeline follows the same architecture as the enclosure timeline.
+The animal timeline follows the same API architecture as the enclosure timeline.
 
-Common timeline information is stored relationally.
+Common timeline information is stored on `ActivityEvent`.
 
 Event-specific details are stored in a PostgreSQL `jsonb` metadata field.
 
@@ -20,18 +20,18 @@ This keeps the table understandable while avoiding nullable columns for every po
 
 The timeline should describe what happened, when it happened, where it happened, who performed it, and any event-specific details needed for display or reporting.
 
-## Core Timeline Event Entity
+## Core Timeline Event View
 
-Every animal timeline event belongs to exactly one animal and stores one enclosure context.
+Every animal timeline response is projected from one `ActivityEvent` related through `ActivityEventAnimals`.
 
 Field Purpose
-Id Bigint identity primary key
-AnimalId Required foreign key to Animals.Id
-EnclosureId Required foreign key to Enclosures.Id
+Id Shared ActivityEvents bigint identity primary key
+AnimalId Requested animal related through ActivityEventAnimals
+EnclosureId Enclosure context related through ActivityEventEnclosures
 EventType Type of timeline event
 OccurredAt When the activity actually occurred
 Title Short human-readable description
-Description Optional notes or context
+Description Optional notes or context projected from ActivityEvent.Notes
 PerformedBy Optional human-readable actor name
 SourceReferenceId Optional reference to an originating source record
 SourceType Optional source entity type name
@@ -39,30 +39,28 @@ Metadata Optional event-specific JSON values
 CreatedAt Record creation timestamp
 UpdatedAt Last modification timestamp
 
-Timeline event identifiers use an incremental `bigint` value. This keeps event URLs compact while leaving room for a large number of future events.
+Timeline event identifiers use the shared `ActivityEvents.Id` incremental `bigint` value. This keeps event URLs compact while leaving room for a large number of future events.
 
-Animal records currently require an enclosure, so animal timeline events also require `EnclosureId`.
+Animal records currently require an enclosure, so animal timeline create and update requests still require `EnclosureId`. The service stores that value as a primary enclosure association.
 
 ## Animal Relationship
 
-Every timeline event belongs to one animal.
+Every animal timeline event must be associated with the requested animal.
 
 Relationship:
 
 Animal (1)
         │
         │
-        └───────────< AnimalTimelineEvent (Many)
+        └───────────< ActivityEventAnimal >─────────── ActivityEvent
 
-An animal may have many timeline events.
+An animal may have many activity events.
 
-A timeline event may not exist without an animal.
-
-Deleting an animal is restricted while timeline events exist so historical data is not silently removed.
+Deleting an animal is restricted while activity event associations exist so historical data is not silently removed.
 
 ## Enclosure Context
 
-Animal timeline events store `EnclosureId` directly.
+Animal timeline events expose `EnclosureId` from an activity enclosure association.
 
 This is intentionally separate from the animal's current enclosure assignment.
 
@@ -73,9 +71,9 @@ Relationship:
 Enclosure (1)
         │
         │
-        └───────────< AnimalTimelineEvent (Many)
+        └───────────< ActivityEventEnclosure >──────── ActivityEvent
 
-Deleting an enclosure is restricted while animal timeline events reference it.
+Deleting an enclosure is restricted while activity event associations reference it.
 
 ## Event Types
 
@@ -84,10 +82,18 @@ EventType is represented as an enum and stored as a readable string in PostgreSQ
 Initial values include:
 
 * Feeding
+* AnimalMovement
+* AnimalDisposition
 * Treatment
 * Note
 * Task
 * Other
+
+Animal movement events are created through `POST /api/animals/{animalId}/movements`, not the generic timeline endpoint. They appear in the animal timeline as movement activity projected from the shared ledger.
+
+Animal feeding events are created through `POST /api/animals/{animalId}/feedings`, not the generic timeline endpoint. They appear in the animal timeline with structured food, quantity, and result details projected from the shared ledger.
+
+Animal disposition events are created through `POST /api/animals/{animalId}/dispositions`, not the generic timeline endpoint. They appear in the animal timeline with disposition type, destination, reason, and notes projected from the shared ledger.
 
 The Other value exists for events that do not yet have a dedicated type.
 

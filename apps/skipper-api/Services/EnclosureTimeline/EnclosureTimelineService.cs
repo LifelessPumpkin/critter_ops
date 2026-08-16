@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using skipper_api.Data;
+using skipper_api.Domain.Activity;
 using skipper_api.Domain.EnclosureTimeline;
 using skipper_api.Dtos.EnclosureTimeline;
 
@@ -19,12 +20,24 @@ public class EnclosureTimelineService : IEnclosureTimelineService
         int enclosureId,
         CancellationToken cancellationToken = default)
     {
-        return await _dbContext.EnclosureTimelineEvents
+        var timelineEvents = await _dbContext.ActivityEvents
             .AsNoTracking()
-            .Where(timelineEvent => timelineEvent.EnclosureId == enclosureId)
-            .OrderByDescending(timelineEvent => timelineEvent.OccurredAt)
-            .Select(timelineEvent => ToDto(timelineEvent))
+            .Include(activityEvent => activityEvent.Enclosures)
+                .ThenInclude(association => association.Enclosure)
+            .Include(activityEvent => activityEvent.Animals)
+                .ThenInclude(association => association.Animal)
+            .Include(activityEvent => activityEvent.AnimalMovement)
+                .ThenInclude(movement => movement!.FromEnclosure)
+            .Include(activityEvent => activityEvent.AnimalMovement)
+                .ThenInclude(movement => movement!.ToEnclosure)
+            .Include(activityEvent => activityEvent.AnimalFeeding)
+            .Include(activityEvent => activityEvent.AnimalDisposition)
+            .Where(activityEvent => activityEvent.Enclosures.Any(association => association.EnclosureId == enclosureId))
+            .OrderByDescending(activityEvent => activityEvent.OccurredAt)
+            .ThenByDescending(activityEvent => activityEvent.Id)
             .ToListAsync(cancellationToken);
+
+        return timelineEvents.Select(activityEvent => ToDto(activityEvent, enclosureId)).ToList();
     }
 
     public async Task<EnclosureTimelineEventDto?> GetByIdAsync(
@@ -32,14 +45,26 @@ public class EnclosureTimelineService : IEnclosureTimelineService
         long eventId,
         CancellationToken cancellationToken = default)
     {
-        var timelineEvent = await _dbContext.EnclosureTimelineEvents
+        var timelineEvent = await _dbContext.ActivityEvents
             .AsNoTracking()
-            .Where(timelineEvent => timelineEvent.Id == eventId && timelineEvent.EnclosureId == enclosureId)
+            .Include(activityEvent => activityEvent.Enclosures)
+                .ThenInclude(association => association.Enclosure)
+            .Include(activityEvent => activityEvent.Animals)
+                .ThenInclude(association => association.Animal)
+            .Include(activityEvent => activityEvent.AnimalMovement)
+                .ThenInclude(movement => movement!.FromEnclosure)
+            .Include(activityEvent => activityEvent.AnimalMovement)
+                .ThenInclude(movement => movement!.ToEnclosure)
+            .Include(activityEvent => activityEvent.AnimalFeeding)
+            .Include(activityEvent => activityEvent.AnimalDisposition)
+            .Where(activityEvent =>
+                activityEvent.Id == eventId &&
+                activityEvent.Enclosures.Any(association => association.EnclosureId == enclosureId))
             .SingleOrDefaultAsync(cancellationToken);
 
         return timelineEvent is null
             ? null
-            : ToDto(timelineEvent);
+            : ToDto(timelineEvent, enclosureId);
     }
 
     public async Task<CreateTimelineEventResult> CreateAsync(
@@ -47,6 +72,13 @@ public class EnclosureTimelineService : IEnclosureTimelineService
         CreateEnclosureTimelineEventDto request,
         CancellationToken cancellationToken = default)
     {
+        if (request.EventType is EnclosureTimelineEventType.AnimalMovement
+            or EnclosureTimelineEventType.Feeding
+            or EnclosureTimelineEventType.AnimalDisposition)
+        {
+            return CreateTimelineEventResult.UnsupportedEventType();
+        }
+
         var enclosureExists = await _dbContext.Enclosures
             .AsNoTracking()
             .AnyAsync(enclosure => enclosure.Id == enclosureId, cancellationToken);
@@ -57,25 +89,32 @@ public class EnclosureTimelineService : IEnclosureTimelineService
         }
 
         var now = DateTime.UtcNow;
-        var timelineEvent = new EnclosureTimelineEvent
+        var timelineEvent = new ActivityEvent
         {
-            EnclosureId = enclosureId,
-            EventType = request.EventType!.Value,
+            EventType = ToActivityEventType(request.EventType!.Value),
             OccurredAt = request.OccurredAt!.Value,
             Title = request.Title!,
-            Description = request.Description,
+            Notes = request.Description,
             PerformedBy = request.PerformedBy,
             SourceReferenceId = request.SourceReferenceId,
             SourceType = request.SourceType,
             Metadata = ToJsonDocument(request.Metadata),
             CreatedAt = now,
             UpdatedAt = now,
+            Enclosures =
+            [
+                new ActivityEventEnclosure
+                {
+                    EnclosureId = enclosureId,
+                    RelationshipType = ActivityEventEnclosureRelationshipType.Primary,
+                },
+            ],
         };
 
-        _dbContext.EnclosureTimelineEvents.Add(timelineEvent);
+        _dbContext.ActivityEvents.Add(timelineEvent);
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        return CreateTimelineEventResult.Created(ToDto(timelineEvent));
+        return CreateTimelineEventResult.Created(ToDto(timelineEvent, enclosureId));
     }
 
     public async Task<UpdateTimelineEventResult> UpdateAsync(
@@ -84,9 +123,11 @@ public class EnclosureTimelineService : IEnclosureTimelineService
         UpdateEnclosureTimelineEventDto request,
         CancellationToken cancellationToken = default)
     {
-        var timelineEvent = await _dbContext.EnclosureTimelineEvents
+        var timelineEvent = await _dbContext.ActivityEvents
             .SingleOrDefaultAsync(
-                timelineEvent => timelineEvent.Id == eventId && timelineEvent.EnclosureId == enclosureId,
+                activityEvent =>
+                    activityEvent.Id == eventId &&
+                    activityEvent.Enclosures.Any(association => association.EnclosureId == enclosureId),
                 cancellationToken);
 
         if (timelineEvent is null)
@@ -94,17 +135,27 @@ public class EnclosureTimelineService : IEnclosureTimelineService
             return UpdateTimelineEventResult.NotFound();
         }
 
-        timelineEvent.EventType = request.EventType!.Value;
+        if (timelineEvent.EventType == ActivityEventType.AnimalMovement ||
+            timelineEvent.EventType == ActivityEventType.Feeding ||
+            timelineEvent.EventType == ActivityEventType.AnimalDisposition ||
+            request.EventType is EnclosureTimelineEventType.AnimalMovement
+                or EnclosureTimelineEventType.Feeding
+                or EnclosureTimelineEventType.AnimalDisposition)
+        {
+            return UpdateTimelineEventResult.UnsupportedEventType();
+        }
+
+        timelineEvent.EventType = ToActivityEventType(request.EventType!.Value);
         timelineEvent.OccurredAt = request.OccurredAt!.Value;
         timelineEvent.Title = request.Title!;
-        timelineEvent.Description = request.Description;
+        timelineEvent.Notes = request.Description;
         timelineEvent.PerformedBy = request.PerformedBy;
         timelineEvent.Metadata = ToJsonDocument(request.Metadata);
         timelineEvent.UpdatedAt = DateTime.UtcNow;
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        return UpdateTimelineEventResult.Updated(ToDto(timelineEvent));
+        return UpdateTimelineEventResult.Updated(ToDto(timelineEvent, enclosureId));
     }
 
     public async Task<DeleteTimelineEventResult> DeleteAsync(
@@ -112,9 +163,11 @@ public class EnclosureTimelineService : IEnclosureTimelineService
         long eventId,
         CancellationToken cancellationToken = default)
     {
-        var timelineEvent = await _dbContext.EnclosureTimelineEvents
+        var timelineEvent = await _dbContext.ActivityEvents
             .SingleOrDefaultAsync(
-                timelineEvent => timelineEvent.Id == eventId && timelineEvent.EnclosureId == enclosureId,
+                activityEvent =>
+                    activityEvent.Id == eventId &&
+                    activityEvent.Enclosures.Any(association => association.EnclosureId == enclosureId),
                 cancellationToken);
 
         if (timelineEvent is null)
@@ -122,7 +175,14 @@ public class EnclosureTimelineService : IEnclosureTimelineService
             return DeleteTimelineEventResult.NotFound;
         }
 
-        _dbContext.EnclosureTimelineEvents.Remove(timelineEvent);
+        if (timelineEvent.EventType is ActivityEventType.AnimalMovement
+            or ActivityEventType.Feeding
+            or ActivityEventType.AnimalDisposition)
+        {
+            return DeleteTimelineEventResult.NotFound;
+        }
+
+        _dbContext.ActivityEvents.Remove(timelineEvent);
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return DeleteTimelineEventResult.Deleted;
@@ -135,22 +195,135 @@ public class EnclosureTimelineService : IEnclosureTimelineService
             : null;
     }
 
-    private static EnclosureTimelineEventDto ToDto(EnclosureTimelineEvent timelineEvent)
+    private static EnclosureTimelineEventDto ToDto(ActivityEvent timelineEvent, int enclosureId)
     {
         return new EnclosureTimelineEventDto
         {
             Id = timelineEvent.Id,
-            EnclosureId = timelineEvent.EnclosureId,
-            EventType = timelineEvent.EventType,
+            EnclosureId = enclosureId,
+            EventType = ToEnclosureTimelineEventType(timelineEvent.EventType),
             OccurredAt = timelineEvent.OccurredAt,
-            Title = timelineEvent.Title,
-            Description = timelineEvent.Description,
+            Title = ToTimelineTitle(timelineEvent, enclosureId),
+            Description = timelineEvent.Notes,
             PerformedBy = timelineEvent.PerformedBy,
             SourceReferenceId = timelineEvent.SourceReferenceId,
             SourceType = timelineEvent.SourceType,
             Metadata = timelineEvent.Metadata?.RootElement.Clone(),
             CreatedAt = timelineEvent.CreatedAt,
             UpdatedAt = timelineEvent.UpdatedAt,
+        };
+    }
+
+    private static ActivityEventType ToActivityEventType(EnclosureTimelineEventType eventType)
+    {
+        return eventType switch
+        {
+            EnclosureTimelineEventType.WaterTest => ActivityEventType.WaterTest,
+            EnclosureTimelineEventType.Cleaning => ActivityEventType.Cleaning,
+            EnclosureTimelineEventType.Feeding => ActivityEventType.Feeding,
+            EnclosureTimelineEventType.AnimalMovement => ActivityEventType.AnimalMovement,
+            EnclosureTimelineEventType.AnimalDisposition => ActivityEventType.AnimalDisposition,
+            EnclosureTimelineEventType.Task => ActivityEventType.Task,
+            EnclosureTimelineEventType.Other => ActivityEventType.Other,
+            _ => ActivityEventType.Other,
+        };
+    }
+
+    private static EnclosureTimelineEventType ToEnclosureTimelineEventType(ActivityEventType eventType)
+    {
+        return eventType switch
+        {
+            ActivityEventType.WaterTest => EnclosureTimelineEventType.WaterTest,
+            ActivityEventType.Cleaning => EnclosureTimelineEventType.Cleaning,
+            ActivityEventType.Feeding => EnclosureTimelineEventType.Feeding,
+            ActivityEventType.AnimalMovement => EnclosureTimelineEventType.AnimalMovement,
+            ActivityEventType.AnimalDisposition => EnclosureTimelineEventType.AnimalDisposition,
+            ActivityEventType.Task => EnclosureTimelineEventType.Task,
+            ActivityEventType.Other => EnclosureTimelineEventType.Other,
+            _ => EnclosureTimelineEventType.Other,
+        };
+    }
+
+    private static string ToTimelineTitle(ActivityEvent timelineEvent, int enclosureId)
+    {
+        if (timelineEvent.EventType != ActivityEventType.AnimalMovement ||
+            timelineEvent.AnimalMovement is not { } movement)
+        {
+            return timelineEvent.EventType == ActivityEventType.Feeding &&
+                timelineEvent.AnimalFeeding is { } feeding
+                ? $"{GetAnimalName(timelineEvent)} was fed {FormatFeedingAmount(feeding.Quantity, feeding.Unit, feeding.Food)} - {feeding.Result}"
+                : timelineEvent.EventType == ActivityEventType.AnimalDisposition &&
+                    timelineEvent.AnimalDisposition is { } disposition
+                    ? ToDispositionTitle(GetAnimalName(timelineEvent), disposition.DispositionType)
+                    : timelineEvent.Title;
+        }
+
+        var animalName = GetAnimalName(timelineEvent);
+
+        if (movement.FromEnclosureId == enclosureId)
+        {
+            return $"{animalName} left this enclosure for {movement.ToEnclosure.Name}";
+        }
+
+        if (movement.ToEnclosureId == enclosureId)
+        {
+            return $"{animalName} entered this enclosure from {movement.FromEnclosure.Name}";
+        }
+
+        return timelineEvent.Title;
+    }
+
+    private static string GetAnimalName(ActivityEvent timelineEvent)
+    {
+        return timelineEvent.Animals
+            .OrderBy(association => association.RelationshipType == ActivityEventAnimalRelationshipType.Primary ? 0 : 1)
+            .FirstOrDefault()
+            ?.Animal
+            .Name ?? "Animal";
+    }
+
+    private static string FormatFeedingAmount(decimal quantity, AnimalFeedingQuantityUnit unit, string food)
+    {
+        var formattedQuantity = quantity % 1 == 0
+            ? decimal.Truncate(quantity).ToString("0")
+            : quantity.ToString("0.####");
+
+        return unit == AnimalFeedingQuantityUnit.Item
+            ? $"{formattedQuantity} {food}"
+            : $"{formattedQuantity} {FormatUnit(unit, quantity)} {food}";
+    }
+
+    private static string FormatUnit(AnimalFeedingQuantityUnit unit, decimal quantity)
+    {
+        var label = unit switch
+        {
+            AnimalFeedingQuantityUnit.Gram => "gram",
+            AnimalFeedingQuantityUnit.Kilogram => "kilogram",
+            AnimalFeedingQuantityUnit.Ounce => "ounce",
+            AnimalFeedingQuantityUnit.Pound => "pound",
+            AnimalFeedingQuantityUnit.Milliliter => "milliliter",
+            AnimalFeedingQuantityUnit.Liter => "liter",
+            AnimalFeedingQuantityUnit.Teaspoon => "teaspoon",
+            AnimalFeedingQuantityUnit.Tablespoon => "tablespoon",
+            AnimalFeedingQuantityUnit.Cup => "cup",
+            AnimalFeedingQuantityUnit.Other => "unit",
+            _ => "item",
+        };
+
+        return quantity == 1 ? label : $"{label}s";
+    }
+
+    private static string ToDispositionTitle(string animalName, AnimalDispositionType dispositionType)
+    {
+        return dispositionType switch
+        {
+            AnimalDispositionType.Sold => $"{animalName} left active care - Sold",
+            AnimalDispositionType.Surrendered => $"{animalName} left active care - Surrendered",
+            AnimalDispositionType.Transferred => $"{animalName} was transferred out",
+            AnimalDispositionType.Released => $"{animalName} was released",
+            AnimalDispositionType.Deceased => $"{animalName} marked deceased",
+            AnimalDispositionType.Other => $"{animalName} left active care",
+            _ => $"{animalName} left active care",
         };
     }
 }

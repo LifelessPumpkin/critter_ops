@@ -6,6 +6,7 @@ public enum UpdateTimelineEventResultStatus
 {
     Updated,
     NotFound,
+    UnsupportedEventType,
 }
 
 public class UpdateTimelineEventResult
@@ -28,6 +29,14 @@ public class UpdateTimelineEventResult
         return new UpdateTimelineEventResult
         {
             Status = UpdateTimelineEventResultStatus.NotFound,
+        };
+    }
+
+    public static UpdateTimelineEventResult UnsupportedEventType()
+    {
+        return new UpdateTimelineEventResult
+        {
+            Status = UpdateTimelineEventResultStatus.UnsupportedEventType,
         };
     }
 }

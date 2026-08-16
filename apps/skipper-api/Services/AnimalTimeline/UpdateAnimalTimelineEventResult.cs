@@ -7,6 +7,7 @@ public enum UpdateAnimalTimelineEventResultStatus
     Updated,
     NotFound,
     EnclosureNotFound,
+    UnsupportedEventType,
 }
 
 public class UpdateAnimalTimelineEventResult
@@ -37,6 +38,14 @@ public class UpdateAnimalTimelineEventResult
         return new UpdateAnimalTimelineEventResult
         {
             Status = UpdateAnimalTimelineEventResultStatus.EnclosureNotFound,
+        };
+    }
+
+    public static UpdateAnimalTimelineEventResult UnsupportedEventType()
+    {
+        return new UpdateAnimalTimelineEventResult
+        {
+            Status = UpdateAnimalTimelineEventResultStatus.UnsupportedEventType,
         };
     }
 }

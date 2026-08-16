@@ -2,6 +2,9 @@ using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
 using skipper_api.Data;
 using skipper_api.Services.Animals;
+using skipper_api.Services.AnimalDispositions;
+using skipper_api.Services.AnimalFeedings;
+using skipper_api.Services.AnimalMovements;
 using skipper_api.Services.AnimalTimeline;
 using skipper_api.Services.Enclosures;
 using skipper_api.Services.EnclosureTimeline;
@@ -44,6 +47,9 @@ builder.Services.AddDbContext<ProfessorDbContext>(options =>
 
 builder.Services.AddScoped<IEnclosureService, EnclosureService>();
 builder.Services.AddScoped<IAnimalService, AnimalService>();
+builder.Services.AddScoped<IAnimalDispositionActivityService, AnimalDispositionActivityService>();
+builder.Services.AddScoped<IAnimalFeedingActivityService, AnimalFeedingActivityService>();
+builder.Services.AddScoped<IAnimalMovementActivityService, AnimalMovementActivityService>();
 builder.Services.AddScoped<IAnimalTimelineService, AnimalTimelineService>();
 builder.Services.AddScoped<IEnclosureTimelineService, EnclosureTimelineService>();
 

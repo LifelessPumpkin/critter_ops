@@ -1,31 +1,17 @@
 using System.Text.Json;
-using skipper_api.Domain.Animals;
-using skipper_api.Domain.Enclosures;
 
-namespace skipper_api.Domain.AnimalTimeline;
+namespace skipper_api.Domain.Activity;
 
 /// <summary>
-/// Historical activity associated with an animal.
+/// Authoritative historical ledger entry for one real-world CritterOps activity.
 /// </summary>
-public class AnimalTimelineEvent
+public class ActivityEvent
 {
     /// <summary>Primary key.</summary>
     public long Id { get; set; }
 
-    /// <summary>Required animal foreign key.</summary>
-    public int AnimalId { get; set; }
-
-    /// <summary>Animal this event belongs to.</summary>
-    public Animal Animal { get; set; } = null!;
-
-    /// <summary>Required enclosure context for the event at the time it occurred.</summary>
-    public int EnclosureId { get; set; }
-
-    /// <summary>Enclosure associated with this event.</summary>
-    public Enclosure Enclosure { get; set; } = null!;
-
-    /// <summary>Kind of timeline event.</summary>
-    public required AnimalTimelineEventType EventType { get; set; }
+    /// <summary>Broad category of activity.</summary>
+    public required ActivityEventType EventType { get; set; }
 
     /// <summary>UTC timestamp when the activity actually occurred.</summary>
     public required DateTime OccurredAt { get; set; }
@@ -34,7 +20,7 @@ public class AnimalTimelineEvent
     public required string Title { get; set; }
 
     /// <summary>Additional notes or context.</summary>
-    public string? Description { get; set; }
+    public string? Notes { get; set; }
 
     /// <summary>Human-readable actor name until user accounts are introduced.</summary>
     public string? PerformedBy { get; set; }
@@ -53,4 +39,19 @@ public class AnimalTimelineEvent
 
     /// <summary>UTC timestamp when this record was last modified.</summary>
     public required DateTime UpdatedAt { get; set; }
+
+    /// <summary>Animals associated with this event.</summary>
+    public ICollection<ActivityEventAnimal> Animals { get; set; } = [];
+
+    /// <summary>Enclosures associated with this event.</summary>
+    public ICollection<ActivityEventEnclosure> Enclosures { get; set; } = [];
+
+    /// <summary>Structured animal movement detail, when this event is an animal movement.</summary>
+    public AnimalMovementActivity? AnimalMovement { get; set; }
+
+    /// <summary>Structured animal feeding detail, when this event is a feeding.</summary>
+    public AnimalFeedingActivity? AnimalFeeding { get; set; }
+
+    /// <summary>Structured animal disposition detail, when this event is a disposition.</summary>
+    public AnimalDispositionActivity? AnimalDisposition { get; set; }
 }

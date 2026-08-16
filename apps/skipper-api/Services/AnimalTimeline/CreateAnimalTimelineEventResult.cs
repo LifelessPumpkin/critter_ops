@@ -7,6 +7,7 @@ public enum CreateAnimalTimelineEventResultStatus
     Created,
     AnimalNotFound,
     EnclosureNotFound,
+    UnsupportedEventType,
 }
 
 public class CreateAnimalTimelineEventResult
@@ -37,6 +38,14 @@ public class CreateAnimalTimelineEventResult
         return new CreateAnimalTimelineEventResult
         {
             Status = CreateAnimalTimelineEventResultStatus.EnclosureNotFound,
+        };
+    }
+
+    public static CreateAnimalTimelineEventResult UnsupportedEventType()
+    {
+        return new CreateAnimalTimelineEventResult
+        {
+            Status = CreateAnimalTimelineEventResultStatus.UnsupportedEventType,
         };
     }
 }

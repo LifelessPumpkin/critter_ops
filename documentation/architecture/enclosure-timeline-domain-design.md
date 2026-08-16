@@ -2,17 +2,17 @@
 
 ## Purpose
 
-The Enclosure Timeline records historical events associated with an enclosure.
+The Enclosure Timeline returns historical events associated with an enclosure.
 
 It provides a shared operational history for activities such as water tests, cleanings, feedings, and tasks without adding many specialized columns to the Enclosure entity.
 
-The design goal is to create a flexible timeline foundation that supports current enclosure operations while allowing new event types to be added later.
+The design goal is to create a flexible timeline foundation that supports current enclosure operations while allowing new event types to be added later. Enclosure timeline API routes remain enclosure-scoped, but the underlying source of truth is the shared Activity Ledger described in `activity-ledger-domain-design.md`.
 
 ## Design Philosophy
 
-Timeline events are modeled as first-class records with strongly typed common fields and flexible metadata for event-specific values.
+Timeline events are modeled as shared activity records with strongly typed common fields and flexible metadata for event-specific values.
 
-Common timeline information is stored relationally.
+Common timeline information is stored on `ActivityEvent`.
 
 Event-specific details are stored in a PostgreSQL `jsonb` metadata field.
 
@@ -23,17 +23,17 @@ This avoids two problems:
 
 The timeline should describe what happened, when it happened, who performed it, and any contextual details needed for display or reporting.
 
-## Core Timeline Event Entity
+## Core Timeline Event View
 
-Every timeline event belongs to exactly one enclosure.
+Every enclosure timeline response is projected from one `ActivityEvent` related through `ActivityEventEnclosures`.
 
 Field Purpose
-Id Bigint identity primary key
-EnclosureId Required foreign key to Enclosures.Id
+Id Shared ActivityEvents bigint identity primary key
+EnclosureId Requested enclosure related through ActivityEventEnclosures
 EventType Type of timeline event
 OccurredAt When the activity actually occurred
 Title Short human-readable description
-Description Optional notes or context
+Description Optional notes or context projected from ActivityEvent.Notes
 PerformedBy Optional human-readable actor name
 SourceReferenceId Optional reference to an originating source record
 SourceType Optional source entity type name
@@ -41,26 +41,24 @@ Metadata Optional event-specific JSON values
 CreatedAt Record creation timestamp
 UpdatedAt Last modification timestamp
 
-Timeline event identifiers use an incremental `bigint` value. This keeps event URLs compact while leaving room for a large number of future events.
+Timeline event identifiers use the shared `ActivityEvents.Id` incremental `bigint` value. This keeps event URLs compact while leaving room for a large number of future events.
 
 The current Enclosure primary key is an integer, so `EnclosureId` uses the existing integer key to preserve a real foreign key relationship.
 
 ## Enclosure Relationship
 
-Every timeline event belongs to one enclosure.
+Every enclosure timeline event must be associated with the requested enclosure.
 
 Relationship:
 
 Enclosure (1)
         │
         │
-        └───────────< EnclosureTimelineEvent (Many)
+        └───────────< ActivityEventEnclosure >──────── ActivityEvent
 
-An enclosure may have many timeline events.
+An enclosure may have many activity events.
 
-A timeline event may not exist without an enclosure.
-
-Deleting an enclosure is restricted while timeline events exist. This protects operational history from being removed accidentally.
+Deleting an enclosure is restricted while activity event associations exist. This protects operational history from being removed accidentally.
 
 ## Event Types
 
@@ -71,12 +69,20 @@ Initial values include:
 * WaterTest
 * Cleaning
 * Feeding
+* AnimalMovement
+* AnimalDisposition
 * Task
 * Other
 
 The Other value exists for events that do not yet have a dedicated type.
 
 Future event types can be added without changing the common timeline shape.
+
+Animal movement events are created through `POST /api/animals/{animalId}/movements`, not the generic timeline endpoint. They appear in both source and destination enclosure timelines with wording based on the requested enclosure.
+
+Animal feeding events are created through `POST /api/animals/{animalId}/feedings`, not the generic timeline endpoint. They appear in the associated enclosure timeline with structured food, quantity, result, and animal context projected from the shared ledger.
+
+Animal disposition events are created through `POST /api/animals/{animalId}/dispositions`, not the generic timeline endpoint. They appear in the associated enclosure timeline as the animal leaving active care or reaching end of life.
 
 ## Metadata
 
