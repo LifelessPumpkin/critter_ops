@@ -10,6 +10,8 @@ public enum EnclosureTimelineEventType
     Feeding,
     AnimalMovement,
     AnimalDisposition,
+    Medication,
+    Treatment,
     Task,
     Other,
 }

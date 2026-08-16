@@ -30,6 +30,10 @@ public class ProfessorDbContext : DbContext
 
     public DbSet<AnimalDispositionActivity> AnimalDispositionActivities => Set<AnimalDispositionActivity>();
 
+    public DbSet<AnimalMedicationActivity> AnimalMedicationActivities => Set<AnimalMedicationActivity>();
+
+    public DbSet<AnimalTreatmentActivity> AnimalTreatmentActivities => Set<AnimalTreatmentActivity>();
+
     public DbSet<Enclosure> Enclosures => Set<Enclosure>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

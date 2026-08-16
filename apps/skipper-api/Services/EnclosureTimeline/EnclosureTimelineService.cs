@@ -32,6 +32,8 @@ public class EnclosureTimelineService : IEnclosureTimelineService
                 .ThenInclude(movement => movement!.ToEnclosure)
             .Include(activityEvent => activityEvent.AnimalFeeding)
             .Include(activityEvent => activityEvent.AnimalDisposition)
+            .Include(activityEvent => activityEvent.AnimalMedication)
+            .Include(activityEvent => activityEvent.AnimalTreatment)
             .Where(activityEvent => activityEvent.Enclosures.Any(association => association.EnclosureId == enclosureId))
             .OrderByDescending(activityEvent => activityEvent.OccurredAt)
             .ThenByDescending(activityEvent => activityEvent.Id)
@@ -57,6 +59,8 @@ public class EnclosureTimelineService : IEnclosureTimelineService
                 .ThenInclude(movement => movement!.ToEnclosure)
             .Include(activityEvent => activityEvent.AnimalFeeding)
             .Include(activityEvent => activityEvent.AnimalDisposition)
+            .Include(activityEvent => activityEvent.AnimalMedication)
+            .Include(activityEvent => activityEvent.AnimalTreatment)
             .Where(activityEvent =>
                 activityEvent.Id == eventId &&
                 activityEvent.Enclosures.Any(association => association.EnclosureId == enclosureId))
@@ -74,7 +78,9 @@ public class EnclosureTimelineService : IEnclosureTimelineService
     {
         if (request.EventType is EnclosureTimelineEventType.AnimalMovement
             or EnclosureTimelineEventType.Feeding
-            or EnclosureTimelineEventType.AnimalDisposition)
+            or EnclosureTimelineEventType.AnimalDisposition
+            or EnclosureTimelineEventType.Medication
+            or EnclosureTimelineEventType.Treatment)
         {
             return CreateTimelineEventResult.UnsupportedEventType();
         }
@@ -138,9 +144,13 @@ public class EnclosureTimelineService : IEnclosureTimelineService
         if (timelineEvent.EventType == ActivityEventType.AnimalMovement ||
             timelineEvent.EventType == ActivityEventType.Feeding ||
             timelineEvent.EventType == ActivityEventType.AnimalDisposition ||
+            timelineEvent.EventType == ActivityEventType.Medication ||
+            timelineEvent.EventType == ActivityEventType.Treatment ||
             request.EventType is EnclosureTimelineEventType.AnimalMovement
                 or EnclosureTimelineEventType.Feeding
-                or EnclosureTimelineEventType.AnimalDisposition)
+                or EnclosureTimelineEventType.AnimalDisposition
+                or EnclosureTimelineEventType.Medication
+                or EnclosureTimelineEventType.Treatment)
         {
             return UpdateTimelineEventResult.UnsupportedEventType();
         }
@@ -177,7 +187,9 @@ public class EnclosureTimelineService : IEnclosureTimelineService
 
         if (timelineEvent.EventType is ActivityEventType.AnimalMovement
             or ActivityEventType.Feeding
-            or ActivityEventType.AnimalDisposition)
+            or ActivityEventType.AnimalDisposition
+            or ActivityEventType.Medication
+            or ActivityEventType.Treatment)
         {
             return DeleteTimelineEventResult.NotFound;
         }
@@ -223,6 +235,8 @@ public class EnclosureTimelineService : IEnclosureTimelineService
             EnclosureTimelineEventType.Feeding => ActivityEventType.Feeding,
             EnclosureTimelineEventType.AnimalMovement => ActivityEventType.AnimalMovement,
             EnclosureTimelineEventType.AnimalDisposition => ActivityEventType.AnimalDisposition,
+            EnclosureTimelineEventType.Medication => ActivityEventType.Medication,
+            EnclosureTimelineEventType.Treatment => ActivityEventType.Treatment,
             EnclosureTimelineEventType.Task => ActivityEventType.Task,
             EnclosureTimelineEventType.Other => ActivityEventType.Other,
             _ => ActivityEventType.Other,
@@ -238,6 +252,8 @@ public class EnclosureTimelineService : IEnclosureTimelineService
             ActivityEventType.Feeding => EnclosureTimelineEventType.Feeding,
             ActivityEventType.AnimalMovement => EnclosureTimelineEventType.AnimalMovement,
             ActivityEventType.AnimalDisposition => EnclosureTimelineEventType.AnimalDisposition,
+            ActivityEventType.Medication => EnclosureTimelineEventType.Medication,
+            ActivityEventType.Treatment => EnclosureTimelineEventType.Treatment,
             ActivityEventType.Task => EnclosureTimelineEventType.Task,
             ActivityEventType.Other => EnclosureTimelineEventType.Other,
             _ => EnclosureTimelineEventType.Other,
@@ -255,7 +271,9 @@ public class EnclosureTimelineService : IEnclosureTimelineService
                 : timelineEvent.EventType == ActivityEventType.AnimalDisposition &&
                     timelineEvent.AnimalDisposition is { } disposition
                     ? ToDispositionTitle(GetAnimalName(timelineEvent), disposition.DispositionType)
-                    : timelineEvent.Title;
+                    : timelineEvent.EventType is ActivityEventType.Medication or ActivityEventType.Treatment
+                        ? $"{GetAnimalName(timelineEvent)} received medical treatment"
+                        : timelineEvent.Title;
         }
 
         var animalName = GetAnimalName(timelineEvent);

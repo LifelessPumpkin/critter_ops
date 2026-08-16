@@ -147,3 +147,49 @@ Disposition endpoints:
 * `DELETE /api/animals/{animalId}/dispositions/{activityId}`
 
 Disposition `PUT` updates descriptive fields and keeps animal status/disposition fields synchronized. Disposition `DELETE` is limited to the latest disposition whose status still matches the animal's current state; it restores the animal to `Active`.
+
+## Animal Medical Activity
+
+Medical activity is represented by structured medication and treatment details on top of the shared ledger.
+
+`AnimalMedicationActivity` has a one-to-one relationship with `ActivityEvent` and uses `ActivityEventId` as its primary key.
+
+Field Purpose
+ActivityEventId Shared activity event ID
+MedicationName Required bounded medication name
+Dose Decimal amount administered or attempted
+DoseUnit Required bounded dose unit, including values such as mL, mg, or mg/kg
+Route Strongly typed administration route
+Result Optional strongly typed administration result
+
+Medication routes are stored as strings and currently include `Oral`, `Injectable`, `Subcutaneous`, `Intramuscular`, `Intravenous`, `Topical`, `Ophthalmic`, `Otic`, `Inhaled`, and `Other`.
+
+Medication results are stored as strings and currently include `Administered`, `PartiallyAdministered`, `Refused`, `Vomited`, `AdverseReaction`, and `Other`.
+
+`AnimalTreatmentActivity` has a one-to-one relationship with `ActivityEvent` and uses `ActivityEventId` as its primary key.
+
+Field Purpose
+ActivityEventId Shared activity event ID
+TreatmentType Optional bounded treatment category
+TreatmentName Required bounded treatment or procedure description
+Result Optional strongly typed treatment result
+
+Treatment results are stored as strings and currently include `Completed`, `PartiallyCompleted`, `NotCompleted`, `NotObserved`, and `Other`.
+
+Medical activity creation writes one `ActivityEvent`, one primary animal association, one primary enclosure association using the animal's current enclosure, and one medical detail row.
+
+Medication endpoints:
+
+* `POST /api/animals/{animalId}/medications`
+* `GET /api/animals/{animalId}/medications`
+* `GET /api/animals/{animalId}/medications/{activityId}`
+* `PUT /api/animals/{animalId}/medications/{activityId}`
+* `DELETE /api/animals/{animalId}/medications/{activityId}`
+
+Treatment endpoints:
+
+* `POST /api/animals/{animalId}/treatments`
+* `GET /api/animals/{animalId}/treatments`
+* `GET /api/animals/{animalId}/treatments/{activityId}`
+* `PUT /api/animals/{animalId}/treatments/{activityId}`
+* `DELETE /api/animals/{animalId}/treatments/{activityId}`

@@ -54,4 +54,10 @@ public class ActivityEvent
 
     /// <summary>Structured animal disposition detail, when this event is a disposition.</summary>
     public AnimalDispositionActivity? AnimalDisposition { get; set; }
+
+    /// <summary>Structured animal medication detail, when this event is medication administration.</summary>
+    public AnimalMedicationActivity? AnimalMedication { get; set; }
+
+    /// <summary>Structured animal treatment detail, when this event is treatment or procedure.</summary>
+    public AnimalTreatmentActivity? AnimalTreatment { get; set; }
 }

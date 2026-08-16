@@ -71,6 +71,8 @@ Initial values include:
 * Feeding
 * AnimalMovement
 * AnimalDisposition
+* Medication
+* Treatment
 * Task
 * Other
 
@@ -83,6 +85,8 @@ Animal movement events are created through `POST /api/animals/{animalId}/movemen
 Animal feeding events are created through `POST /api/animals/{animalId}/feedings`, not the generic timeline endpoint. They appear in the associated enclosure timeline with structured food, quantity, result, and animal context projected from the shared ledger.
 
 Animal disposition events are created through `POST /api/animals/{animalId}/dispositions`, not the generic timeline endpoint. They appear in the associated enclosure timeline as the animal leaving active care or reaching end of life.
+
+Medication and treatment events are created through `POST /api/animals/{animalId}/medications` and `POST /api/animals/{animalId}/treatments`, not the generic timeline endpoint. They appear in enclosure timelines as high-level medical activity for the animal while preserving detailed medical fields in the dedicated animal medical APIs.
 
 ## Metadata
 

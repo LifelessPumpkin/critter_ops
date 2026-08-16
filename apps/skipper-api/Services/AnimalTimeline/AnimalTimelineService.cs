@@ -41,6 +41,8 @@ public class AnimalTimelineService : IAnimalTimelineService
                 .ThenInclude(movement => movement!.ToEnclosure)
             .Include(activityEvent => activityEvent.AnimalFeeding)
             .Include(activityEvent => activityEvent.AnimalDisposition)
+            .Include(activityEvent => activityEvent.AnimalMedication)
+            .Include(activityEvent => activityEvent.AnimalTreatment)
             .Where(activityEvent => activityEvent.Animals.Any(association => association.AnimalId == animalId))
             .OrderByDescending(activityEvent => activityEvent.OccurredAt)
             .ThenByDescending(activityEvent => activityEvent.Id)
@@ -66,6 +68,8 @@ public class AnimalTimelineService : IAnimalTimelineService
                 .ThenInclude(movement => movement!.ToEnclosure)
             .Include(activityEvent => activityEvent.AnimalFeeding)
             .Include(activityEvent => activityEvent.AnimalDisposition)
+            .Include(activityEvent => activityEvent.AnimalMedication)
+            .Include(activityEvent => activityEvent.AnimalTreatment)
             .Where(activityEvent =>
                 activityEvent.Id == eventId &&
                 activityEvent.Animals.Any(association => association.AnimalId == animalId))
@@ -83,7 +87,9 @@ public class AnimalTimelineService : IAnimalTimelineService
     {
         if (request.EventType is AnimalTimelineEventType.AnimalMovement
             or AnimalTimelineEventType.Feeding
-            or AnimalTimelineEventType.AnimalDisposition)
+            or AnimalTimelineEventType.AnimalDisposition
+            or AnimalTimelineEventType.Medication
+            or AnimalTimelineEventType.Treatment)
         {
             return CreateAnimalTimelineEventResult.UnsupportedEventType();
         }
@@ -173,9 +179,13 @@ public class AnimalTimelineService : IAnimalTimelineService
         if (timelineEvent.EventType == ActivityEventType.AnimalMovement ||
             timelineEvent.EventType == ActivityEventType.Feeding ||
             timelineEvent.EventType == ActivityEventType.AnimalDisposition ||
+            timelineEvent.EventType == ActivityEventType.Medication ||
+            timelineEvent.EventType == ActivityEventType.Treatment ||
             request.EventType is AnimalTimelineEventType.AnimalMovement
                 or AnimalTimelineEventType.Feeding
-                or AnimalTimelineEventType.AnimalDisposition)
+                or AnimalTimelineEventType.AnimalDisposition
+                or AnimalTimelineEventType.Medication
+                or AnimalTimelineEventType.Treatment)
         {
             return UpdateAnimalTimelineEventResult.UnsupportedEventType();
         }
@@ -241,7 +251,9 @@ public class AnimalTimelineService : IAnimalTimelineService
 
         if (timelineEvent.EventType is ActivityEventType.AnimalMovement
             or ActivityEventType.Feeding
-            or ActivityEventType.AnimalDisposition)
+            or ActivityEventType.AnimalDisposition
+            or ActivityEventType.Medication
+            or ActivityEventType.Treatment)
         {
             return DeleteAnimalTimelineEventResult.NotFound;
         }
@@ -308,6 +320,7 @@ public class AnimalTimelineService : IAnimalTimelineService
             AnimalTimelineEventType.Feeding => ActivityEventType.Feeding,
             AnimalTimelineEventType.AnimalMovement => ActivityEventType.AnimalMovement,
             AnimalTimelineEventType.AnimalDisposition => ActivityEventType.AnimalDisposition,
+            AnimalTimelineEventType.Medication => ActivityEventType.Medication,
             AnimalTimelineEventType.Treatment => ActivityEventType.Treatment,
             AnimalTimelineEventType.Note => ActivityEventType.Note,
             AnimalTimelineEventType.Task => ActivityEventType.Task,
@@ -323,6 +336,7 @@ public class AnimalTimelineService : IAnimalTimelineService
             ActivityEventType.Feeding => AnimalTimelineEventType.Feeding,
             ActivityEventType.AnimalMovement => AnimalTimelineEventType.AnimalMovement,
             ActivityEventType.AnimalDisposition => AnimalTimelineEventType.AnimalDisposition,
+            ActivityEventType.Medication => AnimalTimelineEventType.Medication,
             ActivityEventType.Treatment => AnimalTimelineEventType.Treatment,
             ActivityEventType.Note => AnimalTimelineEventType.Note,
             ActivityEventType.Task => AnimalTimelineEventType.Task,
@@ -342,7 +356,13 @@ public class AnimalTimelineService : IAnimalTimelineService
                 : timelineEvent.EventType == ActivityEventType.AnimalDisposition &&
                     timelineEvent.AnimalDisposition is { } disposition
                     ? ToDispositionTitle(disposition.DispositionType, disposition.RecipientOrDestination)
-                    : timelineEvent.Title;
+                    : timelineEvent.EventType == ActivityEventType.Medication &&
+                        timelineEvent.AnimalMedication is { } medication
+                        ? ToMedicationTitle(medication)
+                        : timelineEvent.EventType == ActivityEventType.Treatment &&
+                            timelineEvent.AnimalTreatment is { } treatment
+                            ? treatment.TreatmentName
+                            : timelineEvent.Title;
     }
 
     private static string FormatFeedingAmount(decimal quantity, AnimalFeedingQuantityUnit unit, string food)
@@ -393,6 +413,28 @@ public class AnimalTimelineService : IAnimalTimelineService
             AnimalDispositionType.Other when !string.IsNullOrWhiteSpace(recipientOrDestination) =>
                 $"Disposition recorded for {recipientOrDestination}",
             _ => dispositionType.ToString(),
+        };
+    }
+
+    private static string ToMedicationTitle(AnimalMedicationActivity medication)
+    {
+        var formattedDose = medication.Dose % 1 == 0
+            ? decimal.Truncate(medication.Dose).ToString("0")
+            : medication.Dose.ToString("0.####");
+
+        return $"{medication.MedicationName} administered - {formattedDose} {medication.DoseUnit} {FormatRoute(medication.Route)}";
+    }
+
+    private static string FormatRoute(AnimalMedicationRoute route)
+    {
+        return route switch
+        {
+            AnimalMedicationRoute.Oral => "orally",
+            AnimalMedicationRoute.Topical => "topically",
+            AnimalMedicationRoute.Ophthalmic => "ophthalmic",
+            AnimalMedicationRoute.Otic => "otic",
+            AnimalMedicationRoute.Inhaled => "inhaled",
+            _ => route.ToString(),
         };
     }
 }
