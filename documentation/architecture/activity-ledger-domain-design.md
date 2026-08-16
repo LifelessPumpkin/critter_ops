@@ -55,6 +55,25 @@ This allows one movement event to relate to one animal and multiple enclosures w
 
 Both timeline views remain chronologically ordered by `OccurredAt` descending, then event ID descending for deterministic ordering.
 
+## Global Activity Search
+
+`GET /api/activity` provides a read-only search view over the shared activity ledger.
+
+It supports optional filters that combine with AND semantics:
+
+* `eventType`
+* `animalId`
+* `enclosureId`
+* `performedBy`
+* `from`
+* `to`
+* `page`
+* `pageSize`
+
+Animal and enclosure filters use `ActivityEventAnimals` and `ActivityEventEnclosures`, so all associated activity types can be searched consistently. Movement events associated with source and destination enclosures appear when either enclosure is searched, without duplicating the activity row.
+
+Results are ordered by `OccurredAt` descending, then activity ID descending. The response includes pagination metadata, animal and enclosure association names and relationship types, common activity fields, optional metadata, and structured detail sections for supported activity types.
+
 ## Specialized Details
 
 The ledger intentionally does not model every future event detail directly on `ActivityEvent`.
