@@ -8,6 +8,7 @@ using skipper_api.Services.AnimalMedications;
 using skipper_api.Services.AnimalMovements;
 using skipper_api.Services.AnimalTimeline;
 using skipper_api.Services.AnimalTreatments;
+using skipper_api.Services.EnclosureCleanings;
 using skipper_api.Services.Enclosures;
 using skipper_api.Services.EnclosureTimeline;
 
@@ -55,6 +56,7 @@ builder.Services.AddScoped<IAnimalMedicationActivityService, AnimalMedicationAct
 builder.Services.AddScoped<IAnimalMovementActivityService, AnimalMovementActivityService>();
 builder.Services.AddScoped<IAnimalTimelineService, AnimalTimelineService>();
 builder.Services.AddScoped<IAnimalTreatmentActivityService, AnimalTreatmentActivityService>();
+builder.Services.AddScoped<IEnclosureCleaningActivityService, EnclosureCleaningActivityService>();
 builder.Services.AddScoped<IEnclosureTimelineService, EnclosureTimelineService>();
 
 // Health checks — DB check is tagged "db" so it can be filtered independently

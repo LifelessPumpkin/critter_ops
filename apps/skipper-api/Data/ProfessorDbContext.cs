@@ -34,6 +34,8 @@ public class ProfessorDbContext : DbContext
 
     public DbSet<AnimalTreatmentActivity> AnimalTreatmentActivities => Set<AnimalTreatmentActivity>();
 
+    public DbSet<EnclosureCleaningActivity> EnclosureCleaningActivities => Set<EnclosureCleaningActivity>();
+
     public DbSet<Enclosure> Enclosures => Set<Enclosure>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

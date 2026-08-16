@@ -88,6 +88,8 @@ Animal disposition events are created through `POST /api/animals/{animalId}/disp
 
 Medication and treatment events are created through `POST /api/animals/{animalId}/medications` and `POST /api/animals/{animalId}/treatments`, not the generic timeline endpoint. They appear in enclosure timelines as high-level medical activity for the animal while preserving detailed medical fields in the dedicated animal medical APIs.
 
+Enclosure cleaning events are created through `POST /api/enclosures/{enclosureId}/cleanings`, not the generic timeline endpoint. They appear in enclosure timelines with structured cleaning titles such as `Full cleaning completed`, `25% water change completed`, or `Deep cleaning completed - substrate replaced`.
+
 ## Metadata
 
 Metadata stores event-specific values as PostgreSQL `jsonb`.
@@ -107,17 +109,6 @@ Water Test
   "nitrate": 10,
   "salinity": null,
   "unitSystem": "Imperial"
-}
-```
-
-Cleaning
-
-```json
-{
-  "cleaningType": "Partial",
-  "waterChangePercent": 25,
-  "substrateChanged": false,
-  "equipmentCleaned": ["Filter", "Glass"]
 }
 ```
 
@@ -179,6 +170,8 @@ The request may set:
 * Source reference
 * Source type
 * Metadata
+
+Structured event types such as animal movement, animal feeding, animal disposition, medication, treatment, and enclosure cleaning are blocked from the generic timeline create/update/delete operations. Those categories use dedicated endpoints so required detail rows cannot be skipped.
 
 The server sets:
 

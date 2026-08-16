@@ -60,4 +60,7 @@ public class ActivityEvent
 
     /// <summary>Structured animal treatment detail, when this event is treatment or procedure.</summary>
     public AnimalTreatmentActivity? AnimalTreatment { get; set; }
+
+    /// <summary>Structured enclosure cleaning detail, when this event is cleaning.</summary>
+    public EnclosureCleaningActivity? EnclosureCleaning { get; set; }
 }

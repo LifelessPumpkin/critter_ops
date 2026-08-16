@@ -193,3 +193,30 @@ Treatment endpoints:
 * `GET /api/animals/{animalId}/treatments/{activityId}`
 * `PUT /api/animals/{animalId}/treatments/{activityId}`
 * `DELETE /api/animals/{animalId}/treatments/{activityId}`
+
+## Enclosure Cleaning
+
+Enclosure cleaning is a structured husbandry activity implemented on top of the shared ledger.
+
+`EnclosureCleaningActivity` has a one-to-one relationship with `ActivityEvent` and uses `ActivityEventId` as its primary key.
+
+Field Purpose
+ActivityEventId Shared activity event ID
+CleaningType Strongly typed cleaning category
+WaterChangePercent Optional water change percentage from 0 through 100
+SubstrateChanged Whether substrate was replaced
+EquipmentCleaned Optional bounded equipment description
+
+Cleaning types are stored as strings and currently include `SpotClean`, `PartialClean`, `FullClean`, `DeepClean`, `Disinfection`, `WaterChange`, `SubstrateChange`, and `Other`.
+
+Cleaning creation writes one `ActivityEvent` with `EventType = Cleaning`, one primary enclosure association, and one `EnclosureCleaningActivity` detail row. Cleaning events do not create animal associations.
+
+Cleaning endpoints:
+
+* `POST /api/enclosures/{enclosureId}/cleanings`
+* `GET /api/enclosures/{enclosureId}/cleanings`
+* `GET /api/enclosures/{enclosureId}/cleanings/{activityId}`
+* `PUT /api/enclosures/{enclosureId}/cleanings/{activityId}`
+* `DELETE /api/enclosures/{enclosureId}/cleanings/{activityId}`
+
+Cleaning `PUT` updates descriptive and structured cleaning fields: `OccurredAt`, `PerformedBy`, `CleaningType`, `WaterChangePercent`, `SubstrateChanged`, `EquipmentCleaned`, and `Notes`. The generic enclosure timeline endpoint can display cleaning events but does not create, update, or delete structured cleaning events.

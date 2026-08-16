@@ -4,6 +4,7 @@ using skipper_api.Data;
 using skipper_api.Domain.Activity;
 using skipper_api.Domain.EnclosureTimeline;
 using skipper_api.Dtos.EnclosureTimeline;
+using skipper_api.Services.EnclosureCleanings;
 
 namespace skipper_api.Services.EnclosureTimeline;
 
@@ -34,6 +35,7 @@ public class EnclosureTimelineService : IEnclosureTimelineService
             .Include(activityEvent => activityEvent.AnimalDisposition)
             .Include(activityEvent => activityEvent.AnimalMedication)
             .Include(activityEvent => activityEvent.AnimalTreatment)
+            .Include(activityEvent => activityEvent.EnclosureCleaning)
             .Where(activityEvent => activityEvent.Enclosures.Any(association => association.EnclosureId == enclosureId))
             .OrderByDescending(activityEvent => activityEvent.OccurredAt)
             .ThenByDescending(activityEvent => activityEvent.Id)
@@ -61,6 +63,7 @@ public class EnclosureTimelineService : IEnclosureTimelineService
             .Include(activityEvent => activityEvent.AnimalDisposition)
             .Include(activityEvent => activityEvent.AnimalMedication)
             .Include(activityEvent => activityEvent.AnimalTreatment)
+            .Include(activityEvent => activityEvent.EnclosureCleaning)
             .Where(activityEvent =>
                 activityEvent.Id == eventId &&
                 activityEvent.Enclosures.Any(association => association.EnclosureId == enclosureId))
@@ -80,7 +83,8 @@ public class EnclosureTimelineService : IEnclosureTimelineService
             or EnclosureTimelineEventType.Feeding
             or EnclosureTimelineEventType.AnimalDisposition
             or EnclosureTimelineEventType.Medication
-            or EnclosureTimelineEventType.Treatment)
+            or EnclosureTimelineEventType.Treatment
+            or EnclosureTimelineEventType.Cleaning)
         {
             return CreateTimelineEventResult.UnsupportedEventType();
         }
@@ -146,11 +150,13 @@ public class EnclosureTimelineService : IEnclosureTimelineService
             timelineEvent.EventType == ActivityEventType.AnimalDisposition ||
             timelineEvent.EventType == ActivityEventType.Medication ||
             timelineEvent.EventType == ActivityEventType.Treatment ||
+            timelineEvent.EventType == ActivityEventType.Cleaning ||
             request.EventType is EnclosureTimelineEventType.AnimalMovement
                 or EnclosureTimelineEventType.Feeding
                 or EnclosureTimelineEventType.AnimalDisposition
                 or EnclosureTimelineEventType.Medication
-                or EnclosureTimelineEventType.Treatment)
+                or EnclosureTimelineEventType.Treatment
+                or EnclosureTimelineEventType.Cleaning)
         {
             return UpdateTimelineEventResult.UnsupportedEventType();
         }
@@ -189,7 +195,8 @@ public class EnclosureTimelineService : IEnclosureTimelineService
             or ActivityEventType.Feeding
             or ActivityEventType.AnimalDisposition
             or ActivityEventType.Medication
-            or ActivityEventType.Treatment)
+            or ActivityEventType.Treatment
+            or ActivityEventType.Cleaning)
         {
             return DeleteTimelineEventResult.NotFound;
         }
@@ -273,7 +280,10 @@ public class EnclosureTimelineService : IEnclosureTimelineService
                     ? ToDispositionTitle(GetAnimalName(timelineEvent), disposition.DispositionType)
                     : timelineEvent.EventType is ActivityEventType.Medication or ActivityEventType.Treatment
                         ? $"{GetAnimalName(timelineEvent)} received medical treatment"
-                        : timelineEvent.Title;
+                        : timelineEvent.EventType == ActivityEventType.Cleaning &&
+                            timelineEvent.EnclosureCleaning is { } cleaning
+                            ? EnclosureCleaningActivityService.ToTimelineTitle(cleaning)
+                            : timelineEvent.Title;
         }
 
         var animalName = GetAnimalName(timelineEvent);
