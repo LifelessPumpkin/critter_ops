@@ -80,6 +80,10 @@ public class AnimalTimelineController : ControllerBase
             {
                 message = "The provided enclosure does not exist.",
             }),
+            CreateAnimalTimelineEventResultStatus.UnsupportedEventType => BadRequest(new
+            {
+                message = "Structured activity events must be created through their dedicated endpoints.",
+            }),
             _ => StatusCode(StatusCodes.Status500InternalServerError),
         };
     }
@@ -106,6 +110,10 @@ public class AnimalTimelineController : ControllerBase
             UpdateAnimalTimelineEventResultStatus.EnclosureNotFound => NotFound(new
             {
                 message = "The provided enclosure does not exist.",
+            }),
+            UpdateAnimalTimelineEventResultStatus.UnsupportedEventType => BadRequest(new
+            {
+                message = "Structured activity events must be updated through their dedicated endpoints.",
             }),
             _ => StatusCode(StatusCodes.Status500InternalServerError),
         };

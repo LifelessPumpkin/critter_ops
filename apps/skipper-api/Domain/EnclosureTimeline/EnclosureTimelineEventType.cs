@@ -8,6 +8,10 @@ public enum EnclosureTimelineEventType
     WaterTest,
     Cleaning,
     Feeding,
+    AnimalMovement,
+    AnimalDisposition,
+    Medication,
+    Treatment,
     Task,
     Other,
 }

@@ -6,6 +6,9 @@ namespace skipper_api.Domain.AnimalTimeline;
 public enum AnimalTimelineEventType
 {
     Feeding,
+    AnimalMovement,
+    AnimalDisposition,
+    Medication,
     Treatment,
     Note,
     Task,

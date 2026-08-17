@@ -23,7 +23,7 @@ namespace skipper_api.Data.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("skipper_api.Domain.AnimalTimeline.AnimalTimelineEvent", b =>
+            modelBuilder.Entity("skipper_api.Domain.Activity.ActivityEvent", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -31,17 +31,8 @@ namespace skipper_api.Data.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
-                    b.Property<int>("AnimalId")
-                        .HasColumnType("integer");
-
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Description")
-                        .HasColumnType("text");
-
-                    b.Property<int>("EnclosureId")
-                        .HasColumnType("integer");
 
                     b.Property<string>("EventType")
                         .IsRequired()
@@ -50,6 +41,9 @@ namespace skipper_api.Data.Migrations
 
                     b.Property<JsonDocument>("Metadata")
                         .HasColumnType("jsonb");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("text");
 
                     b.Property<DateTime>("OccurredAt")
                         .HasColumnType("timestamp with time zone");
@@ -75,22 +69,245 @@ namespace skipper_api.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("AnimalId")
-                        .HasDatabaseName("IX_AnimalTimelineEvents_AnimalId");
-
-                    b.HasIndex("EnclosureId")
-                        .HasDatabaseName("IX_AnimalTimelineEvents_EnclosureId");
-
                     b.HasIndex("EventType")
-                        .HasDatabaseName("IX_AnimalTimelineEvents_EventType");
+                        .HasDatabaseName("IX_ActivityEvents_EventType");
 
                     b.HasIndex("OccurredAt")
-                        .HasDatabaseName("IX_AnimalTimelineEvents_OccurredAt");
+                        .HasDatabaseName("IX_ActivityEvents_OccurredAt");
 
-                    b.HasIndex("AnimalId", "OccurredAt", "Id")
-                        .HasDatabaseName("IX_AnimalTimelineEvents_AnimalId_OccurredAt_Id");
+                    b.ToTable("ActivityEvents", (string)null);
+                });
 
-                    b.ToTable("AnimalTimelineEvents", (string)null);
+            modelBuilder.Entity("skipper_api.Domain.Activity.ActivityEventAnimal", b =>
+                {
+                    b.Property<long>("ActivityEventId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("AnimalId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("RelationshipType")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.HasKey("ActivityEventId", "AnimalId", "RelationshipType");
+
+                    b.HasIndex("AnimalId")
+                        .HasDatabaseName("IX_ActivityEventAnimals_AnimalId");
+
+                    b.HasIndex("AnimalId", "ActivityEventId")
+                        .HasDatabaseName("IX_ActivityEventAnimals_AnimalId_ActivityEventId");
+
+                    b.ToTable("ActivityEventAnimals", (string)null);
+                });
+
+            modelBuilder.Entity("skipper_api.Domain.Activity.ActivityEventEnclosure", b =>
+                {
+                    b.Property<long>("ActivityEventId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("EnclosureId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("RelationshipType")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.HasKey("ActivityEventId", "EnclosureId", "RelationshipType");
+
+                    b.HasIndex("EnclosureId")
+                        .HasDatabaseName("IX_ActivityEventEnclosures_EnclosureId");
+
+                    b.HasIndex("EnclosureId", "ActivityEventId")
+                        .HasDatabaseName("IX_ActivityEventEnclosures_EnclosureId_ActivityEventId");
+
+                    b.ToTable("ActivityEventEnclosures", (string)null);
+                });
+
+            modelBuilder.Entity("skipper_api.Domain.Activity.AnimalDispositionActivity", b =>
+                {
+                    b.Property<long>("ActivityEventId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("DispositionType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<string>("RecipientOrDestination")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.HasKey("ActivityEventId");
+
+                    b.HasIndex("DispositionType")
+                        .HasDatabaseName("IX_AnimalDispositionActivities_DispositionType");
+
+                    b.ToTable("AnimalDispositionActivities", (string)null);
+                });
+
+            modelBuilder.Entity("skipper_api.Domain.Activity.AnimalFeedingActivity", b =>
+                {
+                    b.Property<long>("ActivityEventId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Food")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(12, 4)
+                        .HasColumnType("numeric(12,4)");
+
+                    b.Property<string>("Result")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.HasKey("ActivityEventId");
+
+                    b.HasIndex("Food")
+                        .HasDatabaseName("IX_AnimalFeedingActivities_Food");
+
+                    b.HasIndex("Result")
+                        .HasDatabaseName("IX_AnimalFeedingActivities_Result");
+
+                    b.ToTable("AnimalFeedingActivities", (string)null);
+                });
+
+            modelBuilder.Entity("skipper_api.Domain.Activity.AnimalMedicationActivity", b =>
+                {
+                    b.Property<long>("ActivityEventId")
+                        .HasColumnType("bigint");
+
+                    b.Property<decimal>("Dose")
+                        .HasPrecision(12, 4)
+                        .HasColumnType("numeric(12,4)");
+
+                    b.Property<string>("DoseUnit")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("MedicationName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<string>("Result")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Route")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.HasKey("ActivityEventId");
+
+                    b.HasIndex("MedicationName")
+                        .HasDatabaseName("IX_AnimalMedicationActivities_MedicationName");
+
+                    b.HasIndex("Route")
+                        .HasDatabaseName("IX_AnimalMedicationActivities_Route");
+
+                    b.ToTable("AnimalMedicationActivities", (string)null);
+                });
+
+            modelBuilder.Entity("skipper_api.Domain.Activity.AnimalMovementActivity", b =>
+                {
+                    b.Property<long>("ActivityEventId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("FromEnclosureId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("ToEnclosureId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("ActivityEventId");
+
+                    b.HasIndex("FromEnclosureId")
+                        .HasDatabaseName("IX_AnimalMovementActivities_FromEnclosureId");
+
+                    b.HasIndex("ToEnclosureId")
+                        .HasDatabaseName("IX_AnimalMovementActivities_ToEnclosureId");
+
+                    b.ToTable("AnimalMovementActivities", (string)null);
+                });
+
+            modelBuilder.Entity("skipper_api.Domain.Activity.AnimalTreatmentActivity", b =>
+                {
+                    b.Property<long>("ActivityEventId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Result")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("TreatmentName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<string>("TreatmentType")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("ActivityEventId");
+
+                    b.HasIndex("TreatmentName")
+                        .HasDatabaseName("IX_AnimalTreatmentActivities_TreatmentName");
+
+                    b.HasIndex("TreatmentType")
+                        .HasDatabaseName("IX_AnimalTreatmentActivities_TreatmentType");
+
+                    b.ToTable("AnimalTreatmentActivities", (string)null);
+                });
+
+            modelBuilder.Entity("skipper_api.Domain.Activity.EnclosureCleaningActivity", b =>
+                {
+                    b.Property<long>("ActivityEventId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("CleaningType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("EquipmentCleaned")
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)");
+
+                    b.Property<bool>("SubstrateChanged")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<decimal?>("WaterChangePercent")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)");
+
+                    b.HasKey("ActivityEventId");
+
+                    b.HasIndex("CleaningType")
+                        .HasDatabaseName("IX_EnclosureCleaningActivities_CleaningType");
+
+                    b.ToTable("EnclosureCleaningActivities", (string)null);
                 });
 
             modelBuilder.Entity("skipper_api.Domain.Animals.Animal", b =>
@@ -198,70 +415,6 @@ namespace skipper_api.Data.Migrations
                     b.ToTable("Animals", (string)null);
                 });
 
-            modelBuilder.Entity("skipper_api.Domain.EnclosureTimeline.EnclosureTimelineEvent", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Description")
-                        .HasColumnType("text");
-
-                    b.Property<int>("EnclosureId")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("EventType")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<JsonDocument>("Metadata")
-                        .HasColumnType("jsonb");
-
-                    b.Property<DateTime>("OccurredAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("PerformedBy")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<Guid?>("SourceReferenceId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("SourceType")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("character varying(150)");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("EnclosureId")
-                        .HasDatabaseName("IX_EnclosureTimelineEvents_EnclosureId");
-
-                    b.HasIndex("EventType")
-                        .HasDatabaseName("IX_EnclosureTimelineEvents_EventType");
-
-                    b.HasIndex("OccurredAt")
-                        .HasDatabaseName("IX_EnclosureTimelineEvents_OccurredAt");
-
-                    b.HasIndex("EnclosureId", "OccurredAt")
-                        .HasDatabaseName("IX_EnclosureTimelineEvents_EnclosureId_OccurredAt");
-
-                    b.ToTable("EnclosureTimelineEvents", (string)null);
-                });
-
             modelBuilder.Entity("skipper_api.Domain.Enclosures.Enclosure", b =>
                 {
                     b.Property<int>("Id")
@@ -360,23 +513,124 @@ namespace skipper_api.Data.Migrations
                     b.ToTable("Enclosures", (string)null);
                 });
 
-            modelBuilder.Entity("skipper_api.Domain.AnimalTimeline.AnimalTimelineEvent", b =>
+            modelBuilder.Entity("skipper_api.Domain.Activity.ActivityEventAnimal", b =>
                 {
+                    b.HasOne("skipper_api.Domain.Activity.ActivityEvent", "ActivityEvent")
+                        .WithMany("Animals")
+                        .HasForeignKey("ActivityEventId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.HasOne("skipper_api.Domain.Animals.Animal", "Animal")
-                        .WithMany("TimelineEvents")
+                        .WithMany("ActivityEvents")
                         .HasForeignKey("AnimalId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.Navigation("ActivityEvent");
+
+                    b.Navigation("Animal");
+                });
+
+            modelBuilder.Entity("skipper_api.Domain.Activity.ActivityEventEnclosure", b =>
+                {
+                    b.HasOne("skipper_api.Domain.Activity.ActivityEvent", "ActivityEvent")
+                        .WithMany("Enclosures")
+                        .HasForeignKey("ActivityEventId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.HasOne("skipper_api.Domain.Enclosures.Enclosure", "Enclosure")
-                        .WithMany("AnimalTimelineEvents")
+                        .WithMany("ActivityEvents")
                         .HasForeignKey("EnclosureId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.Navigation("Animal");
+                    b.Navigation("ActivityEvent");
 
                     b.Navigation("Enclosure");
+                });
+
+            modelBuilder.Entity("skipper_api.Domain.Activity.AnimalDispositionActivity", b =>
+                {
+                    b.HasOne("skipper_api.Domain.Activity.ActivityEvent", "ActivityEvent")
+                        .WithOne("AnimalDisposition")
+                        .HasForeignKey("skipper_api.Domain.Activity.AnimalDispositionActivity", "ActivityEventId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ActivityEvent");
+                });
+
+            modelBuilder.Entity("skipper_api.Domain.Activity.AnimalFeedingActivity", b =>
+                {
+                    b.HasOne("skipper_api.Domain.Activity.ActivityEvent", "ActivityEvent")
+                        .WithOne("AnimalFeeding")
+                        .HasForeignKey("skipper_api.Domain.Activity.AnimalFeedingActivity", "ActivityEventId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ActivityEvent");
+                });
+
+            modelBuilder.Entity("skipper_api.Domain.Activity.AnimalMedicationActivity", b =>
+                {
+                    b.HasOne("skipper_api.Domain.Activity.ActivityEvent", "ActivityEvent")
+                        .WithOne("AnimalMedication")
+                        .HasForeignKey("skipper_api.Domain.Activity.AnimalMedicationActivity", "ActivityEventId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ActivityEvent");
+                });
+
+            modelBuilder.Entity("skipper_api.Domain.Activity.AnimalMovementActivity", b =>
+                {
+                    b.HasOne("skipper_api.Domain.Activity.ActivityEvent", "ActivityEvent")
+                        .WithOne("AnimalMovement")
+                        .HasForeignKey("skipper_api.Domain.Activity.AnimalMovementActivity", "ActivityEventId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("skipper_api.Domain.Enclosures.Enclosure", "FromEnclosure")
+                        .WithMany()
+                        .HasForeignKey("FromEnclosureId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("skipper_api.Domain.Enclosures.Enclosure", "ToEnclosure")
+                        .WithMany()
+                        .HasForeignKey("ToEnclosureId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ActivityEvent");
+
+                    b.Navigation("FromEnclosure");
+
+                    b.Navigation("ToEnclosure");
+                });
+
+            modelBuilder.Entity("skipper_api.Domain.Activity.AnimalTreatmentActivity", b =>
+                {
+                    b.HasOne("skipper_api.Domain.Activity.ActivityEvent", "ActivityEvent")
+                        .WithOne("AnimalTreatment")
+                        .HasForeignKey("skipper_api.Domain.Activity.AnimalTreatmentActivity", "ActivityEventId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ActivityEvent");
+                });
+
+            modelBuilder.Entity("skipper_api.Domain.Activity.EnclosureCleaningActivity", b =>
+                {
+                    b.HasOne("skipper_api.Domain.Activity.ActivityEvent", "ActivityEvent")
+                        .WithOne("EnclosureCleaning")
+                        .HasForeignKey("skipper_api.Domain.Activity.EnclosureCleaningActivity", "ActivityEventId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ActivityEvent");
                 });
 
             modelBuilder.Entity("skipper_api.Domain.Animals.Animal", b =>
@@ -390,29 +644,35 @@ namespace skipper_api.Data.Migrations
                     b.Navigation("Enclosure");
                 });
 
-            modelBuilder.Entity("skipper_api.Domain.EnclosureTimeline.EnclosureTimelineEvent", b =>
+            modelBuilder.Entity("skipper_api.Domain.Activity.ActivityEvent", b =>
                 {
-                    b.HasOne("skipper_api.Domain.Enclosures.Enclosure", "Enclosure")
-                        .WithMany("TimelineEvents")
-                        .HasForeignKey("EnclosureId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                    b.Navigation("AnimalDisposition");
 
-                    b.Navigation("Enclosure");
+                    b.Navigation("AnimalFeeding");
+
+                    b.Navigation("AnimalMedication");
+
+                    b.Navigation("AnimalMovement");
+
+                    b.Navigation("AnimalTreatment");
+
+                    b.Navigation("Animals");
+
+                    b.Navigation("EnclosureCleaning");
+
+                    b.Navigation("Enclosures");
                 });
 
             modelBuilder.Entity("skipper_api.Domain.Animals.Animal", b =>
                 {
-                    b.Navigation("TimelineEvents");
+                    b.Navigation("ActivityEvents");
                 });
 
             modelBuilder.Entity("skipper_api.Domain.Enclosures.Enclosure", b =>
                 {
-                    b.Navigation("AnimalTimelineEvents");
+                    b.Navigation("ActivityEvents");
 
                     b.Navigation("Animals");
-
-                    b.Navigation("TimelineEvents");
                 });
 #pragma warning restore 612, 618
         }

@@ -1,4 +1,4 @@
-using skipper_api.Domain.AnimalTimeline;
+using skipper_api.Domain.Activity;
 using skipper_api.Domain.Enclosures;
 
 namespace skipper_api.Domain.Animals;
@@ -65,7 +65,7 @@ public class Animal
     public string? Source { get; set; }
 
     /// <summary>Historical activity associated with this animal.</summary>
-    public ICollection<AnimalTimelineEvent> TimelineEvents { get; set; } = [];
+    public ICollection<ActivityEventAnimal> ActivityEvents { get; set; } = [];
 
     /// <summary>UTC timestamp when this record was created.</summary>
     public required DateTime CreatedAt { get; set; }

@@ -1,8 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using skipper_api.Domain.Activity;
 using skipper_api.Domain.Animals;
-using skipper_api.Domain.AnimalTimeline;
 using skipper_api.Domain.Enclosures;
-using skipper_api.Domain.EnclosureTimeline;
 
 namespace skipper_api.Data;
 
@@ -19,11 +18,25 @@ public class ProfessorDbContext : DbContext
 
     public DbSet<Animal> Animals => Set<Animal>();
 
-    public DbSet<AnimalTimelineEvent> AnimalTimelineEvents => Set<AnimalTimelineEvent>();
+    public DbSet<ActivityEvent> ActivityEvents => Set<ActivityEvent>();
+
+    public DbSet<ActivityEventAnimal> ActivityEventAnimals => Set<ActivityEventAnimal>();
+
+    public DbSet<ActivityEventEnclosure> ActivityEventEnclosures => Set<ActivityEventEnclosure>();
+
+    public DbSet<AnimalMovementActivity> AnimalMovementActivities => Set<AnimalMovementActivity>();
+
+    public DbSet<AnimalFeedingActivity> AnimalFeedingActivities => Set<AnimalFeedingActivity>();
+
+    public DbSet<AnimalDispositionActivity> AnimalDispositionActivities => Set<AnimalDispositionActivity>();
+
+    public DbSet<AnimalMedicationActivity> AnimalMedicationActivities => Set<AnimalMedicationActivity>();
+
+    public DbSet<AnimalTreatmentActivity> AnimalTreatmentActivities => Set<AnimalTreatmentActivity>();
+
+    public DbSet<EnclosureCleaningActivity> EnclosureCleaningActivities => Set<EnclosureCleaningActivity>();
 
     public DbSet<Enclosure> Enclosures => Set<Enclosure>();
-
-    public DbSet<EnclosureTimelineEvent> EnclosureTimelineEvents => Set<EnclosureTimelineEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
