@@ -1,6 +1,6 @@
 export type Animal = {
-  id: number;
-  enclosureId: number;
+  id: number | string;
+  enclosureId: number | string;
   enclosureName: string;
   name: string;
   species: string;
