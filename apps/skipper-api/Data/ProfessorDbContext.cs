@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using skipper_api.Domain.Activity;
 using skipper_api.Domain.Animals;
 using skipper_api.Domain.Enclosures;
+using TaskEntity = skipper_api.Domain.Tasks.Task;
 
 namespace skipper_api.Data;
 
@@ -37,6 +38,8 @@ public class ProfessorDbContext : DbContext
     public DbSet<EnclosureCleaningActivity> EnclosureCleaningActivities => Set<EnclosureCleaningActivity>();
 
     public DbSet<Enclosure> Enclosures => Set<Enclosure>();
+
+    public DbSet<TaskEntity> Tasks => Set<TaskEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

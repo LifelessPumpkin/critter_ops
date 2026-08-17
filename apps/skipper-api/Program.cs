@@ -12,6 +12,7 @@ using skipper_api.Services.AnimalTreatments;
 using skipper_api.Services.EnclosureCleanings;
 using skipper_api.Services.Enclosures;
 using skipper_api.Services.EnclosureTimeline;
+using skipper_api.Services.Tasks;
 
 if (Environment.GetEnvironmentVariable("CRITTEROPS_EF_DESIGN_TIME") == "true")
 {
@@ -60,6 +61,7 @@ builder.Services.AddScoped<IAnimalTimelineService, AnimalTimelineService>();
 builder.Services.AddScoped<IAnimalTreatmentActivityService, AnimalTreatmentActivityService>();
 builder.Services.AddScoped<IEnclosureCleaningActivityService, EnclosureCleaningActivityService>();
 builder.Services.AddScoped<IEnclosureTimelineService, EnclosureTimelineService>();
+builder.Services.AddScoped<ITaskService, TaskService>();
 
 // Health checks — DB check is tagged "db" so it can be filtered independently
 builder.Services.AddHealthChecks()
