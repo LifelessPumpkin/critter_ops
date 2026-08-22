@@ -51,7 +51,9 @@ a {
 }
 
 button,
-input {
+input,
+select,
+textarea {
   font: inherit;
 }
 
@@ -253,6 +255,13 @@ input {
   margin-bottom: 2rem;
 }
 
+.page-heading-with-action {
+  align-items: flex-start;
+  display: flex;
+  gap: 1.5rem;
+  justify-content: space-between;
+}
+
 .hero-badge {
   background: #eef5ee;
   border: 1px solid #d3e4d5;
@@ -280,6 +289,47 @@ input {
   font-size: 1rem;
   line-height: 1.6;
   max-width: 42rem;
+}
+
+.button {
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 0.9rem;
+  font-weight: 750;
+  justify-content: center;
+  min-height: 2.55rem;
+  padding: 0.65rem 1rem;
+  white-space: nowrap;
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.68;
+}
+
+.button-primary {
+  background: var(--accent-blue);
+  border-color: var(--accent-blue);
+  color: #ffffff;
+}
+
+.button-primary:hover:not(:disabled) {
+  background: #234f73;
+  border-color: #234f73;
+}
+
+.button-secondary {
+  background: var(--bg-surface);
+  border-color: var(--border-color);
+  color: var(--text-secondary);
+}
+
+.button-secondary:hover {
+  border-color: var(--border-hover);
+  color: var(--text-primary);
 }
 
 .dashboard-grid {
@@ -568,6 +618,115 @@ input {
   outline: none;
 }
 
+.entity-form {
+  display: grid;
+  gap: 1.25rem;
+  max-width: 58rem;
+}
+
+.form-section {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 0.5rem;
+  box-shadow: var(--shadow-sm);
+  padding: 1.25rem;
+}
+
+.form-section h2 {
+  color: var(--text-primary);
+  font-size: 1.05rem;
+  font-weight: 750;
+  margin-bottom: 1rem;
+}
+
+.form-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.form-field {
+  color: var(--text-secondary);
+  display: grid;
+  font-size: 0.875rem;
+  font-weight: 700;
+  gap: 0.45rem;
+}
+
+.form-field-full {
+  grid-column: 1 / -1;
+}
+
+.required-marker {
+  color: var(--accent-green);
+  font-size: 0.72rem;
+  font-weight: 750;
+  margin-left: 0.25rem;
+  text-transform: uppercase;
+}
+
+.form-control {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 0.5rem;
+  color: var(--text-primary);
+  min-height: 2.75rem;
+  padding: 0.75rem 0.85rem;
+  width: 100%;
+}
+
+.form-control::placeholder {
+  color: var(--text-muted);
+}
+
+.form-control:focus {
+  border-color: var(--border-hover);
+  box-shadow: 0 0 0 3px rgba(45, 99, 143, 0.12);
+  outline: none;
+}
+
+.form-control-invalid {
+  border-color: #c65f5f;
+}
+
+.form-textarea {
+  line-height: 1.5;
+  min-height: 8rem;
+  resize: vertical;
+}
+
+.field-error {
+  color: #a33f3f;
+  font-size: 0.8rem;
+  font-weight: 650;
+}
+
+.form-error-panel {
+  background: #fff3f3;
+  border: 1px solid #efc0c0;
+  border-radius: 0.5rem;
+  color: #7d2f2f;
+  display: grid;
+  gap: 0.5rem;
+  padding: 1rem;
+}
+
+.form-error-panel p {
+  font-weight: 750;
+}
+
+.form-error-panel ul {
+  display: grid;
+  gap: 0.35rem;
+  margin-left: 1.1rem;
+}
+
+.form-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -599,5 +758,20 @@ input {
 
   .global-search-placeholder {
     min-width: 12rem;
+  }
+}
+
+@media (max-width: 840px) {
+  .page-heading-with-action {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .page-heading-with-action .button {
+    align-self: flex-start;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
   }
 }

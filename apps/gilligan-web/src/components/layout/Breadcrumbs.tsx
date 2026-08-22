@@ -46,10 +46,18 @@ function getBreadcrumbs(pathname: string): Breadcrumb[] {
     const navigationItem = primaryNavigation.find((item) => item.href === href);
 
     return {
-      label: navigationItem?.label ?? formatSegment(segment),
+      label: navigationItem?.label ?? getSegmentLabel(segment),
       href,
     };
   });
+}
+
+function getSegmentLabel(segment: string) {
+  if (segment === "new") {
+    return "Add Enclosure";
+  }
+
+  return formatSegment(segment);
 }
 
 function formatSegment(segment: string) {
