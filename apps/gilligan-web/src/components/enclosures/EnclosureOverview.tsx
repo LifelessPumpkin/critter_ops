@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { CollapsibleSection } from "@/components/common/CollapsibleSection";
 import { EnclosureCard } from "@/components/enclosures/EnclosureCard";
 import { type Enclosure, fetchEnclosures } from "@/lib/api/enclosures";
 
@@ -59,11 +60,38 @@ export function EnclosureOverview() {
     );
   }
 
+  const locationGroups = groupEnclosuresByLocation(enclosures);
+
   return (
-    <section className="enclosure-grid" aria-label="Enclosures">
-      {enclosures.map((enclosure) => (
-        <EnclosureCard key={enclosure.id} enclosure={enclosure} />
+    <section className="location-section-list" aria-label="Enclosures by location">
+      {locationGroups.map((group) => (
+        <CollapsibleSection key={group.location} title={group.location}>
+          <div className="enclosure-grid">
+            {group.enclosures.map((enclosure) => (
+              <EnclosureCard key={enclosure.id} enclosure={enclosure} />
+            ))}
+          </div>
+        </CollapsibleSection>
       ))}
     </section>
   );
+}
+
+function groupEnclosuresByLocation(enclosures: Enclosure[]) {
+  const groups = enclosures.reduce<Map<string, Enclosure[]>>((groupMap, enclosure) => {
+    const location = enclosure.location.trim() || "Unassigned";
+    const locationEnclosures = groupMap.get(location) ?? [];
+
+    locationEnclosures.push(enclosure);
+    groupMap.set(location, locationEnclosures);
+
+    return groupMap;
+  }, new Map());
+
+  return Array.from(groups.entries())
+    .map(([location, locationEnclosures]) => ({
+      location,
+      enclosures: locationEnclosures,
+    }))
+    .sort((firstGroup, secondGroup) => firstGroup.location.localeCompare(secondGroup.location));
 }
