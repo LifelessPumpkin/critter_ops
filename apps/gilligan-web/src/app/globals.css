@@ -1,4 +1,41 @@
 :root {
+  --color-primary: #2d638f;
+  --color-primary-hover: #234f73;
+  --color-secondary: #526171;
+  --color-success: #3f7f68;
+  --color-warning: #8a6b24;
+  --color-danger: #a33f3f;
+  --color-info: #2d638f;
+  --color-background: #f6f7f9;
+  --color-surface: #ffffff;
+  --color-surface-subtle: #f1f4f7;
+  --color-border: #dfe5eb;
+  --color-border-strong: #9bb8d3;
+  --color-text-primary: #17212b;
+  --color-text-secondary: #526171;
+  --color-text-muted: #7a8794;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+
+  --radius-small: 0.375rem;
+  --radius-medium: 0.5rem;
+  --radius-large: 0.75rem;
+
+  --font-size-display: 2.25rem;
+  --font-size-heading-1: 2.25rem;
+  --font-size-heading-2: 1.2rem;
+  --font-size-heading-3: 1.05rem;
+  --font-size-body: 1rem;
+  --font-size-small: 0.875rem;
+  --font-size-caption: 0.75rem;
+
   --bg-main: #f6f7f9;
   --bg-surface: #ffffff;
   --bg-subtle: #f1f4f7;
@@ -55,6 +92,18 @@ input,
 select,
 textarea {
   font: inherit;
+}
+
+.visually-hidden {
+  border: 0;
+  clip: rect(0, 0, 0, 0);
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
 }
 
 .app-shell {
@@ -278,7 +327,7 @@ textarea {
 
 .page-title {
   color: var(--text-primary);
-  font-size: 2.25rem;
+  font-size: var(--font-size-heading-1);
   font-weight: 800;
   line-height: 1.15;
   margin-bottom: 0.7rem;
@@ -286,7 +335,7 @@ textarea {
 
 .page-subtitle {
   color: var(--text-secondary);
-  font-size: 1rem;
+  font-size: var(--font-size-body);
   line-height: 1.6;
   max-width: 42rem;
 }
@@ -317,8 +366,8 @@ textarea {
 }
 
 .button-primary:hover:not(:disabled) {
-  background: #234f73;
-  border-color: #234f73;
+  background: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
 }
 
 .button-secondary {
@@ -332,6 +381,27 @@ textarea {
   color: var(--text-primary);
 }
 
+.button-danger {
+  background: var(--color-danger);
+  border-color: var(--color-danger);
+  color: #ffffff;
+}
+
+.button-danger:hover:not(:disabled) {
+  background: #843232;
+  border-color: #843232;
+}
+
+.button-ghost {
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.button-ghost:hover:not(:disabled) {
+  background: var(--bg-subtle);
+  color: var(--text-primary);
+}
+
 .dashboard-grid {
   display: grid;
   gap: 1.25rem;
@@ -339,6 +409,7 @@ textarea {
   width: 100%;
 }
 
+.card,
 .dashboard-card {
   background: var(--bg-surface);
   border: 1px solid var(--border-color);
@@ -351,6 +422,7 @@ textarea {
   padding: 1.5rem;
 }
 
+.card:hover,
 .dashboard-card:hover {
   border-color: var(--border-hover);
   box-shadow: var(--shadow-md);
@@ -513,14 +585,14 @@ textarea {
   border-bottom: 0;
 }
 
+.data-table-empty {
+  color: var(--text-muted);
+  text-align: center;
+}
+
 .table-primary-text {
   color: var(--text-primary);
   font-weight: 750;
-}
-
-.status-pill-table {
-  display: inline-flex;
-  padding: 0.28rem 0.55rem;
 }
 
 .enclosure-card {
@@ -557,6 +629,45 @@ textarea {
   font-size: 0.75rem;
   font-weight: 750;
   padding: 0.35rem 0.6rem;
+}
+
+.badge {
+  border: 1px solid transparent;
+  border-radius: 9999px;
+  display: inline-flex;
+  font-size: var(--font-size-caption);
+  font-weight: 750;
+  padding: 0.28rem 0.55rem;
+}
+
+.badge-success {
+  background: #eef5ee;
+  border-color: #d3e4d5;
+  color: var(--color-success);
+}
+
+.badge-warning {
+  background: #fff8e7;
+  border-color: #ead8a8;
+  color: var(--color-warning);
+}
+
+.badge-error {
+  background: #fff3f3;
+  border-color: #efc0c0;
+  color: var(--color-danger);
+}
+
+.badge-info {
+  background: var(--accent-soft);
+  border-color: #c6dceb;
+  color: var(--color-info);
+}
+
+.badge-neutral {
+  background: var(--bg-subtle);
+  border-color: var(--border-color);
+  color: var(--text-secondary);
 }
 
 .enclosure-details {

@@ -1,8 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type FormEvent, type ReactNode, useState } from "react";
+import { Button, ButtonLink, Input, Select, Textarea } from "@/components/ui";
 import {
   EnclosureApiError,
   type CreateEnclosureRequest,
@@ -49,7 +49,17 @@ const enclosureTypes = [
   "Other",
 ];
 
+const enclosureTypeOptions = enclosureTypes.map((option) => ({
+  label: formatEnumLabel(option),
+  value: option,
+}));
+
 const mobilityOptions = ["Fixed", "Movable", "Portable", "Temporary", "OutdoorPermanent"];
+
+const mobilitySelectOptions = mobilityOptions.map((option) => ({
+  label: formatEnumLabel(option),
+  value: option,
+}));
 
 const statusOptions = [
   "Active",
@@ -61,6 +71,11 @@ const statusOptions = [
   "Reserved",
   "Retired",
 ];
+
+const statusSelectOptions = statusOptions.map((option) => ({
+  label: formatEnumLabel(option),
+  value: option,
+}));
 
 const initialFormState: EnclosureFormState = {
   name: "",
@@ -151,97 +166,159 @@ export function EnclosureForm() {
       ) : null}
 
       <FormSection title="General Information">
-        <TextField
+        <Input
           label="Name"
           name="name"
           value={formState.name}
           required
           error={fieldErrors.name}
-          onChange={updateField}
+          onChange={(event) => updateField("name", event.target.value)}
         />
-        <SelectField
+        <Select
           label="Type"
           name="type"
           value={formState.type}
-          options={enclosureTypes}
+          options={enclosureTypeOptions}
+          placeholder="Select type"
           required
           error={fieldErrors.type}
-          onChange={updateField}
+          onChange={(event) => updateField("type", event.target.value)}
         />
-        <TextField
+        <Input
           label="Location"
           name="location"
           value={formState.location}
           required
           error={fieldErrors.location}
-          onChange={updateField}
+          onChange={(event) => updateField("location", event.target.value)}
         />
-        <SelectField
+        <Select
           label="Status"
           name="status"
           value={formState.status}
-          options={statusOptions}
+          options={statusSelectOptions}
+          placeholder="Select status"
           required
           error={fieldErrors.status}
-          onChange={updateField}
+          onChange={(event) => updateField("status", event.target.value)}
         />
       </FormSection>
 
       <FormSection title="Size & Construction">
-        <TextField label="Size Label" name="sizeLabel" value={formState.sizeLabel} onChange={updateField} />
-        <NumberField label="Length" name="length" value={formState.length} error={fieldErrors.length} onChange={updateField} />
-        <NumberField label="Width" name="width" value={formState.width} error={fieldErrors.width} onChange={updateField} />
-        <NumberField label="Height" name="height" value={formState.height} error={fieldErrors.height} onChange={updateField} />
-        <TextField
+        <Input
+          label="Size Label"
+          name="sizeLabel"
+          value={formState.sizeLabel}
+          onChange={(event) => updateField("sizeLabel", event.target.value)}
+        />
+        <Input
+          label="Length"
+          name="length"
+          value={formState.length}
+          type="number"
+          min="0"
+          step="0.01"
+          error={fieldErrors.length}
+          onChange={(event) => updateField("length", event.target.value)}
+        />
+        <Input
+          label="Width"
+          name="width"
+          value={formState.width}
+          type="number"
+          min="0"
+          step="0.01"
+          error={fieldErrors.width}
+          onChange={(event) => updateField("width", event.target.value)}
+        />
+        <Input
+          label="Height"
+          name="height"
+          value={formState.height}
+          type="number"
+          min="0"
+          step="0.01"
+          error={fieldErrors.height}
+          onChange={(event) => updateField("height", event.target.value)}
+        />
+        <Input
           label="Dimension Unit"
           name="dimensionUnit"
           value={formState.dimensionUnit}
           placeholder="in, ft, cm"
-          onChange={updateField}
+          onChange={(event) => updateField("dimensionUnit", event.target.value)}
         />
-        <NumberField label="Volume" name="volume" value={formState.volume} error={fieldErrors.volume} onChange={updateField} />
-        <TextField
+        <Input
+          label="Volume"
+          name="volume"
+          value={formState.volume}
+          type="number"
+          min="0"
+          step="0.01"
+          error={fieldErrors.volume}
+          onChange={(event) => updateField("volume", event.target.value)}
+        />
+        <Input
           label="Volume Unit"
           name="volumeUnit"
           value={formState.volumeUnit}
           placeholder="gal, L"
-          onChange={updateField}
+          onChange={(event) => updateField("volumeUnit", event.target.value)}
         />
-        <TextField label="Material" name="material" value={formState.material} onChange={updateField} />
+        <Input
+          label="Material"
+          name="material"
+          value={formState.material}
+          onChange={(event) => updateField("material", event.target.value)}
+        />
       </FormSection>
 
       <FormSection title="Capacity & Safety">
-        <NumberField
+        <Input
           label="Max Animal Capacity"
           name="maxAnimalCapacity"
           value={formState.maxAnimalCapacity}
+          type="number"
+          min="0"
           step="1"
           error={fieldErrors.maxAnimalCapacity}
-          onChange={updateField}
+          onChange={(event) => updateField("maxAnimalCapacity", event.target.value)}
         />
-        <SelectField
+        <Select
           label="Mobility"
           name="mobility"
           value={formState.mobility}
-          options={mobilityOptions}
+          options={mobilitySelectOptions}
+          placeholder="Select mobility"
           required
           error={fieldErrors.mobility}
-          onChange={updateField}
+          onChange={(event) => updateField("mobility", event.target.value)}
         />
-        <TextField label="Safety Rating" name="safetyRating" value={formState.safetyRating} onChange={updateField} />
+        <Input
+          label="Safety Rating"
+          name="safetyRating"
+          value={formState.safetyRating}
+          onChange={(event) => updateField("safetyRating", event.target.value)}
+        />
       </FormSection>
 
       <FormSection title="Notes">
-        <TextAreaField label="Notes" name="notes" value={formState.notes} onChange={updateField} />
+        <Textarea
+          label="Notes"
+          name="notes"
+          value={formState.notes}
+          rows={5}
+          onChange={(event) => updateField("notes", event.target.value)}
+        />
       </FormSection>
 
       <div className="form-actions">
-        <Link href="/enclosures" className="button button-secondary">
+        <ButtonLink href="/enclosures" variant="secondary">
           Cancel
-        </Link>
-        <button type="submit" className="button button-primary" disabled={isSubmitting}>
+        </ButtonLink>
+        <Button type="submit" disabled={isSubmitting}>
           {isSubmitting ? "Creating..." : "Create Enclosure"}
-        </button>
+        </Button>
       </div>
     </form>
   );
@@ -258,103 +335,6 @@ function FormSection({ title, children }: FormSectionProps) {
       <h2>{title}</h2>
       <div className="form-grid">{children}</div>
     </section>
-  );
-}
-
-type BaseFieldProps = {
-  label: string;
-  name: keyof EnclosureFormState;
-  value: string;
-  required?: boolean;
-  error?: string;
-  placeholder?: string;
-  onChange: (fieldName: keyof EnclosureFormState, value: string) => void;
-};
-
-function TextField({ label, name, value, required = false, error, placeholder, onChange }: BaseFieldProps) {
-  return (
-    <label className="form-field">
-      <span>
-        {label}
-        {required ? <span className="required-marker"> Required</span> : null}
-      </span>
-      <input
-        className={error ? "form-control form-control-invalid" : "form-control"}
-        name={name}
-        value={value}
-        placeholder={placeholder}
-        aria-invalid={Boolean(error)}
-        onChange={(event) => onChange(name, event.target.value)}
-      />
-      {error ? <span className="field-error">{error}</span> : null}
-    </label>
-  );
-}
-
-function NumberField({
-  label,
-  name,
-  value,
-  error,
-  step = "0.01",
-  onChange,
-}: BaseFieldProps & { step?: string }) {
-  return (
-    <label className="form-field">
-      <span>{label}</span>
-      <input
-        className={error ? "form-control form-control-invalid" : "form-control"}
-        name={name}
-        value={value}
-        type="number"
-        min="0"
-        step={step}
-        aria-invalid={Boolean(error)}
-        onChange={(event) => onChange(name, event.target.value)}
-      />
-      {error ? <span className="field-error">{error}</span> : null}
-    </label>
-  );
-}
-
-function SelectField({ label, name, value, options, required = false, error, onChange }: BaseFieldProps & { options: string[] }) {
-  return (
-    <label className="form-field">
-      <span>
-        {label}
-        {required ? <span className="required-marker"> Required</span> : null}
-      </span>
-      <select
-        className={error ? "form-control form-control-invalid" : "form-control"}
-        name={name}
-        value={value}
-        aria-invalid={Boolean(error)}
-        onChange={(event) => onChange(name, event.target.value)}
-      >
-        <option value="">Select {label.toLowerCase()}</option>
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {formatEnumLabel(option)}
-          </option>
-        ))}
-      </select>
-      {error ? <span className="field-error">{error}</span> : null}
-    </label>
-  );
-}
-
-function TextAreaField({ label, name, value, onChange }: BaseFieldProps) {
-  return (
-    <label className="form-field form-field-full">
-      <span>{label}</span>
-      <textarea
-        className="form-control form-textarea"
-        name={name}
-        value={value}
-        rows={5}
-        onChange={(event) => onChange(name, event.target.value)}
-      />
-    </label>
   );
 }
 

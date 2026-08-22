@@ -1,4 +1,5 @@
 import type { Enclosure } from "@/lib/api/enclosures";
+import { Badge, Table, type TableColumn, getStatusBadgeVariant } from "@/components/ui";
 
 type EnclosureTableProps = {
   enclosures: Enclosure[];
@@ -6,38 +7,44 @@ type EnclosureTableProps = {
 
 export function EnclosureTable({ enclosures }: EnclosureTableProps) {
   return (
-    <div className="data-table-scroll">
-      <table className="data-table enclosure-table">
-        <thead>
-          <tr>
-            <th scope="col">Name</th>
-            <th scope="col">Type</th>
-            <th scope="col">Status</th>
-            <th scope="col">Size</th>
-            <th scope="col">Capacity</th>
-            <th scope="col">Material</th>
-          </tr>
-        </thead>
-        <tbody>
-          {enclosures.map((enclosure) => (
-            <tr key={enclosure.id}>
-              <td>
-                <span className="table-primary-text">{enclosure.name}</span>
-              </td>
-              <td>{formatEnumLabel(enclosure.type)}</td>
-              <td>
-                <span className="status-pill status-pill-table">{formatEnumLabel(enclosure.status)}</span>
-              </td>
-              <td>{enclosure.sizeLabel || "-"}</td>
-              <td>{formatCapacity(enclosure.maxAnimalCapacity)}</td>
-              <td>{enclosure.material || "-"}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <Table
+      ariaLabel="Enclosures"
+      columns={columns}
+      getRowKey={(enclosure) => enclosure.id}
+      rows={enclosures}
+      tableClassName="enclosure-table"
+    />
   );
 }
+
+const columns: TableColumn<Enclosure>[] = [
+  {
+    header: "Name",
+    render: (enclosure) => <span className="table-primary-text">{enclosure.name}</span>,
+  },
+  {
+    header: "Type",
+    render: (enclosure) => formatEnumLabel(enclosure.type),
+  },
+  {
+    header: "Status",
+    render: (enclosure) => (
+      <Badge variant={getStatusBadgeVariant(enclosure.status)}>{formatEnumLabel(enclosure.status)}</Badge>
+    ),
+  },
+  {
+    header: "Size",
+    render: (enclosure) => enclosure.sizeLabel || "-",
+  },
+  {
+    header: "Capacity",
+    render: (enclosure) => formatCapacity(enclosure.maxAnimalCapacity),
+  },
+  {
+    header: "Material",
+    render: (enclosure) => enclosure.material || "-",
+  },
+];
 
 function formatCapacity(capacity: number | null | undefined) {
   return capacity === null || capacity === undefined ? "-" : capacity;
