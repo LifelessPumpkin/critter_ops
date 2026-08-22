@@ -7,9 +7,10 @@ type CollapsibleSectionProps = {
   title: string;
   children: ReactNode;
   defaultExpanded?: boolean;
+  summary?: ReactNode;
 };
 
-export function CollapsibleSection({ title, children, defaultExpanded = true }: CollapsibleSectionProps) {
+export function CollapsibleSection({ title, children, defaultExpanded = true, summary }: CollapsibleSectionProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
   return (
@@ -24,6 +25,7 @@ export function CollapsibleSection({ title, children, defaultExpanded = true }: 
           {isExpanded ? "v" : ">"}
         </span>
         <span className="collapsible-section-title">{title}</span>
+        {summary ? <span className="collapsible-section-summary">{summary}</span> : null}
       </button>
 
       {isExpanded ? <div className="collapsible-section-content">{children}</div> : null}

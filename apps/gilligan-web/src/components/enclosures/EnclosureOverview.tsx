@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { CollapsibleSection } from "@/components/common/CollapsibleSection";
-import { EnclosureCard } from "@/components/enclosures/EnclosureCard";
+import { EnclosureTable } from "@/components/enclosures/EnclosureTable";
 import { type Enclosure, fetchEnclosures } from "@/lib/api/enclosures";
 
 type LoadState = "loading" | "loaded" | "error";
@@ -65,12 +65,12 @@ export function EnclosureOverview() {
   return (
     <section className="location-section-list" aria-label="Enclosures by location">
       {locationGroups.map((group) => (
-        <CollapsibleSection key={group.location} title={group.location}>
-          <div className="enclosure-grid">
-            {group.enclosures.map((enclosure) => (
-              <EnclosureCard key={enclosure.id} enclosure={enclosure} />
-            ))}
-          </div>
+        <CollapsibleSection
+          key={group.location}
+          title={group.location}
+          summary={`${group.enclosures.length} ${group.enclosures.length === 1 ? "enclosure" : "enclosures"}`}
+        >
+          <EnclosureTable enclosures={group.enclosures} />
         </CollapsibleSection>
       ))}
     </section>

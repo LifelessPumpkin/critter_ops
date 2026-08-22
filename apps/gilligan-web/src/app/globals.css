@@ -460,9 +460,67 @@ textarea {
   font-weight: 750;
 }
 
+.collapsible-section-summary {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  font-weight: 650;
+  margin-left: auto;
+}
+
 .collapsible-section-content {
   border-top: 1px solid var(--border-color);
-  padding: 1rem;
+  padding: 0;
+}
+
+.data-table-scroll {
+  overflow-x: auto;
+  width: 100%;
+}
+
+.data-table {
+  border-collapse: collapse;
+  min-width: 46rem;
+  width: 100%;
+}
+
+.data-table th,
+.data-table td {
+  border-bottom: 1px solid var(--border-color);
+  padding: 0.85rem 1rem;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.data-table th {
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.data-table td {
+  color: var(--text-secondary);
+  font-size: 0.925rem;
+}
+
+.data-table tbody tr:hover {
+  background: #f9fbfc;
+}
+
+.data-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.table-primary-text {
+  color: var(--text-primary);
+  font-weight: 750;
+}
+
+.status-pill-table {
+  display: inline-flex;
+  padding: 0.28rem 0.55rem;
 }
 
 .enclosure-card {
