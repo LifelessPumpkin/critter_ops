@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SummaryCard } from "@/components/ui";
 
 export default function Home() {
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5198";
@@ -14,9 +15,15 @@ export default function Home() {
       </section>
 
       <section className="dashboard-grid">
-        <div className="dashboard-card animated-fade-in animation-delay-1">
-          <div>
-            <div className="card-header-icon">
+        <SummaryCard
+          action={
+            <Link href={`${apiBaseUrl}/swagger`} target="_blank" rel="noopener noreferrer" className="card-link">
+              Open API Docs <span className="arrow">-&gt;</span>
+            </Link>
+          }
+          className="animated-fade-in animation-delay-1"
+          description="Interactive Swagger / OpenAPI documentation for exploring, testing, and developing Skipper backend endpoints."
+          icon={
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="24"
@@ -34,20 +41,19 @@ export default function Home() {
                 <line x1="16" y1="17" x2="8" y2="17" />
                 <polyline points="10 9 9 9 8 9" />
               </svg>
-            </div>
-            <h2 className="card-title">Skipper API Specification</h2>
-            <p className="card-description">
-              Interactive Swagger / OpenAPI documentation for exploring, testing, and developing Skipper backend endpoints.
-            </p>
-          </div>
-          <Link href={`${apiBaseUrl}/swagger`} target="_blank" rel="noopener noreferrer" className="card-link">
-            Open API Docs <span className="arrow">-&gt;</span>
-          </Link>
-        </div>
+          }
+          title="Skipper API Specification"
+        />
 
-        <div className="dashboard-card animated-fade-in animation-delay-2">
-          <div>
-            <div className="card-header-icon">
+        <SummaryCard
+          action={
+            <Link href={`${apiBaseUrl}/health`} target="_blank" rel="noopener noreferrer" className="card-link">
+              Check Service Health <span className="arrow">-&gt;</span>
+            </Link>
+          }
+          className="animated-fade-in animation-delay-2"
+          description="Direct health check endpoint monitor verifying active server telemetry and connection status."
+          icon={
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="24"
@@ -61,16 +67,9 @@ export default function Home() {
               >
                 <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
               </svg>
-            </div>
-            <h2 className="card-title">Service Telemetry</h2>
-            <p className="card-description">
-              Direct health check endpoint monitor verifying active server telemetry and connection status.
-            </p>
-          </div>
-          <Link href={`${apiBaseUrl}/health`} target="_blank" rel="noopener noreferrer" className="card-link">
-            Check Service Health <span className="arrow">-&gt;</span>
-          </Link>
-        </div>
+          }
+          title="Service Telemetry"
+        />
       </section>
     </>
   );
