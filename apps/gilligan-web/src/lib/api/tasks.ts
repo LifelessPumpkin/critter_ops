@@ -20,10 +20,24 @@ export type HusbandryTask = {
   updatedAt: string;
 };
 
+export type CreateTaskRequest = {
+  title: string;
+  description?: string | null;
+  taskType: string;
+  dueAt: string;
+  recurrenceType: string;
+  recurrenceInterval?: number | null;
+  animalId?: number | null;
+  enclosureId?: number | null;
+};
+
 export class TaskApiError extends Error {
-  constructor(message: string) {
+  details: string[];
+
+  constructor(message: string, details: string[] = []) {
     super(message);
     this.name = "TaskApiError";
+    this.details = details;
   }
 }
 
@@ -34,6 +48,22 @@ export async function fetchTasks(): Promise<HusbandryTask[]> {
 
   if (!response.ok) {
     throw new TaskApiError(`Failed to fetch tasks: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+export async function createTask(request: CreateTaskRequest): Promise<HusbandryTask> {
+  const response = await fetch(`${apiBaseUrl}/api/tasks`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    throw await createTaskApiError(response);
   }
 
   return response.json();
@@ -64,4 +94,31 @@ async function getTaskErrorMessage(response: Response) {
   } catch {
     return `Task request failed: ${response.status}`;
   }
+}
+
+async function createTaskApiError(response: Response) {
+  const fallbackMessage = `Task request failed: ${response.status}`;
+
+  try {
+    const errorBody = await response.json();
+    return new TaskApiError(errorBody.message ?? errorBody.title ?? fallbackMessage, getTaskErrorDetails(errorBody));
+  } catch {
+    return new TaskApiError(fallbackMessage);
+  }
+}
+
+function getTaskErrorDetails(errorBody: unknown) {
+  if (!errorBody || typeof errorBody !== "object" || !("errors" in errorBody)) {
+    return [];
+  }
+
+  const errors = (errorBody as { errors?: Record<string, string[]> }).errors;
+
+  if (!errors) {
+    return [];
+  }
+
+  return Object.entries(errors).flatMap(([fieldName, messages]) =>
+    messages.map((message) => `${fieldName}: ${message}`),
+  );
 }

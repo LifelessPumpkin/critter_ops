@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Input } from "@/components/ui";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Button, Input } from "@/components/ui";
+import { TaskCreateDialog } from "@/components/tasks/TaskCreateDialog";
 import { TaskQueueSkeleton } from "@/components/tasks/TaskQueueSkeleton";
 import { TaskRow } from "@/components/tasks/TaskRow";
 import { TaskSection } from "@/components/tasks/TaskSection";
@@ -19,11 +20,13 @@ type TaskGroups = {
 const todayInputValue = formatDateInputValue(new Date());
 
 export function TaskQueue() {
+  const addTaskButtonRef = useRef<HTMLButtonElement>(null);
   const [activeTab, setActiveTab] = useState<TaskTab>("today");
   const [tasks, setTasks] = useState<HusbandryTask[]>([]);
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [completingTaskId, setCompletingTaskId] = useState<number | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [customFrom, setCustomFrom] = useState(todayInputValue);
   const [customTo, setCustomTo] = useState(todayInputValue);
 
@@ -75,6 +78,16 @@ export function TaskQueue() {
     }
   }
 
+  function handleTaskCreated(task: HusbandryTask) {
+    setTasks((currentTasks) => [task, ...currentTasks]);
+    setActionError(null);
+  }
+
+  function handleCloseCreateDialog() {
+    setIsCreateDialogOpen(false);
+    window.setTimeout(() => addTaskButtonRef.current?.focus(), 0);
+  }
+
   if (loadState === "loading") {
     return <TaskQueueSkeleton />;
   }
@@ -90,7 +103,18 @@ export function TaskQueue() {
 
   return (
     <div className="task-queue animated-fade-in">
-      <TaskTabs activeTab={activeTab} onSelectTab={setActiveTab} />
+      <div className="task-queue-toolbar">
+        <TaskTabs activeTab={activeTab} onSelectTab={setActiveTab} />
+        <Button ref={addTaskButtonRef} type="button" onClick={() => setIsCreateDialogOpen(true)}>
+          Add Task
+        </Button>
+      </div>
+
+      <TaskCreateDialog
+        isOpen={isCreateDialogOpen}
+        onClose={handleCloseCreateDialog}
+        onCreated={handleTaskCreated}
+      />
 
       {actionError ? (
         <div className="form-error-panel" role="alert">

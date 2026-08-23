@@ -10,6 +10,7 @@
 
   --radius-medium: 0.5rem;
 
+  --font-size-heading-2: 1.2rem;
   --font-size-heading-3: 1.05rem;
   --font-size-body: 1rem;
   --font-size-small: 0.875rem;
@@ -746,6 +747,13 @@ textarea {
   max-width: 58rem;
 }
 
+.task-queue-toolbar {
+  align-items: flex-start;
+  display: flex;
+  gap: var(--space-4);
+  justify-content: space-between;
+}
+
 .task-tabs {
   margin-bottom: 0;
 }
@@ -878,6 +886,72 @@ textarea {
   grid-template-columns: repeat(2, minmax(0, 14rem));
 }
 
+.dialog {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-medium);
+  box-shadow: 0 24px 70px rgba(20, 33, 43, 0.22);
+  color: var(--text-primary);
+  margin: auto;
+  max-height: min(88vh, 56rem);
+  max-width: min(92vw, 52rem);
+  overflow: auto;
+  padding: 0;
+  width: 100%;
+}
+
+.dialog::backdrop {
+  background: rgba(23, 33, 43, 0.32);
+}
+
+.dialog-header {
+  align-items: flex-start;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  gap: var(--space-4);
+  justify-content: space-between;
+  padding: 1.25rem;
+}
+
+.dialog-header h2 {
+  font-size: var(--font-size-heading-2);
+  margin-bottom: 0.35rem;
+}
+
+.dialog-header p {
+  color: var(--text-secondary);
+  font-size: var(--font-size-small);
+  line-height: 1.45;
+}
+
+.dialog-close-button {
+  align-items: center;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-medium);
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-weight: 800;
+  height: 2rem;
+  justify-content: center;
+  width: 2rem;
+}
+
+.dialog-close-button:hover {
+  border-color: var(--border-hover);
+  color: var(--text-primary);
+}
+
+.task-create-dialog .entity-form {
+  padding: 1.25rem;
+}
+
+.task-create-form {
+  max-width: none;
+}
+
 .skeleton {
   animation: skeletonPulse 1.3s ease-in-out infinite;
   background: linear-gradient(90deg, #edf1f4, #f8fafb, #edf1f4);
@@ -946,7 +1020,8 @@ textarea {
   padding: 1.25rem;
 }
 
-.form-section h2 {
+.form-section h2,
+.form-section h3 {
   color: var(--text-primary);
   font-size: 1.05rem;
   font-weight: 750;
@@ -1106,6 +1181,15 @@ textarea {
 
   .task-complete-button {
     justify-self: start;
+  }
+
+  .task-queue-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .task-queue-toolbar .button {
+    align-self: flex-start;
   }
 
   .custom-range-controls {
