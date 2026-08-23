@@ -3,6 +3,7 @@ import type {
   SelectHTMLAttributes,
   TextareaHTMLAttributes,
 } from "react";
+import { forwardRef } from "react";
 
 type BaseFieldProps = {
   error?: string;
@@ -24,11 +25,15 @@ type SelectProps = BaseFieldProps &
 
 type TextareaProps = BaseFieldProps & TextareaHTMLAttributes<HTMLTextAreaElement>;
 
-export function Input({ error, label, labelHidden = false, required = false, className, ...props }: InputProps) {
+export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
+  { error, label, labelHidden = false, required = false, className, ...props },
+  ref,
+) {
   return (
     <label className="form-field">
       <FieldLabel hidden={labelHidden} label={label} required={required} />
       <input
+        ref={ref}
         className={["form-control", error ? "form-control-invalid" : null, className].filter(Boolean).join(" ")}
         aria-invalid={Boolean(error)}
         {...props}
@@ -36,7 +41,7 @@ export function Input({ error, label, labelHidden = false, required = false, cla
       {error ? <span className="field-error">{error}</span> : null}
     </label>
   );
-}
+});
 
 export function Select({
   error,

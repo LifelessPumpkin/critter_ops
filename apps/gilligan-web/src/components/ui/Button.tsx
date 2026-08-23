@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { AnchorHTMLAttributes, ButtonHTMLAttributes, ReactNode } from "react";
+import { forwardRef } from "react";
 
 type ButtonVariant = "primary" | "secondary" | "danger" | "ghost";
 
@@ -13,9 +14,12 @@ type ButtonLinkProps = AnchorHTMLAttributes<HTMLAnchorElement> & {
   variant?: ButtonVariant;
 };
 
-export function Button({ className, variant = "primary", ...props }: ButtonProps) {
-  return <button className={getButtonClassName(variant, className)} {...props} />;
-}
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
+  { className, variant = "primary", ...props },
+  ref,
+) {
+  return <button ref={ref} className={getButtonClassName(variant, className)} {...props} />;
+});
 
 export function ButtonLink({ className, variant = "primary", ...props }: ButtonLinkProps) {
   return <Link className={getButtonClassName(variant, className)} {...props} />;
