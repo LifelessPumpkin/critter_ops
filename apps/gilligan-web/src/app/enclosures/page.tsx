@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { EnclosureOverview } from "@/components/enclosures/EnclosureOverview";
+import { ButtonLink } from "@/components/ui";
 
 export default function EnclosuresPage() {
   return (
@@ -10,9 +10,9 @@ export default function EnclosuresPage() {
           <h1 className="page-title">Enclosures</h1>
           <p className="page-subtitle">Browse tanks, cages, habitats, and other managed spaces in CritterOps.</p>
         </div>
-        <Link href="/enclosures/new" className="button button-primary">
+        <ButtonLink href="/enclosures/new">
           Add Enclosure
-        </Link>
+        </ButtonLink>
       </section>
 
       <EnclosureOverview />

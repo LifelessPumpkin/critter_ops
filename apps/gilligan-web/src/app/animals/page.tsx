@@ -1,4 +1,5 @@
 import { AnimalOverview } from "@/components/animals/AnimalOverview";
+import { Input } from "@/components/ui";
 
 export default function AnimalsPage() {
   return (
@@ -10,10 +11,7 @@ export default function AnimalsPage() {
       </section>
 
       <div className="toolbar-row">
-        <label className="search-label" htmlFor="animal-search">
-          Search animals
-        </label>
-        <input id="animal-search" className="search-input" placeholder="Search animals..." type="search" />
+        <Input id="animal-search" label="Search animals" labelHidden placeholder="Search animals..." type="search" />
       </div>
 
       <AnimalOverview />
