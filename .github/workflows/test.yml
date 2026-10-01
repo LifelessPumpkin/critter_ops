@@ -1,0 +1,38 @@
+name: CritterOps Tests
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - main
+
+jobs:
+  test:
+    name: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/gilligan-web/package-lock.json
+
+      - name: Install Gilligan dependencies
+        working-directory: apps/gilligan-web
+        run: npm ci
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore Skipper dependencies
+        run: dotnet restore apps/skipper-api/skipper-api.csproj
+
+      - name: Run tests
+        run: make test
