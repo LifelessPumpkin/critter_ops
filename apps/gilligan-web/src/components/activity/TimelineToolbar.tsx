@@ -1,10 +1,13 @@
 "use client";
 
-import { useMemo, useState, type MouseEvent } from "react";
+import { useMemo, useState, type MouseEvent, type RefObject } from "react";
 import type { Animal } from "@/lib/api/animals";
 import type { Enclosure } from "@/lib/api/enclosures";
-import { activityEventTypes, formatEnumLabel, type ActivityEventType, type ActivitySortDirection } from "@/lib/api/activity";
+import { activityEventTypes, activitySortOptions, formatEnumLabel, getActivitySortLabel, type ActivityEventType, type ActivitySortDirection } from "@/lib/api/activity";
 import { Button } from "@/components/ui";
+import { ActivityCreateMenu } from "@/components/activity/ActivityCreateMenu";
+import { useDebouncedValue } from "@/components/activity/useDebouncedValue";
+import { TimelinePresetControl } from "@/components/activity/TimelinePresetControl";
 import {
   hasActiveFilters,
   timelineColumns,
@@ -12,6 +15,7 @@ import {
   type TimelineColumnId,
   type TimelineContext,
   type TimelineFilters,
+  type TimelinePreset,
   type TimelineView,
 } from "@/components/activity/timelineTypes";
 
@@ -23,14 +27,20 @@ type TimelineToolbarProps = {
   filters: TimelineFilters;
   groupBy: RangeGroupBy;
   search: string;
+  searchInputRef: RefObject<HTMLInputElement | null>;
   sort: ActivitySortDirection;
   view: TimelineView;
+  presets: TimelinePreset[];
   onColumnsChange: (columns: TimelineColumnId[]) => void;
   onFiltersChange: (filters: TimelineFilters) => void;
   onGroupByChange: (groupBy: RangeGroupBy) => void;
   onSearchChange: (search: string) => void;
   onSortChange: (sort: ActivitySortDirection) => void;
   onViewChange: (view: TimelineView) => void;
+  onResetColumns: () => void;
+  onApplyPreset: (preset: TimelinePreset) => void;
+  onDeletePreset: (id: string) => void;
+  onSavePreset: (name: string) => void;
 };
 
 export function TimelineToolbar({
@@ -41,24 +51,32 @@ export function TimelineToolbar({
   filters,
   groupBy,
   search,
+  searchInputRef,
   sort,
   view,
+  presets,
   onColumnsChange,
   onFiltersChange,
   onGroupByChange,
   onSearchChange,
   onSortChange,
   onViewChange,
+  onResetColumns,
+  onApplyPreset,
+  onDeletePreset,
+  onSavePreset,
 }: TimelineToolbarProps) {
   const [animalSearch, setAnimalSearch] = useState("");
   const [enclosureSearch, setEnclosureSearch] = useState("");
+  const debouncedAnimalSearch = useDebouncedValue(animalSearch, 300);
+  const debouncedEnclosureSearch = useDebouncedValue(enclosureSearch, 300);
   const filteredAnimals = useMemo(
-    () => animals.filter((animal) => animal.name.toLowerCase().includes(animalSearch.toLowerCase())),
-    [animalSearch, animals],
+    () => animals.filter((animal) => animal.name.toLowerCase().includes(debouncedAnimalSearch.toLowerCase())),
+    [debouncedAnimalSearch, animals],
   );
   const filteredEnclosures = useMemo(
-    () => enclosures.filter((enclosure) => enclosure.name.toLowerCase().includes(enclosureSearch.toLowerCase())),
-    [enclosureSearch, enclosures],
+    () => enclosures.filter((enclosure) => enclosure.name.toLowerCase().includes(debouncedEnclosureSearch.toLowerCase())),
+    [debouncedEnclosureSearch, enclosures],
   );
 
   function toggleEventType(eventType: ActivityEventType) {
@@ -76,8 +94,16 @@ export function TimelineToolbar({
       return;
     }
 
-    const orderedColumns = timelineColumns.map((item) => item.id).filter((value) => [...columns, column].includes(value));
-    onColumnsChange(orderedColumns);
+    onColumnsChange([...columns, column]);
+  }
+
+  function moveColumn(column: TimelineColumnId, direction: -1 | 1) {
+    const index = columns.indexOf(column);
+    const nextIndex = index + direction;
+    if (index < 0 || nextIndex < 0 || nextIndex >= columns.length) return;
+    const reordered = [...columns];
+    [reordered[index], reordered[nextIndex]] = [reordered[nextIndex], reordered[index]];
+    onColumnsChange(reordered);
   }
 
   return (
@@ -86,10 +112,12 @@ export function TimelineToolbar({
         <span className="visually-hidden">Search activities</span>
         <SearchIcon />
         <input
+          ref={searchInputRef}
           type="search"
           value={search}
           onChange={(event) => onSearchChange(event.target.value)}
           placeholder="Search activities..."
+          aria-keyshortcuts="/"
         />
       </label>
 
@@ -188,6 +216,9 @@ export function TimelineToolbar({
       </div>
 
       <div className="timeline-view-controls">
+        <ActivityCreateMenu />
+        <TimelinePresetControl presets={presets} onApply={onApplyPreset} onDelete={onDeletePreset} onSave={onSavePreset} />
+
         {hasActiveFilters(filters) ? (
           <Button variant="ghost" className="timeline-clear-all" onClick={() => onFiltersChange({ eventTypes: [], performer: "", from: "", to: "" })}>
             Clear filters
@@ -199,22 +230,31 @@ export function TimelineToolbar({
             <FilterPopover label="Columns">
               <PopoverHeading title="Columns" />
               <div className="timeline-option-list">
-                {timelineColumns.map((column) => (
-                  <label key={column.id} className="timeline-check-option">
-                    <input type="checkbox" checked={columns.includes(column.id)} onChange={() => toggleColumn(column.id)} />
-                    <span>{column.label}</span>
-                  </label>
+                {[...columns, ...timelineColumns.map((column) => column.id).filter((column) => !columns.includes(column))].map((columnId) => (
+                  <div key={columnId} className="timeline-column-option">
+                    <label className="timeline-check-option">
+                      <input type="checkbox" checked={columns.includes(columnId)} onChange={() => toggleColumn(columnId)} />
+                      <span>{timelineColumns.find((column) => column.id === columnId)?.label}</span>
+                    </label>
+                    {columns.includes(columnId) ? (
+                      <span className="timeline-column-order-controls">
+                        <button type="button" aria-label={`Move ${columnId} column left`} disabled={columns.indexOf(columnId) === 0} onClick={() => moveColumn(columnId, -1)}>←</button>
+                        <button type="button" aria-label={`Move ${columnId} column right`} disabled={columns.indexOf(columnId) === columns.length - 1} onClick={() => moveColumn(columnId, 1)}>→</button>
+                      </span>
+                    ) : null}
+                  </div>
                 ))}
               </div>
+              <button type="button" className="timeline-popover-clear" onClick={onResetColumns}>Reset to default</button>
             </FilterPopover>
 
-            <FilterPopover label={sort === "Newest" ? "Newest first" : "Oldest first"}>
+            <FilterPopover label={getActivitySortLabel(sort)}>
               <PopoverHeading title="Sort" />
               <div className="timeline-option-list">
-                {(["Newest", "Oldest"] as ActivitySortDirection[]).map((option) => (
-                  <label key={option} className="timeline-check-option">
-                    <input type="radio" name="timeline-sort" checked={sort === option} onChange={() => onSortChange(option)} />
-                    <span>{option} first</span>
+                {activitySortOptions.map((option) => (
+                  <label key={option.value} className="timeline-check-option">
+                    <input type="radio" name="timeline-sort" aria-label={option.label} checked={sort === option.value} onChange={() => onSortChange(option.value)} />
+                    <span>{option.label}</span>
                   </label>
                 ))}
               </div>

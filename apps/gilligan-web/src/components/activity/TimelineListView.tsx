@@ -6,6 +6,10 @@ type TimelineListViewProps = {
   activities: ActivityRecord[];
   columns: TimelineColumnId[];
   sort: ActivitySortDirection;
+  onSelectActivity: (activity: ActivityRecord, trigger: HTMLElement) => void;
+  selectedActivityIds: Set<number>;
+  onToggleSelection: (activityId: number, modifiers: { shiftKey: boolean; additive: boolean }) => void;
+  onToggleAll: (checked: boolean) => void;
 };
 
 type ActivityGroup = {
@@ -24,9 +28,18 @@ const createdFormatter = new Intl.DateTimeFormat("en", {
   minute: "2-digit",
 });
 
-export function TimelineListView({ activities, columns, sort }: TimelineListViewProps) {
+export function TimelineListView({
+  activities,
+  columns,
+  sort,
+  onSelectActivity,
+  selectedActivityIds,
+  onToggleSelection,
+  onToggleAll,
+}: TimelineListViewProps) {
   const groups = groupActivitiesByDate(activities, sort);
   const columnLabels = new Map(timelineColumns.map((column) => [column.id, column.label]));
+  const allSelected = activities.length > 0 && activities.every((activity) => selectedActivityIds.has(activity.id));
 
   return (
     <div className="timeline-list" aria-label="Activity timeline">
@@ -37,12 +50,49 @@ export function TimelineListView({ activities, columns, sort }: TimelineListView
             <table className="timeline-table">
               <thead>
                 <tr>
+                  <th scope="col" className="timeline-selection-cell">
+                    <input
+                      type="checkbox"
+                      checked={allSelected}
+                      aria-label="Select all activities on this page"
+                      onChange={(event) => onToggleAll(event.target.checked)}
+                    />
+                  </th>
                   {columns.map((column) => <th key={column} scope="col" className={`timeline-column-${column}`}>{columnLabels.get(column)}</th>)}
                 </tr>
               </thead>
               <tbody>
                 {group.activities.map((activity) => (
-                  <tr key={activity.id} tabIndex={0} aria-label={`${formatEnumLabel(activity.type)} at ${timeFormatter.format(new Date(activity.occurredAt))}`}>
+                  <tr
+                    key={activity.id}
+                    tabIndex={0}
+                    aria-haspopup="dialog"
+                    aria-selected={selectedActivityIds.has(activity.id)}
+                    aria-label={`${formatEnumLabel(activity.type)} at ${timeFormatter.format(new Date(activity.occurredAt))}. Open details.`}
+                    className={selectedActivityIds.has(activity.id) ? "timeline-row-interactive timeline-row-selected" : "timeline-row-interactive"}
+                    onClick={(event) => onSelectActivity(activity, event.currentTarget)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        onSelectActivity(activity, event.currentTarget);
+                      }
+                    }}
+                  >
+                    <td className="timeline-selection-cell">
+                      <input
+                        type="checkbox"
+                        checked={selectedActivityIds.has(activity.id)}
+                        readOnly
+                        aria-label={`Select ${formatEnumLabel(activity.type)} activity ${activity.id}`}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onToggleSelection(activity.id, {
+                            shiftKey: event.shiftKey,
+                            additive: event.metaKey || event.ctrlKey,
+                          });
+                        }}
+                      />
+                    </td>
                     {columns.map((column) => (
                       <td key={column} className={`timeline-column-${column}`}>{renderCell(activity, column)}</td>
                     ))}
@@ -92,24 +142,45 @@ function formatAssociations(associations: ActivityRecord["animals"] | ActivityRe
 }
 
 export function groupActivitiesByDate(activities: ActivityRecord[], sort: ActivitySortDirection): ActivityGroup[] {
-  const sortedActivities = [...activities].sort((first, second) => {
-    const dateDifference = new Date(first.occurredAt).getTime() - new Date(second.occurredAt).getTime();
-    const idDifference = first.id - second.id;
-    return sort === "Oldest" ? dateDifference || idDifference : -(dateDifference || idDifference);
-  });
   const groups = new Map<string, ActivityRecord[]>();
 
-  sortedActivities.forEach((activity) => {
+  activities.forEach((activity) => {
     const date = new Date(activity.occurredAt);
     const dateKey = toLocalDateKey(date);
     groups.set(dateKey, [...(groups.get(dateKey) ?? []), activity]);
   });
 
-  return Array.from(groups.entries()).map(([dateKey, groupedActivities]) => ({
-    dateKey,
-    label: formatDateGroupLabel(new Date(groupedActivities[0].occurredAt)),
-    activities: groupedActivities,
-  }));
+  const dateDirection = sort === "Oldest" ? 1 : -1;
+  return Array.from(groups.entries())
+    .sort(([firstDate], [secondDate]) => firstDate.localeCompare(secondDate) * dateDirection)
+    .map(([dateKey, groupedActivities]) => ({
+      dateKey,
+      label: formatDateGroupLabel(new Date(groupedActivities[0].occurredAt)),
+      activities: [...groupedActivities].sort((first, second) => compareActivities(first, second, sort)),
+    }));
+}
+
+function compareActivities(first: ActivityRecord, second: ActivityRecord, sort: ActivitySortDirection) {
+  const dateDifference = new Date(first.occurredAt).getTime() - new Date(second.occurredAt).getTime();
+  const idDifference = first.id - second.id;
+  const newestFallback = -(dateDifference || idDifference);
+  const compareText = (firstValue: string, secondValue: string, descending = false) => {
+    const difference = firstValue.localeCompare(secondValue, undefined, { sensitivity: "base" });
+    return (descending ? -difference : difference) || newestFallback;
+  };
+
+  switch (sort) {
+    case "Oldest": return dateDifference || idDifference;
+    case "TypeAscending": return compareText(formatEnumLabel(first.type), formatEnumLabel(second.type));
+    case "TypeDescending": return compareText(formatEnumLabel(first.type), formatEnumLabel(second.type), true);
+    case "AnimalAscending": return compareText(formatAssociations(first.animals), formatAssociations(second.animals));
+    case "AnimalDescending": return compareText(formatAssociations(first.animals), formatAssociations(second.animals), true);
+    case "EnclosureAscending": return compareText(formatAssociations(first.enclosures), formatAssociations(second.enclosures));
+    case "EnclosureDescending": return compareText(formatAssociations(first.enclosures), formatAssociations(second.enclosures), true);
+    case "PerformerAscending": return compareText(first.performer || "", second.performer || "");
+    case "PerformerDescending": return compareText(first.performer || "", second.performer || "", true);
+    default: return newestFallback;
+  }
 }
 
 function formatDateGroupLabel(date: Date) {

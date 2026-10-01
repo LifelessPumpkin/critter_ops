@@ -12,14 +12,31 @@ export const activityEventTypes = [
 ] as const;
 
 export type ActivityEventType = (typeof activityEventTypes)[number];
-export type ActivitySortDirection = "Newest" | "Oldest";
+export const activitySortOptions = [
+  { value: "Newest", label: "Occurred · Newest first" },
+  { value: "Oldest", label: "Occurred · Oldest first" },
+  { value: "TypeAscending", label: "Activity type · A–Z" },
+  { value: "TypeDescending", label: "Activity type · Z–A" },
+  { value: "AnimalAscending", label: "Animal · A–Z" },
+  { value: "AnimalDescending", label: "Animal · Z–A" },
+  { value: "EnclosureAscending", label: "Enclosure · A–Z" },
+  { value: "EnclosureDescending", label: "Enclosure · Z–A" },
+  { value: "PerformerAscending", label: "Performer · A–Z" },
+  { value: "PerformerDescending", label: "Performer · Z–A" },
+] as const;
+
+export type ActivitySortDirection = (typeof activitySortOptions)[number]["value"];
+
+export function getActivitySortLabel(sort: ActivitySortDirection) {
+  return activitySortOptions.find((option) => option.value === sort)?.label ?? "Occurred · Newest first";
+}
 
 export type ActivityAssociation = {
   id: number;
   name: string;
 };
 
-type ActivityDetails = {
+export type ActivityDetails = {
   movement?: {
     fromEnclosureId: number;
     fromEnclosureName: string;
@@ -65,6 +82,8 @@ type ActivitySearchResultDto = {
   title: string;
   performedBy?: string | null;
   notes?: string | null;
+  sourceType?: string | null;
+  metadata?: unknown;
   createdAt: string;
   animals: Array<{ animalId: number; animalName: string }>;
   enclosures: Array<{ enclosureId: number; enclosureName: string }>;
@@ -78,7 +97,11 @@ export type ActivityRecord = {
   createdAt: string;
   title: string;
   description: string;
+  notes?: string | null;
   performer?: string | null;
+  sourceType?: string | null;
+  metadata?: unknown;
+  details: ActivityDetails;
   animals: ActivityAssociation[];
   enclosures: ActivityAssociation[];
 };
@@ -147,7 +170,11 @@ function normalizeActivity(activity: ActivitySearchResultDto): ActivityRecord {
     createdAt: activity.createdAt,
     title: activity.title,
     description: formatActivityDescription(activity),
+    notes: activity.notes,
     performer: activity.performedBy,
+    sourceType: activity.sourceType,
+    metadata: activity.metadata,
+    details: activity.details,
     animals: activity.animals.map((animal) => ({ id: animal.animalId, name: animal.animalName })),
     enclosures: activity.enclosures.map((enclosure) => ({
       id: enclosure.enclosureId,

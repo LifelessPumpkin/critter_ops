@@ -4,7 +4,15 @@ import { formatEnumLabel, type ActivityRecord } from "@/lib/api/activity";
 
 const timeFormatter = new Intl.DateTimeFormat("en", { hour: "numeric", minute: "2-digit" });
 
-export function TimelineCompactEvent({ activity, showTime = true }: { activity: ActivityRecord; showTime?: boolean }) {
+export function TimelineCompactEvent({
+  activity,
+  showTime = true,
+  onSelectActivity,
+}: {
+  activity: ActivityRecord;
+  showTime?: boolean;
+  onSelectActivity?: (activity: ActivityRecord, trigger: HTMLElement) => void;
+}) {
   const metadata = [
     formatAssociationNames(activity.animals),
     formatAssociationNames(activity.enclosures),
@@ -15,7 +23,16 @@ export function TimelineCompactEvent({ activity, showTime = true }: { activity: 
     <div
       className="timeline-compact-event"
       tabIndex={0}
-      aria-label={`${formatEnumLabel(activity.type)} at ${timeFormatter.format(new Date(activity.occurredAt))}`}
+      role={onSelectActivity ? "button" : undefined}
+      aria-haspopup={onSelectActivity ? "dialog" : undefined}
+      aria-label={`${formatEnumLabel(activity.type)} at ${timeFormatter.format(new Date(activity.occurredAt))}${onSelectActivity ? ". Open details." : ""}`}
+      onClick={(event) => onSelectActivity?.(activity, event.currentTarget)}
+      onKeyDown={(event) => {
+        if (onSelectActivity && (event.key === "Enter" || event.key === " ")) {
+          event.preventDefault();
+          onSelectActivity(activity, event.currentTarget);
+        }
+      }}
     >
       {showTime ? <time dateTime={activity.occurredAt}>{timeFormatter.format(new Date(activity.occurredAt))}</time> : null}
       <ActivityTypeMark type={activity.type} />

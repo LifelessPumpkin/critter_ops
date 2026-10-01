@@ -13,6 +13,7 @@ const timeFormatter = new Intl.DateTimeFormat("en", { month: "short", day: "nume
 type TimelineRangeViewProps = {
   activities: ActivityRecord[];
   filtered: boolean;
+  filteredMessage?: string;
   from: string;
   groupBy: RangeGroupBy;
   rangeDays: number;
@@ -23,6 +24,7 @@ type TimelineRangeViewProps = {
   onRangeDaysChange: (days: number) => void;
   onUseCustomRange: () => void;
   onJumpToCurrent: () => void;
+  onSelectActivity: (activity: ActivityRecord, trigger: HTMLElement) => void;
 };
 
 type RangeGroup = {
@@ -41,6 +43,7 @@ type DateBucket = {
 export function TimelineRangeView({
   activities,
   filtered,
+  filteredMessage,
   from,
   groupBy,
   rangeDays,
@@ -51,6 +54,7 @@ export function TimelineRangeView({
   onRangeDaysChange,
   onUseCustomRange,
   onJumpToCurrent,
+  onSelectActivity,
 }: TimelineRangeViewProps) {
   const groups = groupActivities(activities, groupBy);
   const buckets = createBuckets(from, to);
@@ -87,7 +91,7 @@ export function TimelineRangeView({
         </button>
       </div>
       {activities.length === 0 ? (
-        <TimelineEmptyState message="No activity found in this date range." filtered={filtered} onClear={onClear} />
+        <TimelineEmptyState message="No activity found in this date range." filtered={filtered} filteredMessage={filteredMessage} onClear={onClear} />
       ) : (
         <div className="timeline-range-scroll">
           <div
@@ -99,7 +103,7 @@ export function TimelineRangeView({
             <div className="timeline-range-corner" role="columnheader">{getGroupLabel(groupBy)}</div>
             {buckets.map((bucket) => <div className="timeline-range-axis-label" role="columnheader" key={bucket.id}>{bucket.label}</div>)}
             {groups.map((group) => (
-              <RangeRow group={group} buckets={buckets} key={group.id} />
+              <RangeRow group={group} buckets={buckets} key={group.id} onSelectActivity={onSelectActivity} />
             ))}
           </div>
         </div>
@@ -108,7 +112,7 @@ export function TimelineRangeView({
   );
 }
 
-function RangeRow({ group, buckets }: { group: RangeGroup; buckets: DateBucket[] }) {
+function RangeRow({ group, buckets, onSelectActivity }: { group: RangeGroup; buckets: DateBucket[]; onSelectActivity: (activity: ActivityRecord, trigger: HTMLElement) => void }) {
   return (
     <>
       <div className="timeline-range-group-label" role="rowheader" title={group.label}>{group.label}</div>
@@ -119,7 +123,7 @@ function RangeRow({ group, buckets }: { group: RangeGroup; buckets: DateBucket[]
         });
         return (
           <div className="timeline-range-cell" role="gridcell" key={bucket.id}>
-            {bucketActivities.length ? <ActivityCluster activities={bucketActivities} label={`${group.label}, ${bucket.label}`} /> : null}
+            {bucketActivities.length ? <ActivityCluster activities={bucketActivities} label={`${group.label}, ${bucket.label}`} onSelectActivity={onSelectActivity} /> : null}
           </div>
         );
       })}
@@ -127,7 +131,7 @@ function RangeRow({ group, buckets }: { group: RangeGroup; buckets: DateBucket[]
   );
 }
 
-function ActivityCluster({ activities, label }: { activities: ActivityRecord[]; label: string }) {
+function ActivityCluster({ activities, label, onSelectActivity }: { activities: ActivityRecord[]; label: string; onSelectActivity: (activity: ActivityRecord, trigger: HTMLElement) => void }) {
   return (
     <details className="timeline-cluster">
       <summary aria-label={`${activities.length} activities for ${label}`}>
@@ -137,14 +141,14 @@ function ActivityCluster({ activities, label }: { activities: ActivityRecord[]; 
         <strong>{activities.length} {activities.length === 1 ? "activity" : "activities"}</strong>
         <div className="timeline-cluster-list">
           {activities.slice(0, 8).map((activity) => (
-            <div className="timeline-cluster-event" key={activity.id}>
+            <button className="timeline-cluster-event" type="button" key={activity.id} onClick={(event) => onSelectActivity(activity, event.currentTarget)}>
               <ActivityTypeMark type={activity.type} />
               <div>
                 <strong>{formatEnumLabel(activity.type)}</strong>
                 <time dateTime={activity.occurredAt}>{timeFormatter.format(new Date(activity.occurredAt))}</time>
                 <span title={activity.description}>{activity.description}</span>
               </div>
-            </div>
+            </button>
           ))}
           {activities.length > 8 ? <small>+ {activities.length - 8} additional activities</small> : null}
         </div>

@@ -16,6 +16,11 @@ export const primaryNavigation: NavigationItem[] = [
     icon: "A",
   },
   {
+    label: "Activity",
+    href: "/activity",
+    icon: "L",
+  },
+  {
     label: "Enclosures",
     href: "/enclosures",
     icon: "E",

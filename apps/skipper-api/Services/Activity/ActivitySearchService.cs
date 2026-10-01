@@ -40,13 +40,7 @@ public class ActivitySearchService : IActivitySearchService
             .Include(activityEvent => activityEvent.AnimalTreatment)
             .Include(activityEvent => activityEvent.EnclosureCleaning);
 
-        var orderedQuery = request.Sort == ActivitySortDirection.Oldest
-            ? detailedQuery
-                .OrderBy(activityEvent => activityEvent.OccurredAt)
-                .ThenBy(activityEvent => activityEvent.Id)
-            : detailedQuery
-                .OrderByDescending(activityEvent => activityEvent.OccurredAt)
-                .ThenByDescending(activityEvent => activityEvent.Id);
+        var orderedQuery = ApplyOrdering(detailedQuery, request.Sort);
 
         var activityEvents = await orderedQuery
             .Skip((page - 1) * pageSize)
@@ -62,6 +56,69 @@ public class ActivitySearchService : IActivitySearchService
                 ? 0
                 : (int)Math.Ceiling(totalCount / (double)pageSize),
             Items = activityEvents.Select(ToDto).ToList(),
+        };
+    }
+
+    private static IOrderedQueryable<ActivityEvent> ApplyOrdering(
+        IQueryable<ActivityEvent> query,
+        ActivitySortDirection sort)
+    {
+        return sort switch
+        {
+            ActivitySortDirection.Oldest => query
+                .OrderBy(activityEvent => activityEvent.OccurredAt)
+                .ThenBy(activityEvent => activityEvent.Id),
+            ActivitySortDirection.TypeAscending => query
+                .OrderBy(activityEvent => activityEvent.EventType)
+                .ThenByDescending(activityEvent => activityEvent.OccurredAt)
+                .ThenByDescending(activityEvent => activityEvent.Id),
+            ActivitySortDirection.TypeDescending => query
+                .OrderByDescending(activityEvent => activityEvent.EventType)
+                .ThenByDescending(activityEvent => activityEvent.OccurredAt)
+                .ThenByDescending(activityEvent => activityEvent.Id),
+            ActivitySortDirection.AnimalAscending => query
+                .OrderBy(activityEvent => activityEvent.Animals
+                    .OrderBy(association => association.RelationshipType)
+                    .ThenBy(association => association.Animal.Name)
+                    .Select(association => association.Animal.Name)
+                    .FirstOrDefault())
+                .ThenByDescending(activityEvent => activityEvent.OccurredAt)
+                .ThenByDescending(activityEvent => activityEvent.Id),
+            ActivitySortDirection.AnimalDescending => query
+                .OrderByDescending(activityEvent => activityEvent.Animals
+                    .OrderBy(association => association.RelationshipType)
+                    .ThenBy(association => association.Animal.Name)
+                    .Select(association => association.Animal.Name)
+                    .FirstOrDefault())
+                .ThenByDescending(activityEvent => activityEvent.OccurredAt)
+                .ThenByDescending(activityEvent => activityEvent.Id),
+            ActivitySortDirection.EnclosureAscending => query
+                .OrderBy(activityEvent => activityEvent.Enclosures
+                    .OrderBy(association => association.RelationshipType)
+                    .ThenBy(association => association.Enclosure.Name)
+                    .Select(association => association.Enclosure.Name)
+                    .FirstOrDefault())
+                .ThenByDescending(activityEvent => activityEvent.OccurredAt)
+                .ThenByDescending(activityEvent => activityEvent.Id),
+            ActivitySortDirection.EnclosureDescending => query
+                .OrderByDescending(activityEvent => activityEvent.Enclosures
+                    .OrderBy(association => association.RelationshipType)
+                    .ThenBy(association => association.Enclosure.Name)
+                    .Select(association => association.Enclosure.Name)
+                    .FirstOrDefault())
+                .ThenByDescending(activityEvent => activityEvent.OccurredAt)
+                .ThenByDescending(activityEvent => activityEvent.Id),
+            ActivitySortDirection.PerformerAscending => query
+                .OrderBy(activityEvent => activityEvent.PerformedBy)
+                .ThenByDescending(activityEvent => activityEvent.OccurredAt)
+                .ThenByDescending(activityEvent => activityEvent.Id),
+            ActivitySortDirection.PerformerDescending => query
+                .OrderByDescending(activityEvent => activityEvent.PerformedBy)
+                .ThenByDescending(activityEvent => activityEvent.OccurredAt)
+                .ThenByDescending(activityEvent => activityEvent.Id),
+            _ => query
+                .OrderByDescending(activityEvent => activityEvent.OccurredAt)
+                .ThenByDescending(activityEvent => activityEvent.Id),
         };
     }
 

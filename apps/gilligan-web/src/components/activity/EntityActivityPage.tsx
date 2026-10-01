@@ -4,11 +4,11 @@ import { useEffect, useState } from "react";
 import { ActivityTimeline } from "@/components/activity/ActivityTimeline";
 import { fetchAnimal, type Animal } from "@/lib/api/animals";
 import { fetchEnclosure, type Enclosure } from "@/lib/api/enclosures";
-import type { TimelineView } from "@/components/activity/timelineTypes";
+import type { TimelineInitialState } from "@/components/activity/timelineTypes";
 
 type EntityActivityPageProps =
-  | { kind: "animal"; id: number; initialDate?: string; initialView?: TimelineView }
-  | { kind: "enclosure"; id: number; initialDate?: string; initialView?: TimelineView };
+  | { kind: "animal"; id: number; initialState?: TimelineInitialState }
+  | { kind: "enclosure"; id: number; initialState?: TimelineInitialState };
 
 export function EntityActivityPage(props: EntityActivityPageProps) {
   const [entity, setEntity] = useState<Animal | Enclosure | null>(null);
@@ -61,8 +61,7 @@ export function EntityActivityPage(props: EntityActivityPageProps) {
       </section>
       <ActivityTimeline
         context={{ kind: props.kind, id: props.id, name: entity.name }}
-        initialDate={props.initialDate}
-        initialView={props.initialView}
+        initialState={props.initialState}
       />
     </>
   );

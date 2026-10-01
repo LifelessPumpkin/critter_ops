@@ -16,11 +16,13 @@ type TimelineDayViewProps = {
   activities: ActivityRecord[];
   date: string;
   filtered: boolean;
+  filteredMessage?: string;
   onClear: () => void;
   onDateChange: (date: string) => void;
+  onSelectActivity: (activity: ActivityRecord, trigger: HTMLElement) => void;
 };
 
-export function TimelineDayView({ activities, date, filtered, onClear, onDateChange }: TimelineDayViewProps) {
+export function TimelineDayView({ activities, date, filtered, filteredMessage, onClear, onDateChange, onSelectActivity }: TimelineDayViewProps) {
   const selectedActivities = activities
     .filter((activity) => localDateKey(activity.occurredAt) === date)
     .sort(compareActivitiesAscending);
@@ -41,6 +43,7 @@ export function TimelineDayView({ activities, date, filtered, onClear, onDateCha
         <TimelineEmptyState
           message={`No activity recorded on ${dayFormatter.format(new Date(`${date}T12:00:00`))}.`}
           filtered={filtered}
+          filteredMessage={filteredMessage}
           onClear={onClear}
         />
       ) : (
@@ -50,7 +53,7 @@ export function TimelineDayView({ activities, date, filtered, onClear, onDateCha
               <time dateTime={`${date}T${String(group.hour).padStart(2, "0")}:00:00`}>{hourFormatter.format(group.date)}</time>
               <div className="timeline-hour-line" />
               <div className="timeline-hour-events">
-                {group.activities.map((activity) => <TimelineCompactEvent activity={activity} key={activity.id} />)}
+                {group.activities.map((activity) => <TimelineCompactEvent activity={activity} key={activity.id} onSelectActivity={onSelectActivity} />)}
               </div>
             </section>
           ))}

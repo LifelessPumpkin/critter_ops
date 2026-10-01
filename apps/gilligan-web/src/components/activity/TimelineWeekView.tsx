@@ -14,13 +14,15 @@ type TimelineWeekViewProps = {
   activities: ActivityRecord[];
   date: string;
   filtered: boolean;
+  filteredMessage?: string;
   sort: ActivitySortDirection;
   onClear: () => void;
   onDateChange: (date: string) => void;
   onOpenDay: (date: string) => void;
+  onSelectActivity: (activity: ActivityRecord, trigger: HTMLElement) => void;
 };
 
-export function TimelineWeekView({ activities, date, filtered, sort, onClear, onDateChange, onOpenDay }: TimelineWeekViewProps) {
+export function TimelineWeekView({ activities, date, filtered, filteredMessage, sort, onClear, onDateChange, onOpenDay, onSelectActivity }: TimelineWeekViewProps) {
   const weekDates = getWeekDates(date);
   const firstDate = weekDates[0];
   const lastDate = weekDates[6];
@@ -35,7 +37,7 @@ export function TimelineWeekView({ activities, date, filtered, sort, onClear, on
         onJump={() => onDateChange(toDateInputValue(new Date()))}
       />
       {activities.length === 0 ? (
-        <TimelineEmptyState message="No activity recorded this week." filtered={filtered} onClear={onClear} />
+        <TimelineEmptyState message="No activity recorded this week." filtered={filtered} filteredMessage={filteredMessage} onClear={onClear} />
       ) : (
         <div className="timeline-week-scroll">
           <div className="timeline-week-grid" role="grid" aria-label="Weekly activity">
@@ -55,7 +57,7 @@ export function TimelineWeekView({ activities, date, filtered, sort, onClear, on
                   </header>
                   <div className="timeline-week-events">
                     {dayActivities.slice(0, visibleActivityLimit).map((activity) => (
-                      <TimelineCompactEvent activity={activity} key={activity.id} />
+                      <TimelineCompactEvent activity={activity} key={activity.id} onSelectActivity={onSelectActivity} />
                     ))}
                     {overflowCount > 0 ? (
                       <button type="button" className="timeline-week-more" onClick={() => onOpenDay(weekDate)}>

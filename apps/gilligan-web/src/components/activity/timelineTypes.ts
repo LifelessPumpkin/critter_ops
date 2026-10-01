@@ -3,6 +3,16 @@ import type { ActivityEventType, ActivitySortDirection } from "@/lib/api/activit
 export type TimelineView = "list" | "day" | "week" | "range";
 export type RangeGroupBy = "type" | "animal" | "enclosure";
 
+export type TimelineInitialState = {
+  view?: TimelineView;
+  date?: string;
+  search?: string;
+  sort?: ActivitySortDirection;
+  groupBy?: RangeGroupBy;
+  filters?: Partial<TimelineFilters>;
+  page?: number;
+};
+
 export type TimelineContext =
   | { kind: "animal"; id: number; name: string }
   | { kind: "enclosure"; id: number; name: string }
@@ -25,6 +35,15 @@ export type TimelineFilters = {
   performer: string;
   from: string;
   to: string;
+};
+
+export type TimelinePreset = {
+  id: string;
+  name: string;
+  filters: TimelineFilters;
+  sort: ActivitySortDirection;
+  groupBy: RangeGroupBy;
+  view: TimelineView;
 };
 
 export type TimelineQueryState = {
