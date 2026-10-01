@@ -57,6 +57,10 @@ function getSegmentLabel(segment: string) {
     return "Add Enclosure";
   }
 
+  if (/^\d+$/.test(segment)) {
+    return "Details";
+  }
+
   return formatSegment(segment);
 }
 

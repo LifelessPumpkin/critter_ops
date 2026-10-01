@@ -24,7 +24,7 @@ public class ActivitySearchService : IActivitySearchService
         var pageSize = Math.Clamp(request.PageSize, 1, MaximumPageSize);
         var query = ApplyFilters(_dbContext.ActivityEvents.AsNoTracking(), request);
         var totalCount = await query.CountAsync(cancellationToken);
-        var activityEvents = await query
+        var detailedQuery = query
             .AsSplitQuery()
             .Include(activityEvent => activityEvent.Animals)
                 .ThenInclude(association => association.Animal)
@@ -38,9 +38,17 @@ public class ActivitySearchService : IActivitySearchService
             .Include(activityEvent => activityEvent.AnimalDisposition)
             .Include(activityEvent => activityEvent.AnimalMedication)
             .Include(activityEvent => activityEvent.AnimalTreatment)
-            .Include(activityEvent => activityEvent.EnclosureCleaning)
-            .OrderByDescending(activityEvent => activityEvent.OccurredAt)
-            .ThenByDescending(activityEvent => activityEvent.Id)
+            .Include(activityEvent => activityEvent.EnclosureCleaning);
+
+        var orderedQuery = request.Sort == ActivitySortDirection.Oldest
+            ? detailedQuery
+                .OrderBy(activityEvent => activityEvent.OccurredAt)
+                .ThenBy(activityEvent => activityEvent.Id)
+            : detailedQuery
+                .OrderByDescending(activityEvent => activityEvent.OccurredAt)
+                .ThenByDescending(activityEvent => activityEvent.Id);
+
+        var activityEvents = await orderedQuery
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(cancellationToken);
@@ -61,7 +69,23 @@ public class ActivitySearchService : IActivitySearchService
         IQueryable<ActivityEvent> query,
         ActivitySearchRequestDto request)
     {
-        if (request.EventType.HasValue)
+        if (!string.IsNullOrWhiteSpace(request.Search))
+        {
+            var search = request.Search.Trim();
+            var pattern = $"%{search}%";
+            query = query.Where(activityEvent =>
+                EF.Functions.ILike(activityEvent.Title, pattern) ||
+                (activityEvent.Notes != null && EF.Functions.ILike(activityEvent.Notes, pattern)) ||
+                (activityEvent.PerformedBy != null && EF.Functions.ILike(activityEvent.PerformedBy, pattern)) ||
+                activityEvent.Animals.Any(association => EF.Functions.ILike(association.Animal.Name, pattern)) ||
+                activityEvent.Enclosures.Any(association => EF.Functions.ILike(association.Enclosure.Name, pattern)));
+        }
+
+        if (request.EventTypes.Count > 0)
+        {
+            query = query.Where(activityEvent => request.EventTypes.Contains(activityEvent.EventType));
+        }
+        else if (request.EventType.HasValue)
         {
             query = query.Where(activityEvent => activityEvent.EventType == request.EventType.Value);
         }
