@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type MouseEvent } from "react";
 import type { Animal } from "@/lib/api/animals";
 import type { Enclosure } from "@/lib/api/enclosures";
 import { activityEventTypes, formatEnumLabel, type ActivityEventType, type ActivitySortDirection } from "@/lib/api/activity";
@@ -8,9 +8,11 @@ import { Button } from "@/components/ui";
 import {
   hasActiveFilters,
   timelineColumns,
+  type RangeGroupBy,
   type TimelineColumnId,
   type TimelineContext,
   type TimelineFilters,
+  type TimelineView,
 } from "@/components/activity/timelineTypes";
 
 type TimelineToolbarProps = {
@@ -19,12 +21,16 @@ type TimelineToolbarProps = {
   context: TimelineContext;
   enclosures: Enclosure[];
   filters: TimelineFilters;
+  groupBy: RangeGroupBy;
   search: string;
   sort: ActivitySortDirection;
+  view: TimelineView;
   onColumnsChange: (columns: TimelineColumnId[]) => void;
   onFiltersChange: (filters: TimelineFilters) => void;
+  onGroupByChange: (groupBy: RangeGroupBy) => void;
   onSearchChange: (search: string) => void;
   onSortChange: (sort: ActivitySortDirection) => void;
+  onViewChange: (view: TimelineView) => void;
 };
 
 export function TimelineToolbar({
@@ -33,12 +39,16 @@ export function TimelineToolbar({
   context,
   enclosures,
   filters,
+  groupBy,
   search,
   sort,
+  view,
   onColumnsChange,
   onFiltersChange,
+  onGroupByChange,
   onSearchChange,
   onSortChange,
+  onViewChange,
 }: TimelineToolbarProps) {
   const [animalSearch, setAnimalSearch] = useState("");
   const [enclosureSearch, setEnclosureSearch] = useState("");
@@ -184,36 +194,79 @@ export function TimelineToolbar({
           </Button>
         ) : null}
 
-        <FilterPopover label="Columns">
-          <PopoverHeading title="Columns" />
-          <div className="timeline-option-list">
-            {timelineColumns.map((column) => (
-              <label key={column.id} className="timeline-check-option">
-                <input type="checkbox" checked={columns.includes(column.id)} onChange={() => toggleColumn(column.id)} />
-                <span>{column.label}</span>
-              </label>
-            ))}
-          </div>
-        </FilterPopover>
+        {view === "list" ? (
+          <>
+            <FilterPopover label="Columns">
+              <PopoverHeading title="Columns" />
+              <div className="timeline-option-list">
+                {timelineColumns.map((column) => (
+                  <label key={column.id} className="timeline-check-option">
+                    <input type="checkbox" checked={columns.includes(column.id)} onChange={() => toggleColumn(column.id)} />
+                    <span>{column.label}</span>
+                  </label>
+                ))}
+              </div>
+            </FilterPopover>
 
-        <FilterPopover label={sort === "Newest" ? "Newest first" : "Oldest first"}>
-          <PopoverHeading title="Sort" />
-          <div className="timeline-option-list">
-            {(["Newest", "Oldest"] as ActivitySortDirection[]).map((option) => (
-              <label key={option} className="timeline-check-option">
-                <input type="radio" name="timeline-sort" checked={sort === option} onChange={() => onSortChange(option)} />
-                <span>{option} first</span>
-              </label>
-            ))}
-          </div>
-        </FilterPopover>
+            <FilterPopover label={sort === "Newest" ? "Newest first" : "Oldest first"}>
+              <PopoverHeading title="Sort" />
+              <div className="timeline-option-list">
+                {(["Newest", "Oldest"] as ActivitySortDirection[]).map((option) => (
+                  <label key={option} className="timeline-check-option">
+                    <input type="radio" name="timeline-sort" checked={sort === option} onChange={() => onSortChange(option)} />
+                    <span>{option} first</span>
+                  </label>
+                ))}
+              </div>
+            </FilterPopover>
+          </>
+        ) : null}
+
+        {view === "range" ? (
+          <FilterPopover label={`Group: ${getGroupByLabel(groupBy)}`}>
+            <PopoverHeading title="Group range by" />
+            <div className="timeline-option-list" role="radiogroup" aria-label="Group range by">
+              {(["type", "animal", "enclosure"] as RangeGroupBy[]).map((option) => (
+                <button
+                  type="button"
+                  role="radio"
+                  aria-label={`Group by ${getGroupByLabel(option)}`}
+                  aria-checked={groupBy === option}
+                  className={groupBy === option ? "timeline-view-option timeline-view-option-active" : "timeline-view-option"}
+                  key={option}
+                  onClick={(event) => {
+                    onGroupByChange(option);
+                    closeContainingPopover(event);
+                  }}
+                >
+                  {getGroupByLabel(option)} {groupBy === option ? <span>Selected</span> : null}
+                </button>
+              ))}
+            </div>
+          </FilterPopover>
+        ) : null}
 
         <details className="timeline-popover">
-          <summary className="timeline-control">List <ChevronIcon /></summary>
+          <summary className="timeline-control" aria-label={`View: ${getViewLabel(view)}`}>{getViewLabel(view)} <ChevronIcon /></summary>
           <div className="timeline-popover-panel timeline-popover-panel-right">
             <PopoverHeading title="View" />
-            <div className="timeline-option-list">
-              <span className="timeline-view-option timeline-view-option-active">List <span>Active</span></span>
+            <div className="timeline-option-list" role="radiogroup" aria-label="Timeline view">
+              {(["list", "day", "week", "range"] as TimelineView[]).map((option) => (
+                <button
+                  type="button"
+                  role="radio"
+                  aria-label={`${getViewLabel(option)} view`}
+                  aria-checked={view === option}
+                  className={view === option ? "timeline-view-option timeline-view-option-active" : "timeline-view-option"}
+                  key={option}
+                  onClick={(event) => {
+                    onViewChange(option);
+                    closeContainingPopover(event);
+                  }}
+                >
+                  {getViewLabel(option)} {view === option ? <span>Selected</span> : null}
+                </button>
+              ))}
             </div>
           </div>
         </details>
@@ -290,4 +343,18 @@ function ChevronIcon() {
 
 export function ActivityTypeMark({ type }: { type: ActivityEventType }) {
   return <span className={`activity-type-mark activity-type-${type.toLowerCase()}`} aria-hidden="true">{formatEnumLabel(type).charAt(0)}</span>;
+}
+
+function getViewLabel(view: TimelineView) {
+  return view.charAt(0).toUpperCase() + view.slice(1);
+}
+
+function getGroupByLabel(groupBy: RangeGroupBy) {
+  if (groupBy === "animal") return "Animal";
+  if (groupBy === "enclosure") return "Enclosure";
+  return "Event type";
+}
+
+function closeContainingPopover(event: MouseEvent<HTMLButtonElement>) {
+  event.currentTarget.closest("details")?.removeAttribute("open");
 }

@@ -1,5 +1,8 @@
 import type { ActivityEventType, ActivitySortDirection } from "@/lib/api/activity";
 
+export type TimelineView = "list" | "day" | "week" | "range";
+export type RangeGroupBy = "type" | "animal" | "enclosure";
+
 export type TimelineContext =
   | { kind: "animal"; id: number; name: string }
   | { kind: "enclosure"; id: number; name: string }
