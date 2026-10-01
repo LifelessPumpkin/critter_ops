@@ -1,4 +1,5 @@
 import type { Animal } from "@/lib/api/animals";
+import Link from "next/link";
 import { Badge, Table, type TableColumn, getStatusBadgeVariant } from "@/components/ui";
 
 type AnimalTableProps = {
@@ -13,7 +14,7 @@ export function AnimalTable({ animals, ariaLabel }: AnimalTableProps) {
 const columns: TableColumn<Animal>[] = [
   {
     header: "Name",
-    render: (animal) => <span className="table-primary-text">{animal.name}</span>,
+    render: (animal) => <Link className="table-primary-link" href={`/animals/${animal.id}/activity`}>{animal.name}</Link>,
   },
   {
     header: "Type",

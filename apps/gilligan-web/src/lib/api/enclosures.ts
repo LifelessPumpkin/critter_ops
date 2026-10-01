@@ -59,6 +59,16 @@ export async function fetchEnclosures(): Promise<Enclosure[]> {
   return response.json();
 }
 
+export async function fetchEnclosure(id: number): Promise<Enclosure> {
+  const response = await fetch(`${apiBaseUrl}/api/enclosures/${id}`);
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch enclosure: ${response.status}`);
+  }
+
+  return response.json();
+}
+
 export async function createEnclosure(request: CreateEnclosureRequest): Promise<Enclosure> {
   const response = await fetch(`${apiBaseUrl}/api/enclosures`, {
     method: "POST",
