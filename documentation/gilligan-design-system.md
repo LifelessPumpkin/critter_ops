@@ -65,6 +65,9 @@ Reusable components live in `apps/gilligan-web/src/components/ui`.
 - `Table`: standard operational table with headers, hover state, empty state, and responsive scroll container.
 - `Card` and `SummaryCard`: summary and information panel surfaces.
 - `Badge`: success, warning, error, info, and neutral status indicators.
+- `Skeleton`, `SkeletonText`, `SkeletonButton`, `SkeletonInput`, and `SkeletonBadge`: low-contrast loading shapes for composing page-specific placeholders.
+- `SkeletonTable` and `SkeletonTableRow`: row-based table placeholders with stable headers and column proportions.
+- `SkeletonPageHeader`: a composable loading header for titles that depend on asynchronous data.
 
 Import from the barrel where practical:
 
@@ -82,3 +85,7 @@ Pages should follow this hierarchy:
 4. Main content using shared UI components.
 
 Operational collections should default to tables. Cards remain appropriate for dashboards, metrics, and short summary panels.
+
+## Loading states
+
+Use skeletons only while data is loading; keep empty and error states distinct. Compose the shared primitives into a layout that resembles the final page instead of using a generic full-width loader. Use stable, deliberate widths and a representative number of rows to minimize layout shift. Skeletons are decorative, non-focusable, and use one subtle pulse animation that is disabled when the user prefers reduced motion.

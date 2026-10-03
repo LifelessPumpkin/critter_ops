@@ -31,7 +31,7 @@ import {
   type TimelineSavedView,
   type TimelineView,
 } from "@/components/activity/timelineTypes";
-import { Button } from "@/components/ui";
+import { Button, Skeleton, SkeletonText } from "@/components/ui";
 import { activityEventTypes, activityPageSize, activitySortOptions, fetchActivities, formatEnumLabel, type ActivityEventType, type ActivityRecord, type ActivitySortDirection } from "@/lib/api/activity";
 import { fetchAnimals, type Animal } from "@/lib/api/animals";
 import { fetchEnclosures, type Enclosure } from "@/lib/api/enclosures";
@@ -619,20 +619,20 @@ function TimelineViewContent(props: TimelineViewContentProps) {
 
 function TimelineLoadingState({ columns, view }: { columns: number; view: TimelineView }) {
   if (view === "day") {
-    return <div className="timeline-loading timeline-loading-day" role="status" aria-label="Loading day activity">{[0, 1, 2].map((row) => <div key={row}><span className="skeleton" /><span className="skeleton" /></div>)}</div>;
+    return <div className="timeline-loading timeline-loading-day" role="status" aria-label="Loading day activity">{[0, 1, 2].map((row) => <div key={row}><Skeleton /><Skeleton /></div>)}</div>;
   }
   if (view === "week") {
-    return <div className="timeline-loading timeline-loading-week" role="status" aria-label="Loading week activity">{Array.from({ length: 7 }, (_, column) => <span className="skeleton" key={column} />)}</div>;
+    return <div className="timeline-loading timeline-loading-week" role="status" aria-label="Loading week activity">{Array.from({ length: 7 }, (_, column) => <Skeleton key={column} />)}</div>;
   }
   if (view === "range") {
-    return <div className="timeline-loading timeline-loading-range" role="status" aria-label="Loading range activity">{[0, 1, 2, 3].map((row) => <div key={row}>{Array.from({ length: 8 }, (_, column) => <span className="skeleton" key={column} />)}</div>)}</div>;
+    return <div className="timeline-loading timeline-loading-range" role="status" aria-label="Loading range activity">{[0, 1, 2, 3].map((row) => <div key={row}>{Array.from({ length: 8 }, (_, column) => <Skeleton key={column} />)}</div>)}</div>;
   }
   return (
     <div className="timeline-loading" role="status" aria-label="Loading activity">
       <span className="visually-hidden">Loading activity...</span>
       {[0, 1, 2, 3, 4].map((row) => (
         <div className="timeline-skeleton-row" key={row} style={{ gridTemplateColumns: `repeat(${columns}, minmax(4rem, 1fr))` }}>
-          {Array.from({ length: columns }, (_, column) => <span className="skeleton" key={column} />)}
+          {Array.from({ length: columns }, (_, column) => <SkeletonText variant="metadata" width={column % 3 === 0 ? "72%" : "88%"} key={column} />)}
         </div>
       ))}
     </div>
@@ -654,7 +654,13 @@ function TimelineInfiniteScrollStatus({
 }) {
   return (
     <div ref={sentinelRef} className="timeline-load-more-sentinel" role="status" aria-live="polite">
-      {additionalLoadState === "loading" ? <span className="timeline-load-more-message"><span className="timeline-loading-spinner" aria-hidden="true" /> Loading more activity…</span> : null}
+      {additionalLoadState === "loading" ? (
+        <div className="timeline-load-more-message timeline-load-more-skeleton">
+          <SkeletonText variant="metadata" width="7rem" />
+          <SkeletonText variant="metadata" width="11rem" />
+          <span className="visually-hidden">Loading more activity…</span>
+        </div>
+      ) : null}
       {additionalLoadState === "error" ? (
         <span className="timeline-load-more-error">
           <span>Unable to load more activity.</span>

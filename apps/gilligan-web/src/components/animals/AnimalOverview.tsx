@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { AnimalTableSkeleton } from "@/components/animals/AnimalTableSkeleton";
 import { AnimalTable } from "@/components/animals/AnimalTable";
+import { Input } from "@/components/ui";
 import { type Animal, fetchAnimals } from "@/lib/api/animals";
 
 type LoadState = "loading" | "loaded" | "error";
@@ -43,7 +45,7 @@ export function AnimalOverview() {
   }, []);
 
   if (loadState === "loading") {
-    return <p className="state-message">Loading animals...</p>;
+    return <AnimalTableSkeleton />;
   }
 
   if (loadState === "error") {
@@ -64,6 +66,7 @@ export function AnimalOverview() {
   if (animals.length === 0) {
     return (
       <>
+        <AnimalSearch />
         <AnimalTabs
           activeCount={0}
           deceasedCount={0}
@@ -81,6 +84,7 @@ export function AnimalOverview() {
 
   return (
     <>
+      <AnimalSearch />
       <AnimalTabs
         activeCount={activeAnimals.length}
         deceasedCount={deceasedAnimals.length}
@@ -97,6 +101,14 @@ export function AnimalOverview() {
         <AnimalTable animals={visibleAnimals} ariaLabel={getTabAriaLabel(selectedTab)} />
       )}
     </>
+  );
+}
+
+function AnimalSearch() {
+  return (
+    <div className="toolbar-row">
+      <Input id="animal-search" label="Search animals" labelHidden placeholder="Search animals..." type="search" />
+    </div>
   );
 }
 
