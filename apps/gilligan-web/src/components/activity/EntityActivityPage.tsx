@@ -5,6 +5,7 @@ import { ActivityTimeline } from "@/components/activity/ActivityTimeline";
 import { fetchAnimal, type Animal } from "@/lib/api/animals";
 import { fetchEnclosure, type Enclosure } from "@/lib/api/enclosures";
 import type { TimelineInitialState } from "@/components/activity/timelineTypes";
+import { SkeletonPageHeader } from "@/components/ui";
 
 type EntityActivityPageProps =
   | { kind: "animal"; id: number; initialState?: TimelineInitialState }
@@ -36,7 +37,7 @@ export function EntityActivityPage(props: EntityActivityPageProps) {
   }, [props.id, props.kind]);
 
   if (loadState === "loading") {
-    return <p className="state-message">Loading {props.kind}...</p>;
+    return <SkeletonPageHeader badgeWidth="5.5rem" subtitleWidth="18rem" titleWidth="13rem" />;
   }
 
   if (loadState === "error" || !entity) {

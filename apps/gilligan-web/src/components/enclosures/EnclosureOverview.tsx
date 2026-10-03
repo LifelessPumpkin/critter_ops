@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { CollapsibleSection } from "@/components/common/CollapsibleSection";
+import { EnclosureTableSkeleton } from "@/components/enclosures/EnclosureTableSkeleton";
 import { EnclosureTable } from "@/components/enclosures/EnclosureTable";
 import { type Enclosure, fetchEnclosures } from "@/lib/api/enclosures";
 
@@ -39,7 +40,7 @@ export function EnclosureOverview() {
   }, []);
 
   if (loadState === "loading") {
-    return <p className="state-message">Loading enclosures...</p>;
+    return <EnclosureTableSkeleton />;
   }
 
   if (loadState === "error") {
