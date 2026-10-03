@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { ActivityTypeMark } from "@/components/activity/TimelineToolbar";
 import { timelineColumns, type TimelineColumnId } from "@/components/activity/timelineTypes";
 import { formatEnumLabel, type ActivityRecord, type ActivitySortDirection } from "@/lib/api/activity";
@@ -37,7 +38,7 @@ export function TimelineListView({
   onToggleSelection,
   onToggleAll,
 }: TimelineListViewProps) {
-  const groups = groupActivitiesByDate(activities, sort);
+  const groups = useMemo(() => groupActivitiesByDate(activities, sort), [activities, sort]);
   const columnLabels = new Map(timelineColumns.map((column) => [column.id, column.label]));
   const allSelected = activities.length > 0 && activities.every((activity) => selectedActivityIds.has(activity.id));
 

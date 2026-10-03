@@ -127,6 +127,8 @@ export type ActivitySearchQuery = {
   pageSize?: number;
 };
 
+export const activityPageSize = 50;
+
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5198";
 
 export async function fetchActivities(
@@ -144,7 +146,7 @@ export async function fetchActivities(
   append(parameters, "To", query.to);
   append(parameters, "Sort", query.sort ?? "Newest");
   append(parameters, "Page", query.page ?? 1);
-  append(parameters, "PageSize", query.pageSize ?? 100);
+  append(parameters, "PageSize", query.pageSize ?? activityPageSize);
 
   const response = await fetch(`${apiBaseUrl}/api/activity?${parameters.toString()}`, { signal });
 

@@ -39,9 +39,15 @@ public class ActivitySearchRequestDto
 
     public ActivitySortDirection Sort { get; set; } = ActivitySortDirection.Newest;
 
+    /// <summary>
+    /// One-based result page. Filters and ordering are applied before pagination.
+    /// </summary>
     [Range(1, int.MaxValue)]
     public int Page { get; set; } = 1;
 
+    /// <summary>
+    /// Number of activity records per page. Defaults to 50 and is capped at 100.
+    /// </summary>
     [Range(1, 100)]
     public int PageSize { get; set; } = 50;
 }

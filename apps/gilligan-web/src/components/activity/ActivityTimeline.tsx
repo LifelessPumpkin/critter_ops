@@ -1,13 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { ActivityDetailDrawer } from "@/components/activity/ActivityDetailDrawer";
 import { TimelineBulkToolbar } from "@/components/activity/TimelineBulkToolbar";
 import { TimelineListView } from "@/components/activity/TimelineListView";
 import { TimelineDayView } from "@/components/activity/TimelineDayView";
 import { TimelineEmptyState } from "@/components/activity/TimelineEmptyState";
 import { TimelineRangeView } from "@/components/activity/TimelineRangeView";
-import { TimelinePagination } from "@/components/activity/TimelinePagination";
 import { TimelineQuickFilters } from "@/components/activity/TimelineQuickFilters";
 import { TimelineToolbar } from "@/components/activity/TimelineToolbar";
 import { TimelineWeekView, getWeekWindow } from "@/components/activity/TimelineWeekView";
@@ -29,25 +28,27 @@ import {
   type TimelineContext,
   type TimelineFilters,
   type TimelineInitialState,
-  type TimelinePreset,
+  type TimelineSavedView,
   type TimelineView,
 } from "@/components/activity/timelineTypes";
 import { Button } from "@/components/ui";
-import { activityEventTypes, activitySortOptions, fetchActivities, formatEnumLabel, type ActivityEventType, type ActivityRecord, type ActivitySortDirection } from "@/lib/api/activity";
+import { activityEventTypes, activityPageSize, activitySortOptions, fetchActivities, formatEnumLabel, type ActivityEventType, type ActivityRecord, type ActivitySortDirection } from "@/lib/api/activity";
 import { fetchAnimals, type Animal } from "@/lib/api/animals";
 import { fetchEnclosures, type Enclosure } from "@/lib/api/enclosures";
 
 type LoadState = "loading" | "loaded" | "error";
 type RequestState = { key: string; status: LoadState };
+type AdditionalLoadState = "idle" | "loading" | "error";
 
 type ActivityTimelineProps = {
   context: TimelineContext;
   initialState?: TimelineInitialState;
 };
 
-const defaultActivityPage = { page: 1, pageSize: 100, totalCount: 0, totalPages: 0, items: [] as ActivityRecord[] };
+const defaultActivityPage = { page: 0, pageSize: activityPageSize, totalCount: 0, totalPages: 0, items: [] as ActivityRecord[] };
 const preferencesKey = "critterops.activityTimeline.preferences.v1";
-const presetsKey = "critterops.activityTimeline.filterPresets.v1";
+const savedViewsKey = "critterops.activityTimeline.savedViews.v1";
+const legacyPresetsKey = "critterops.activityTimeline.filterPresets.v1";
 
 export function ActivityTimeline({ context, initialState = {} }: ActivityTimelineProps) {
   const initialFilters: TimelineFilters = {
@@ -61,6 +62,7 @@ export function ActivityTimeline({ context, initialState = {} }: ActivityTimelin
   const [activityPage, setActivityPage] = useState(defaultActivityPage);
   const [animals, setAnimals] = useState<Animal[]>([]);
   const [enclosures, setEnclosures] = useState<Enclosure[]>([]);
+  const [performers, setPerformers] = useState<string[]>([]);
   const [columns, setColumns] = useState<TimelineColumnId[]>(() => getDefaultColumns(context));
   const [filters, setFilters] = useState<TimelineFilters>(initialFilters);
   const [search, setSearch] = useState(initialState.search ?? "");
@@ -71,14 +73,20 @@ export function ActivityTimeline({ context, initialState = {} }: ActivityTimelin
   const [groupBy, setGroupBy] = useState<RangeGroupBy>(initialState.groupBy ?? "type");
   const [selectedActivityId, setSelectedActivityId] = useState<number | null>(null);
   const [selectedActivityIds, setSelectedActivityIds] = useState<Set<number>>(() => new Set());
-  const [presets, setPresets] = useState<TimelinePreset[]>([]);
-  const [page, setPage] = useState(initialState.page ?? 1);
+  const [savedViews, setSavedViews] = useState<TimelineSavedView[]>([]);
+  const [savedViewsError, setSavedViewsError] = useState("");
   const [requestState, setRequestState] = useState<RequestState>({ key: "", status: "loading" });
+  const [additionalLoadState, setAdditionalLoadState] = useState<AdditionalLoadState>("idle");
   const [reloadKey, setReloadKey] = useState(0);
   const preferencesReadyRef = useRef(false);
   const drawerTriggerRef = useRef<HTMLElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const lastSelectedIndexRef = useRef<number | null>(null);
+  const loadingSentinelRef = useRef<HTMLDivElement>(null);
+  const loadMoreAbortRef = useRef<AbortController | null>(null);
+  const inFlightPageRef = useRef<number | null>(null);
+  const loadedPagesRef = useRef(new Set<number>());
+  const activeRequestKeyRef = useRef("");
   const deferredSearch = useDebouncedValue(search.trim(), 300);
   const deferredPerformer = useDebouncedValue(filters.performer.trim(), 300);
   const viewWindow = useMemo(
@@ -96,10 +104,9 @@ export function ActivityTimeline({ context, initialState = {} }: ActivityTimelin
       from: viewWindow.from ? dateBoundaryToIso(viewWindow.from, false) : undefined,
       to: viewWindow.to ? dateBoundaryToIso(viewWindow.to, true) : undefined,
       sort,
-      page,
-      pageSize: 100,
+      pageSize: activityPageSize,
     }),
-    [context, deferredPerformer, deferredSearch, filters.animalId, filters.enclosureId, filters.eventTypes, page, sort, viewWindow.from, viewWindow.to],
+    [context, deferredPerformer, deferredSearch, filters.animalId, filters.enclosureId, filters.eventTypes, sort, viewWindow.from, viewWindow.to],
   );
   const requestKey = useMemo(() => `${JSON.stringify(query)}:${reloadKey}`, [query, reloadKey]);
   const loadState: LoadState = requestState.key === requestKey ? requestState.status : "loading";
@@ -121,9 +128,8 @@ export function ActivityTimeline({ context, initialState = {} }: ActivityTimelin
     setUrlParameter(url, "type", filters.eventTypes.length ? filters.eventTypes.join(",") : undefined);
     setUrlParameter(url, "sort", sort === "Newest" ? undefined : sort.toLowerCase());
     setUrlParameter(url, "group", groupBy === "type" ? undefined : groupBy);
-    setUrlParameter(url, "page", page > 1 ? page : undefined);
     window.history.replaceState(window.history.state, "", url);
-  }, [filters, groupBy, page, search, selectedDate, sort, view]);
+  }, [filters, groupBy, search, selectedDate, sort, view]);
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
@@ -133,7 +139,9 @@ export function ActivityTimeline({ context, initialState = {} }: ActivityTimelin
       if (!initialState.view && preferences.view) setView(preferences.view);
       if (!initialState.sort && preferences.sort) setSort(preferences.sort);
       if (!initialState.groupBy && preferences.groupBy) setGroupBy(preferences.groupBy);
-      setPresets(readPresets());
+      const storedSavedViews = readSavedViews();
+      if (storedSavedViews) setSavedViews(storedSavedViews);
+      else setSavedViewsError("Saved Views are unavailable in this browser.");
       preferencesReadyRef.current = true;
     });
     return () => window.cancelAnimationFrame(frame);
@@ -171,15 +179,22 @@ export function ActivityTimeline({ context, initialState = {} }: ActivityTimelin
   useEffect(() => {
     const abortController = new AbortController();
     let isActive = true;
+    loadMoreAbortRef.current?.abort();
+    loadMoreAbortRef.current = null;
+    inFlightPageRef.current = null;
+    loadedPagesRef.current = new Set();
+    activeRequestKeyRef.current = requestKey;
 
-    fetchActivities(query, abortController.signal)
+    fetchActivities({ ...query, page: 1 }, abortController.signal)
       .then((response) => {
-        if (!isActive) return;
-        if (response.totalPages > 0 && response.page > response.totalPages) {
-          setPage(response.totalPages);
-          return;
-        }
-        setActivityPage(response);
+        if (!isActive || activeRequestKeyRef.current !== requestKey) return;
+        loadedPagesRef.current.add(1);
+        setPerformers((current) => mergePerformers(
+          current,
+          response.items.map((activity) => activity.performer?.trim()).filter((performer): performer is string => Boolean(performer)),
+        ));
+        setActivityPage({ ...response, items: deduplicateActivities(response.items) });
+        setAdditionalLoadState("idle");
         setRequestState({ key: requestKey, status: "loaded" });
       })
       .catch((error: unknown) => {
@@ -194,19 +209,69 @@ export function ActivityTimeline({ context, initialState = {} }: ActivityTimelin
     return () => {
       isActive = false;
       abortController.abort();
+      loadMoreAbortRef.current?.abort();
     };
   }, [query, requestKey]);
 
-  const isFiltered = Boolean(search.trim() || hasActiveFilters(filters));
+  const isFiltered = Boolean(deferredSearch.trim() || hasActiveFilters(filters));
   const visibleActivities = useMemo(
     () => activityPage.items.filter((activity) => matchesDateFilter(activity, filters)),
     [activityPage.items, filters],
   );
-  const visibleTotalCount = visibleActivities.length === activityPage.items.length ? activityPage.totalCount : visibleActivities.length;
+  const hasMore = activityPage.page > 0 && activityPage.page < activityPage.totalPages;
+  const resultsComplete = loadState === "loaded" && !hasMore;
+  const automaticallyLoadMore = view === "list" || view === "day";
   const selectedActivityIndex = visibleActivities.findIndex((activity) => activity.id === selectedActivityId);
   const selectedActivity = selectedActivityIndex >= 0 ? visibleActivities[selectedActivityIndex] : undefined;
-  const isInitialLoading = loadState === "loading" && requestState.key === "";
-  const isRefreshing = loadState === "loading" && requestState.key !== "";
+  const isInitialLoading = loadState === "loading";
+
+  const loadNextPage = useCallback(() => {
+    if (loadState !== "loaded" || !hasMore || additionalLoadState === "loading") return;
+    const nextPage = activityPage.page + 1;
+    if (loadedPagesRef.current.has(nextPage) || inFlightPageRef.current === nextPage) return;
+
+    const abortController = new AbortController();
+    loadMoreAbortRef.current?.abort();
+    loadMoreAbortRef.current = abortController;
+    inFlightPageRef.current = nextPage;
+    setAdditionalLoadState("loading");
+
+    fetchActivities({ ...query, page: nextPage }, abortController.signal)
+      .then((response) => {
+        if (activeRequestKeyRef.current !== requestKey || inFlightPageRef.current !== nextPage) return;
+        loadedPagesRef.current.add(nextPage);
+        setPerformers((current) => mergePerformers(
+          current,
+          response.items.map((activity) => activity.performer?.trim()).filter((performer): performer is string => Boolean(performer)),
+        ));
+        setActivityPage((current) => ({
+          ...response,
+          page: Math.max(current.page, response.page),
+          items: mergeActivityPages(current.items, response.items),
+        }));
+        setAdditionalLoadState("idle");
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        if (activeRequestKeyRef.current !== requestKey) return;
+        console.error(error);
+        setAdditionalLoadState("error");
+      })
+      .finally(() => {
+        if (inFlightPageRef.current === nextPage) inFlightPageRef.current = null;
+      });
+  }, [activityPage.page, additionalLoadState, hasMore, loadState, query, requestKey]);
+
+  useEffect(() => {
+    const sentinel = loadingSentinelRef.current;
+    if (!sentinel || !automaticallyLoadMore || !hasMore || loadState !== "loaded" || additionalLoadState === "error") return;
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) loadNextPage(); },
+      { rootMargin: "0px 0px 480px", threshold: 0 },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [additionalLoadState, automaticallyLoadMore, hasMore, loadNextPage, loadState]);
 
   const handleSelectActivity = useCallback((activity: ActivityRecord, trigger: HTMLElement) => {
     drawerTriggerRef.current = trigger;
@@ -221,19 +286,16 @@ export function ActivityTimeline({ context, initialState = {} }: ActivityTimelin
   function clearFilters() {
     setSearch("");
     setFilters(defaultTimelineFilters);
-    setPage(1);
     setSelectedActivityIds(new Set());
   }
 
   function handleViewChange(nextView: TimelineView) {
     setView(nextView);
-    setPage(1);
   }
 
   function handleOpenDay(date: string) {
     setSelectedDate(date);
     setView("day");
-    setPage(1);
   }
 
   function handleRangeNavigation(direction: -1 | 1) {
@@ -243,79 +305,82 @@ export function ActivityTimeline({ context, initialState = {} }: ActivityTimelin
       const nextTo = addDays(viewWindow.to!, duration * direction);
       setFilters((current) => ({ ...current, from: nextFrom, to: nextTo }));
       setSelectedDate(nextTo);
-      setPage(1);
       return;
     }
     setSelectedDate(addDays(selectedDate, rangeDays * direction));
-    setPage(1);
   }
 
   function handleRangeDaysChange(days: number) {
     setRangeDays(days);
     setFilters((current) => ({ ...current, from: "", to: "" }));
-    setPage(1);
   }
 
   function handleUseCustomRange() {
     setFilters((current) => ({ ...current, from: viewWindow.from!, to: viewWindow.to! }));
-    setPage(1);
   }
 
   function handleDateChange(date: string) {
     setSelectedDate(date);
-    setPage(1);
     setSelectedActivityIds(new Set());
   }
 
   function handleFiltersChange(nextFilters: TimelineFilters) {
     setFilters(nextFilters);
-    setPage(1);
     setSelectedActivityIds(new Set());
   }
 
   function handleSearchChange(nextSearch: string) {
     setSearch(nextSearch);
-    setPage(1);
   }
 
   function handleSortChange(nextSort: ActivitySortDirection) {
     setSort(nextSort);
-    setPage(1);
   }
 
   function handleGroupByChange(nextGroupBy: RangeGroupBy) {
     setGroupBy(nextGroupBy);
-    setPage(1);
   }
 
-  function handleSavePreset(name: string) {
-    const preset: TimelinePreset = {
-      id: typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `${Date.now()}`,
+  function handleSaveView(name: string) {
+    const savedView: TimelineSavedView = {
+      id: crypto.randomUUID(),
       name,
       filters: { ...filters, eventTypes: [...filters.eventTypes] },
       sort,
       groupBy,
       view,
+      columns: [...columns],
+      search,
+      pinned: false,
     };
-    const nextPresets = [...presets, preset];
-    setPresets(nextPresets);
-    writePresets(nextPresets);
+    updateSavedViews([...savedViews, savedView]);
   }
 
-  function handleApplyPreset(preset: TimelinePreset) {
-    setSearch("");
-    setFilters(sanitizeFiltersForContext(preset.filters, context));
-    setSort(preset.sort);
-    setGroupBy(preset.groupBy);
-    setView(preset.view);
-    setPage(1);
+  function handleApplySavedView(savedView: TimelineSavedView) {
+    setSearch(savedView.search ?? "");
+    setFilters(sanitizeFiltersForContext(savedView.filters, context));
+    setSort(savedView.sort);
+    setGroupBy(savedView.groupBy);
+    setView(savedView.view);
+    if (savedView.columns?.length) setColumns(sanitizeColumnsForContext(savedView.columns, context));
     setSelectedActivityIds(new Set());
   }
 
-  function handleDeletePreset(id: string) {
-    const nextPresets = presets.filter((preset) => preset.id !== id);
-    setPresets(nextPresets);
-    writePresets(nextPresets);
+  function handleDeleteSavedView(id: string) {
+    updateSavedViews(savedViews.filter((savedView) => savedView.id !== id));
+  }
+
+  function handleRenameSavedView(id: string, name: string) {
+    updateSavedViews(savedViews.map((savedView) => savedView.id === id ? { ...savedView, name } : savedView));
+  }
+
+  function handleToggleSavedViewPin(id: string) {
+    updateSavedViews(savedViews.map((savedView) => savedView.id === id ? { ...savedView, pinned: !savedView.pinned } : savedView));
+  }
+
+  function updateSavedViews(nextSavedViews: TimelineSavedView[]) {
+    setSavedViews(nextSavedViews);
+    setSavedViewsError(writeSavedViews(nextSavedViews) ? "" : "Saved Views could not be saved in this browser.");
   }
 
   function handleToggleSelection(activityId: number, modifiers: { shiftKey: boolean; additive: boolean }) {
@@ -339,12 +404,6 @@ export function ActivityTimeline({ context, initialState = {} }: ActivityTimelin
 
   function handleToggleAll(checked: boolean) {
     setSelectedActivityIds(checked ? new Set(visibleActivities.map((activity) => activity.id)) : new Set());
-  }
-
-  function handlePageChange(nextPage: number) {
-    setPage(nextPage);
-    setSelectedActivityIds(new Set());
-    setSelectedActivityId(null);
   }
 
   useEffect(() => {
@@ -376,21 +435,15 @@ export function ActivityTimeline({ context, initialState = {} }: ActivityTimelin
     if (filters.from || filters.to) {
       setFilters((current) => ({ ...current, from: addDays(today, -(duration - 1)), to: today }));
     }
-    setPage(1);
   }
 
   return (
-    <section className="activity-timeline" aria-labelledby="activity-timeline-title">
+    <section className="activity-timeline" aria-labelledby="activity-timeline-title" aria-busy={isInitialLoading || additionalLoadState === "loading"}>
       <div className="activity-timeline-heading">
         <div>
           <span className="activity-timeline-eyebrow">Operational history</span>
           <h2 id="activity-timeline-title">Activity timeline</h2>
         </div>
-        {loadState === "loaded" ? (
-          <span className="activity-result-count">
-            {visibleActivities.length < visibleTotalCount ? `${visibleActivities.length} of ` : ""}{visibleTotalCount} {visibleTotalCount === 1 ? "activity" : "activities"}
-          </span>
-        ) : null}
       </div>
 
       <TimelineToolbar
@@ -400,26 +453,37 @@ export function ActivityTimeline({ context, initialState = {} }: ActivityTimelin
         enclosures={enclosures}
         filters={filters}
         groupBy={groupBy}
+        performers={performers}
         search={search}
         searchInputRef={searchInputRef}
         sort={sort}
         view={view}
         onColumnsChange={setColumns}
-        presets={presets}
         onFiltersChange={handleFiltersChange}
         onGroupByChange={handleGroupByChange}
         onSearchChange={handleSearchChange}
         onSortChange={handleSortChange}
         onViewChange={handleViewChange}
         onResetColumns={() => setColumns(getDefaultColumns(context))}
-        onApplyPreset={handleApplyPreset}
-        onDeletePreset={handleDeletePreset}
-        onSavePreset={handleSavePreset}
       />
 
-      <TimelineQuickFilters filters={filters} onChange={handleFiltersChange} />
+      <TimelineQuickFilters
+        columns={columns}
+        filters={filters}
+        groupBy={groupBy}
+        savedViews={savedViews}
+        savedViewsError={savedViewsError}
+        search={search}
+        sort={sort}
+        view={view}
+        onChange={handleFiltersChange}
+        onApplySavedView={handleApplySavedView}
+        onDeleteSavedView={handleDeleteSavedView}
+        onRenameSavedView={handleRenameSavedView}
+        onSaveView={handleSaveView}
+        onTogglePin={handleToggleSavedViewPin}
+      />
       {selectedActivityIds.size ? <TimelineBulkToolbar count={selectedActivityIds.size} onClear={() => setSelectedActivityIds(new Set())} /> : null}
-      {isRefreshing ? <div className="timeline-refresh-indicator" role="status"><span /> Updating activity…</div> : null}
 
       {isInitialLoading ? <TimelineLoadingState columns={columns.length} view={view} /> : null}
       {loadState === "error" ? (
@@ -429,16 +493,17 @@ export function ActivityTimeline({ context, initialState = {} }: ActivityTimelin
           <Button variant="secondary" onClick={() => setReloadKey((value) => value + 1)}>Retry</Button>
         </div>
       ) : null}
-      {requestState.status === "loaded" ? (
+      {loadState === "loaded" ? (
         <TimelineViewContent
           activities={visibleActivities}
           columns={columns}
           customRange={Boolean(filters.from || filters.to)}
           emptyMessage={context.kind === "global" ? "No activity has been recorded." : "No activity recorded yet."}
-          filteredMessage={getFilteredEmptyMessage(filters, search)}
+          filteredMessage={getFilteredEmptyMessage(filters, deferredSearch)}
           filtered={isFiltered}
           groupBy={groupBy}
           rangeDays={rangeDays}
+          resultsComplete={resultsComplete}
           selectedDate={selectedDate}
           sort={sort}
           view={view}
@@ -457,8 +522,14 @@ export function ActivityTimeline({ context, initialState = {} }: ActivityTimelin
         />
       ) : null}
 
-      {requestState.status === "loaded" && !isRefreshing ? (
-        <TimelinePagination {...activityPage} onPageChange={handlePageChange} />
+      {loadState === "loaded" && visibleActivities.length > 0 ? (
+        <TimelineInfiniteScrollStatus
+          additionalLoadState={additionalLoadState}
+          automaticallyLoadMore={automaticallyLoadMore}
+          hasMore={hasMore}
+          sentinelRef={loadingSentinelRef}
+          onRetry={loadNextPage}
+        />
       ) : null}
 
       {selectedActivity ? (
@@ -484,6 +555,7 @@ type TimelineViewContentProps = {
   filtered: boolean;
   groupBy: RangeGroupBy;
   rangeDays: number;
+  resultsComplete: boolean;
   selectedDate: string;
   sort: ActivitySortDirection;
   view: TimelineView;
@@ -503,10 +575,10 @@ type TimelineViewContentProps = {
 
 function TimelineViewContent(props: TimelineViewContentProps) {
   if (props.view === "day") {
-    return <TimelineDayView activities={props.activities} date={props.selectedDate} filtered={props.filtered} filteredMessage={props.filteredMessage} onClear={props.onClear} onDateChange={props.onDateChange} onSelectActivity={props.onSelectActivity} />;
+    return <TimelineDayView activities={props.activities} date={props.selectedDate} filtered={props.filtered} filteredMessage={props.filteredMessage} resultsComplete={props.resultsComplete} onClear={props.onClear} onDateChange={props.onDateChange} onSelectActivity={props.onSelectActivity} />;
   }
   if (props.view === "week") {
-    return <TimelineWeekView activities={props.activities} date={props.selectedDate} filtered={props.filtered} filteredMessage={props.filteredMessage} sort={props.sort} onClear={props.onClear} onDateChange={props.onDateChange} onOpenDay={props.onOpenDay} onSelectActivity={props.onSelectActivity} />;
+    return <TimelineWeekView activities={props.activities} date={props.selectedDate} filtered={props.filtered} filteredMessage={props.filteredMessage} resultsComplete={props.resultsComplete} sort={props.sort} onClear={props.onClear} onDateChange={props.onDateChange} onOpenDay={props.onOpenDay} onSelectActivity={props.onSelectActivity} />;
   }
   if (props.view === "range") {
     return (
@@ -517,6 +589,7 @@ function TimelineViewContent(props: TimelineViewContentProps) {
         from={props.viewWindow.from!}
         groupBy={props.groupBy}
         rangeDays={props.rangeDays}
+        resultsComplete={props.resultsComplete}
         to={props.viewWindow.to!}
         customRange={props.customRange}
         onClear={props.onClear}
@@ -562,6 +635,35 @@ function TimelineLoadingState({ columns, view }: { columns: number; view: Timeli
           {Array.from({ length: columns }, (_, column) => <span className="skeleton" key={column} />)}
         </div>
       ))}
+    </div>
+  );
+}
+
+function TimelineInfiniteScrollStatus({
+  additionalLoadState,
+  automaticallyLoadMore,
+  hasMore,
+  sentinelRef,
+  onRetry,
+}: {
+  additionalLoadState: AdditionalLoadState;
+  automaticallyLoadMore: boolean;
+  hasMore: boolean;
+  sentinelRef: RefObject<HTMLDivElement | null>;
+  onRetry: () => void;
+}) {
+  return (
+    <div ref={sentinelRef} className="timeline-load-more-sentinel" role="status" aria-live="polite">
+      {additionalLoadState === "loading" ? <span className="timeline-load-more-message"><span className="timeline-loading-spinner" aria-hidden="true" /> Loading more activity…</span> : null}
+      {additionalLoadState === "error" ? (
+        <span className="timeline-load-more-error">
+          <span>Unable to load more activity.</span>
+          <Button variant="secondary" onClick={onRetry}>Retry</Button>
+        </span>
+      ) : null}
+      {additionalLoadState === "idle" && hasMore && automaticallyLoadMore ? <span className="visually-hidden">More activity will load as you scroll.</span> : null}
+      {additionalLoadState === "idle" && hasMore && !automaticallyLoadMore ? <Button variant="secondary" onClick={onRetry}>Load more activity</Button> : null}
+      {additionalLoadState === "idle" && !hasMore ? <span className="timeline-end-of-activity">End of activity</span> : null}
     </div>
   );
 }
@@ -647,15 +749,24 @@ function sanitizeFiltersForContext(filters: TimelineFilters, context: TimelineCo
   };
 }
 
-function readPresets(): TimelinePreset[] {
+function sanitizeColumnsForContext(columns: TimelineColumnId[], context: TimelineContext) {
+  const visibleColumns = columns
+    .filter((column) => !(context.kind === "animal" && column === "animal"))
+    .filter((column) => !(context.kind === "enclosure" && column === "enclosure"));
+  return visibleColumns.length ? visibleColumns : getDefaultColumns(context);
+}
+
+function readSavedViews(): TimelineSavedView[] | null {
   try {
-    const value = JSON.parse(window.localStorage.getItem(presetsKey) ?? "[]") as unknown;
+    const savedValue = window.localStorage.getItem(savedViewsKey);
+    const value = JSON.parse(savedValue ?? window.localStorage.getItem(legacyPresetsKey) ?? "[]") as unknown;
     if (!Array.isArray(value)) return [];
-    return value.flatMap((item): TimelinePreset[] => {
+    return value.flatMap((item): TimelineSavedView[] => {
       if (!item || typeof item !== "object") return [];
-      const candidate = item as Partial<TimelinePreset>;
+      const candidate = item as Partial<TimelineSavedView>;
       if (typeof candidate.id !== "string" || typeof candidate.name !== "string" || !candidate.name.trim()) return [];
       if (!candidate.filters || !isActivitySort(candidate.sort) || !isRangeGroupBy(candidate.groupBy) || !isTimelineView(candidate.view)) return [];
+      const validColumnIds: TimelineColumnId[] = ["time", "type", "animal", "enclosure", "details", "performer", "activityId", "createdAt"];
       return [{
         id: candidate.id,
         name: candidate.name.trim(),
@@ -663,19 +774,42 @@ function readPresets(): TimelinePreset[] {
         sort: candidate.sort,
         groupBy: candidate.groupBy,
         view: candidate.view,
+        columns: candidate.columns?.filter((column): column is TimelineColumnId => validColumnIds.includes(column)),
+        search: typeof candidate.search === "string" ? candidate.search : "",
+        pinned: candidate.pinned === true,
       }];
     });
   } catch {
-    return [];
+    return null;
   }
 }
 
-function writePresets(presets: TimelinePreset[]) {
+function writeSavedViews(savedViews: TimelineSavedView[]) {
   try {
-    window.localStorage.setItem(presetsKey, JSON.stringify(presets));
+    window.localStorage.setItem(savedViewsKey, JSON.stringify(savedViews));
+    return true;
   } catch {
-    // Presets are still available for the current session.
+    return false;
   }
+}
+
+function mergePerformers(current: string[], incoming: string[]) {
+  const performers = new Map<string, string>();
+  [...current, ...incoming].forEach((performer) => {
+    const key = performer.toLocaleLowerCase();
+    if (!performers.has(key)) performers.set(key, performer);
+  });
+  return Array.from(performers.values()).sort((first, second) => first.localeCompare(second, undefined, { sensitivity: "base" }));
+}
+
+function deduplicateActivities(activities: ActivityRecord[]) {
+  return mergeActivityPages([], activities);
+}
+
+function mergeActivityPages(current: ActivityRecord[], incoming: ActivityRecord[]) {
+  const activities = new Map(current.map((activity) => [activity.id, activity]));
+  incoming.forEach((activity) => activities.set(activity.id, activity));
+  return Array.from(activities.values());
 }
 
 function getFilteredEmptyMessage(filters: TimelineFilters, search: string) {

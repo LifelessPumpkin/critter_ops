@@ -28,7 +28,6 @@ export function parseTimelineInitialState(searchParams: TimelineSearchParams): T
       from: parseDate(getValue(searchParams.from)) ?? "",
       to: parseDate(getValue(searchParams.to)) ?? "",
     },
-    page: parsePositiveInteger(getValue(searchParams.page)),
   };
 }
 

@@ -10,7 +10,6 @@ export type TimelineInitialState = {
   sort?: ActivitySortDirection;
   groupBy?: RangeGroupBy;
   filters?: Partial<TimelineFilters>;
-  page?: number;
 };
 
 export type TimelineContext =
@@ -37,13 +36,16 @@ export type TimelineFilters = {
   to: string;
 };
 
-export type TimelinePreset = {
+export type TimelineSavedView = {
   id: string;
   name: string;
   filters: TimelineFilters;
   sort: ActivitySortDirection;
   groupBy: RangeGroupBy;
   view: TimelineView;
+  columns?: TimelineColumnId[];
+  search?: string;
+  pinned: boolean;
 };
 
 export type TimelineQueryState = {

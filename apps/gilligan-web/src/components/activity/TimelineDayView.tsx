@@ -17,12 +17,13 @@ type TimelineDayViewProps = {
   date: string;
   filtered: boolean;
   filteredMessage?: string;
+  resultsComplete: boolean;
   onClear: () => void;
   onDateChange: (date: string) => void;
   onSelectActivity: (activity: ActivityRecord, trigger: HTMLElement) => void;
 };
 
-export function TimelineDayView({ activities, date, filtered, filteredMessage, onClear, onDateChange, onSelectActivity }: TimelineDayViewProps) {
+export function TimelineDayView({ activities, date, filtered, filteredMessage, resultsComplete, onClear, onDateChange, onSelectActivity }: TimelineDayViewProps) {
   const selectedActivities = activities
     .filter((activity) => localDateKey(activity.occurredAt) === date)
     .sort(compareActivitiesAscending);
@@ -39,6 +40,7 @@ export function TimelineDayView({ activities, date, filtered, filteredMessage, o
         onNext={() => onDateChange(addDays(date, 1))}
         onJump={() => onDateChange(toDateInputValue(new Date()))}
       />
+      {!resultsComplete && selectedActivities.length ? <p className="timeline-partial-results" role="status">Additional activity for this day is loading as you scroll.</p> : null}
       {selectedActivities.length === 0 ? (
         <TimelineEmptyState
           message={`No activity recorded on ${dayFormatter.format(new Date(`${date}T12:00:00`))}.`}

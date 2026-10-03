@@ -15,6 +15,7 @@ type TimelineWeekViewProps = {
   date: string;
   filtered: boolean;
   filteredMessage?: string;
+  resultsComplete: boolean;
   sort: ActivitySortDirection;
   onClear: () => void;
   onDateChange: (date: string) => void;
@@ -22,7 +23,7 @@ type TimelineWeekViewProps = {
   onSelectActivity: (activity: ActivityRecord, trigger: HTMLElement) => void;
 };
 
-export function TimelineWeekView({ activities, date, filtered, filteredMessage, sort, onClear, onDateChange, onOpenDay, onSelectActivity }: TimelineWeekViewProps) {
+export function TimelineWeekView({ activities, date, filtered, filteredMessage, resultsComplete, sort, onClear, onDateChange, onOpenDay, onSelectActivity }: TimelineWeekViewProps) {
   const weekDates = getWeekDates(date);
   const firstDate = weekDates[0];
   const lastDate = weekDates[6];
@@ -36,6 +37,7 @@ export function TimelineWeekView({ activities, date, filtered, filteredMessage, 
         onNext={() => onDateChange(addDays(date, 7))}
         onJump={() => onDateChange(toDateInputValue(new Date()))}
       />
+      {!resultsComplete && activities.length ? <p className="timeline-partial-results" role="status">Weekly counts reflect loaded activity and will update as more records load.</p> : null}
       {activities.length === 0 ? (
         <TimelineEmptyState message="No activity recorded this week." filtered={filtered} filteredMessage={filteredMessage} onClear={onClear} />
       ) : (
@@ -53,7 +55,7 @@ export function TimelineWeekView({ activities, date, filtered, filteredMessage, 
                   <header className={weekDate === toDateInputValue(new Date()) ? "timeline-week-day-today" : undefined}>
                     <span>{weekdayFormatter.format(dateObject)}</span>
                     <strong>{dayFormatter.format(dateObject)}</strong>
-                    <small>{dayActivities.length} {dayActivities.length === 1 ? "activity" : "activities"}</small>
+                    <small>{resultsComplete ? `${dayActivities.length} ${dayActivities.length === 1 ? "activity" : "activities"}` : `${dayActivities.length} loaded`}</small>
                   </header>
                   <div className="timeline-week-events">
                     {dayActivities.slice(0, visibleActivityLimit).map((activity) => (
@@ -64,7 +66,7 @@ export function TimelineWeekView({ activities, date, filtered, filteredMessage, 
                         + {overflowCount} more
                       </button>
                     ) : null}
-                    {dayActivities.length === 0 ? <span className="timeline-week-none">No activity</span> : null}
+                    {dayActivities.length === 0 ? <span className="timeline-week-none">{resultsComplete ? "No activity" : "No activity loaded yet"}</span> : null}
                   </div>
                 </section>
               );

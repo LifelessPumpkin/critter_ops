@@ -17,6 +17,7 @@ type TimelineRangeViewProps = {
   from: string;
   groupBy: RangeGroupBy;
   rangeDays: number;
+  resultsComplete: boolean;
   to: string;
   customRange: boolean;
   onClear: () => void;
@@ -47,6 +48,7 @@ export function TimelineRangeView({
   from,
   groupBy,
   rangeDays,
+  resultsComplete,
   to,
   customRange,
   onClear,
@@ -90,6 +92,7 @@ export function TimelineRangeView({
           Custom
         </button>
       </div>
+      {!resultsComplete && activities.length ? <p className="timeline-partial-results" role="status">Range groups reflect loaded activity and will update as more records load.</p> : null}
       {activities.length === 0 ? (
         <TimelineEmptyState message="No activity found in this date range." filtered={filtered} filteredMessage={filteredMessage} onClear={onClear} />
       ) : (
@@ -103,7 +106,7 @@ export function TimelineRangeView({
             <div className="timeline-range-corner" role="columnheader">{getGroupLabel(groupBy)}</div>
             {buckets.map((bucket) => <div className="timeline-range-axis-label" role="columnheader" key={bucket.id}>{bucket.label}</div>)}
             {groups.map((group) => (
-              <RangeRow group={group} buckets={buckets} key={group.id} onSelectActivity={onSelectActivity} />
+              <RangeRow group={group} buckets={buckets} key={group.id} resultsComplete={resultsComplete} onSelectActivity={onSelectActivity} />
             ))}
           </div>
         </div>
@@ -112,7 +115,7 @@ export function TimelineRangeView({
   );
 }
 
-function RangeRow({ group, buckets, onSelectActivity }: { group: RangeGroup; buckets: DateBucket[]; onSelectActivity: (activity: ActivityRecord, trigger: HTMLElement) => void }) {
+function RangeRow({ group, buckets, resultsComplete, onSelectActivity }: { group: RangeGroup; buckets: DateBucket[]; resultsComplete: boolean; onSelectActivity: (activity: ActivityRecord, trigger: HTMLElement) => void }) {
   return (
     <>
       <div className="timeline-range-group-label" role="rowheader" title={group.label}>{group.label}</div>
@@ -123,7 +126,7 @@ function RangeRow({ group, buckets, onSelectActivity }: { group: RangeGroup; buc
         });
         return (
           <div className="timeline-range-cell" role="gridcell" key={bucket.id}>
-            {bucketActivities.length ? <ActivityCluster activities={bucketActivities} label={`${group.label}, ${bucket.label}`} onSelectActivity={onSelectActivity} /> : null}
+            {bucketActivities.length ? <ActivityCluster activities={bucketActivities} label={`${group.label}, ${bucket.label}`} resultsComplete={resultsComplete} onSelectActivity={onSelectActivity} /> : null}
           </div>
         );
       })}
@@ -131,14 +134,14 @@ function RangeRow({ group, buckets, onSelectActivity }: { group: RangeGroup; buc
   );
 }
 
-function ActivityCluster({ activities, label, onSelectActivity }: { activities: ActivityRecord[]; label: string; onSelectActivity: (activity: ActivityRecord, trigger: HTMLElement) => void }) {
+function ActivityCluster({ activities, label, resultsComplete, onSelectActivity }: { activities: ActivityRecord[]; label: string; resultsComplete: boolean; onSelectActivity: (activity: ActivityRecord, trigger: HTMLElement) => void }) {
   return (
     <details className="timeline-cluster">
-      <summary aria-label={`${activities.length} activities for ${label}`}>
-        <span aria-hidden="true">{activities.length === 1 ? "" : activities.length}</span>
+      <summary aria-label={`${activities.length}${resultsComplete ? "" : " loaded"} activities for ${label}`}>
+        <span aria-hidden="true">{activities.length === 1 && resultsComplete ? "" : resultsComplete ? activities.length : `${activities.length}+`}</span>
       </summary>
       <div className="timeline-cluster-panel">
-        <strong>{activities.length} {activities.length === 1 ? "activity" : "activities"}</strong>
+        <strong>{activities.length} {resultsComplete ? (activities.length === 1 ? "activity" : "activities") : "activities loaded"}</strong>
         <div className="timeline-cluster-list">
           {activities.slice(0, 8).map((activity) => (
             <button className="timeline-cluster-event" type="button" key={activity.id} onClick={(event) => onSelectActivity(activity, event.currentTarget)}>
