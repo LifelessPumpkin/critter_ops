@@ -1,7 +1,8 @@
 export { Badge, getStatusBadgeVariant } from "@/components/ui/Badge";
 export { Button, ButtonLink } from "@/components/ui/Button";
 export { Card, SummaryCard } from "@/components/ui/Card";
-export { Input, Select, Textarea } from "@/components/ui/Field";
+export { Input, Textarea } from "@/components/ui/Field";
+export { Combobox, MultiSelect, Select, type SelectionOption } from "@/components/ui/Selection";
 export { Table, type TableColumn } from "@/components/ui/Table";
 export {
   Skeleton,

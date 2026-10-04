@@ -182,7 +182,7 @@ export function EnclosureForm() {
           placeholder="Select type"
           required
           error={fieldErrors.type}
-          onChange={(event) => updateField("type", event.target.value)}
+          onValueChange={(value) => updateField("type", value)}
         />
         <Input
           label="Location"
@@ -200,7 +200,7 @@ export function EnclosureForm() {
           placeholder="Select status"
           required
           error={fieldErrors.status}
-          onChange={(event) => updateField("status", event.target.value)}
+          onValueChange={(value) => updateField("status", value)}
         />
       </FormSection>
 
@@ -292,7 +292,7 @@ export function EnclosureForm() {
           placeholder="Select mobility"
           required
           error={fieldErrors.mobility}
-          onChange={(event) => updateField("mobility", event.target.value)}
+          onValueChange={(value) => updateField("mobility", value)}
         />
         <Input
           label="Safety Rating"
