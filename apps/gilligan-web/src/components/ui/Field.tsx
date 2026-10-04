@@ -1,6 +1,5 @@
 import type {
   InputHTMLAttributes,
-  SelectHTMLAttributes,
   TextareaHTMLAttributes,
 } from "react";
 import { forwardRef } from "react";
@@ -13,15 +12,6 @@ type BaseFieldProps = {
 };
 
 type InputProps = BaseFieldProps & InputHTMLAttributes<HTMLInputElement>;
-
-type SelectProps = BaseFieldProps &
-  SelectHTMLAttributes<HTMLSelectElement> & {
-    options: Array<{
-      label: string;
-      value: string;
-    }>;
-    placeholder?: string;
-  };
 
 type TextareaProps = BaseFieldProps & TextareaHTMLAttributes<HTMLTextAreaElement>;
 
@@ -42,36 +32,6 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
     </label>
   );
 });
-
-export function Select({
-  error,
-  label,
-  labelHidden = false,
-  options,
-  placeholder,
-  required = false,
-  className,
-  ...props
-}: SelectProps) {
-  return (
-    <label className="form-field">
-      <FieldLabel hidden={labelHidden} label={label} required={required} />
-      <select
-        className={["form-control", error ? "form-control-invalid" : null, className].filter(Boolean).join(" ")}
-        aria-invalid={Boolean(error)}
-        {...props}
-      >
-        {placeholder ? <option value="">{placeholder}</option> : null}
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-      {error ? <span className="field-error">{error}</span> : null}
-    </label>
-  );
-}
 
 export function Textarea({ error, label, labelHidden = false, required = false, className, ...props }: TextareaProps) {
   return (

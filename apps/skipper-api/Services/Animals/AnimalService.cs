@@ -8,6 +8,7 @@ namespace skipper_api.Services.Animals;
 
 public class AnimalService : IAnimalService
 {
+    private const int MaximumPageSize = 100;
     private readonly ProfessorDbContext _dbContext;
 
     public AnimalService(ProfessorDbContext dbContext)
@@ -22,6 +23,100 @@ public class AnimalService : IAnimalService
             .OrderBy(animal => animal.Name)
             .Select(ToResponseDtoProjection)
             .ToListAsync(cancellationToken);
+    }
+
+    public async Task<AnimalSearchResponseDto> SearchAsync(
+        AnimalSearchRequestDto request,
+        CancellationToken cancellationToken = default)
+    {
+        var page = Math.Max(request.Page, 1);
+        var pageSize = Math.Clamp(request.PageSize, 1, MaximumPageSize);
+        var filteredQuery = ApplyNonLifecycleFilters(_dbContext.Animals.AsNoTracking(), request);
+        var inCareStatuses = AnimalLifecycleRules.InCareStatuses;
+        var outOfCareStatuses = AnimalLifecycleRules.OutOfCareStatuses;
+
+        // A DbContext cannot execute concurrent operations. Await each aggregate while
+        // keeping them server-side and scoped to the complete filtered query.
+        var allCount = await filteredQuery.CountAsync(cancellationToken);
+        var inCareCount = await filteredQuery.CountAsync(
+            animal => inCareStatuses.Contains(animal.Status), cancellationToken);
+        var outOfCareCount = await filteredQuery.CountAsync(
+            animal => outOfCareStatuses.Contains(animal.Status), cancellationToken);
+
+        var lifecycleQuery = request.Lifecycle switch
+        {
+            AnimalLifecycle.InCare => filteredQuery.Where(animal => inCareStatuses.Contains(animal.Status)),
+            AnimalLifecycle.OutOfCare => filteredQuery.Where(animal => outOfCareStatuses.Contains(animal.Status)),
+            _ => filteredQuery,
+        };
+        var totalCount = request.Lifecycle switch
+        {
+            AnimalLifecycle.InCare => inCareCount,
+            AnimalLifecycle.OutOfCare => outOfCareCount,
+            _ => allCount,
+        };
+
+        var items = await lifecycleQuery
+            .OrderBy(animal => animal.Name)
+            .ThenBy(animal => animal.Id)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(animal => new AnimalListItemDto
+            {
+                Id = animal.Id,
+                EnclosureId = animal.EnclosureId,
+                EnclosureName = animal.Enclosure.Name,
+                EnclosureLocation = animal.Enclosure.Location,
+                Name = animal.Name,
+                Species = animal.Species,
+                SubspeciesOrMorph = animal.SubspeciesOrMorph,
+                AnimalType = animal.AnimalType,
+                Status = animal.Status,
+                Sex = animal.Sex,
+                BirthDate = animal.BirthDate,
+                BirthDateIsEstimated = animal.BirthDateIsEstimated,
+            })
+            .ToListAsync(cancellationToken);
+
+        return new AnimalSearchResponseDto
+        {
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = totalCount,
+            TotalPages = totalCount == 0 ? 0 : (int)Math.Ceiling(totalCount / (double)pageSize),
+            AllCount = allCount,
+            InCareCount = inCareCount,
+            OutOfCareCount = outOfCareCount,
+            Items = items,
+        };
+    }
+
+    private static IQueryable<Animal> ApplyNonLifecycleFilters(
+        IQueryable<Animal> query,
+        AnimalSearchRequestDto request)
+    {
+        if (!string.IsNullOrWhiteSpace(request.Search))
+        {
+            var search = request.Search.Trim();
+            query = query.Where(animal => EF.Functions.ILike(animal.Name, $"%{search}%"));
+        }
+
+        if (request.Statuses.Count > 0)
+        {
+            query = query.Where(animal => request.Statuses.Contains(animal.Status));
+        }
+
+        if (request.AnimalTypes.Count > 0)
+        {
+            query = query.Where(animal => request.AnimalTypes.Contains(animal.AnimalType));
+        }
+
+        if (request.EnclosureId.HasValue)
+        {
+            query = query.Where(animal => animal.EnclosureId == request.EnclosureId.Value);
+        }
+
+        return query;
     }
 
     public async Task<AnimalResponseDto?> GetByIdAsync(int id, CancellationToken cancellationToken = default)

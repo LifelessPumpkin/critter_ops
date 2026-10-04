@@ -26,6 +26,16 @@ public class AnimalsController : ControllerBase
         return Ok(animals);
     }
 
+    /// <summary>Returns a filtered and paged operational animal list.</summary>
+    [HttpGet("search")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(AnimalSearchResponseDto))]
+    public async Task<ActionResult<AnimalSearchResponseDto>> Search(
+        [FromQuery] AnimalSearchRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        return Ok(await _animalService.SearchAsync(request, cancellationToken));
+    }
+
     /// <summary>
     /// Returns a single animal by ID.
     /// </summary>

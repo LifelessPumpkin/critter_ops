@@ -12,6 +12,7 @@ type TableProps<Row> = {
   getRowKey: (row: Row) => string | number;
   rows: Row[];
   tableClassName?: string;
+  trailingRows?: ReactNode;
 };
 
 export function Table<Row>({
@@ -21,6 +22,7 @@ export function Table<Row>({
   getRowKey,
   rows,
   tableClassName,
+  trailingRows,
 }: TableProps<Row>) {
   return (
     <div className="data-table-scroll">
@@ -35,14 +37,17 @@ export function Table<Row>({
           </tr>
         </thead>
         <tbody>
-          {rows.length > 0 ? (
-            rows.map((row) => (
+          {rows.length > 0 || trailingRows ? (
+            <>
+              {rows.map((row) => (
               <tr key={getRowKey(row)}>
                 {columns.map((column) => (
                   <td key={column.header}>{column.render(row)}</td>
                 ))}
               </tr>
-            ))
+              ))}
+              {trailingRows}
+            </>
           ) : (
             <tr>
               <td colSpan={columns.length} className="data-table-empty">

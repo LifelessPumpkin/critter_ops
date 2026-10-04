@@ -46,15 +46,15 @@ function getBreadcrumbs(pathname: string): Breadcrumb[] {
     const navigationItem = primaryNavigation.find((item) => item.href === href);
 
     return {
-      label: navigationItem?.label ?? getSegmentLabel(segment),
+      label: navigationItem?.label ?? getSegmentLabel(segment, segments[index - 1]),
       href,
     };
   });
 }
 
-function getSegmentLabel(segment: string) {
+function getSegmentLabel(segment: string, parentSegment?: string) {
   if (segment === "new") {
-    return "Add Enclosure";
+    return parentSegment === "animals" ? "Add Animal" : "Add Enclosure";
   }
 
   if (/^\d+$/.test(segment)) {

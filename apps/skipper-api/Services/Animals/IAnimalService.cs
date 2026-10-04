@@ -6,6 +6,10 @@ public interface IAnimalService
 {
     Task<IReadOnlyList<AnimalResponseDto>> GetAllAsync(CancellationToken cancellationToken = default);
 
+    Task<AnimalSearchResponseDto> SearchAsync(
+        AnimalSearchRequestDto request,
+        CancellationToken cancellationToken = default);
+
     Task<AnimalResponseDto?> GetByIdAsync(int id, CancellationToken cancellationToken = default);
 
     Task<CreateAnimalResult> CreateAsync(CreateAnimalRequestDto request, CancellationToken cancellationToken = default);
