@@ -162,6 +162,7 @@ public class TaskService : ITaskService
         await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
 
         var task = await _dbContext.Tasks
+            .Include(task => task.Animal)
             .SingleOrDefaultAsync(task => task.Id == id, cancellationToken);
 
         if (task is null)
@@ -269,11 +270,54 @@ public class TaskService : ITaskService
 
     private static ActivityEvent ToCompletionActivityEvent(TaskEntity task, DateTime completedAt)
     {
+        return task.TaskType switch
+        {
+            TaskType.Feeding => ToFeedingCompletionActivityEvent(task, completedAt),
+            _ => ToGenericCompletionActivityEvent(task, completedAt),
+        };
+    }
+
+    private static ActivityEvent ToFeedingCompletionActivityEvent(TaskEntity task, DateTime completedAt)
+    {
+        var activityEvent = CreateCompletionActivityEvent(
+            task,
+            completedAt,
+            ActivityEventType.Feeding,
+            task.Title);
+
+        activityEvent.AnimalFeeding = new AnimalFeedingActivity
+        {
+            // Tasks do not currently capture a structured food amount. Preserve the
+            // task's description of the feeding without claiming an observed result.
+            Food = task.Title,
+            Quantity = 1,
+            Unit = AnimalFeedingQuantityUnit.Other,
+            Result = AnimalFeedingResult.NotObserved,
+        };
+
+        return activityEvent;
+    }
+
+    private static ActivityEvent ToGenericCompletionActivityEvent(TaskEntity task, DateTime completedAt)
+    {
+        return CreateCompletionActivityEvent(
+            task,
+            completedAt,
+            ActivityEventType.Task,
+            $"Task completed: {task.Title}");
+    }
+
+    private static ActivityEvent CreateCompletionActivityEvent(
+        TaskEntity task,
+        DateTime completedAt,
+        ActivityEventType eventType,
+        string title)
+    {
         var activityEvent = new ActivityEvent
         {
-            EventType = ActivityEventType.Task,
+            EventType = eventType,
             OccurredAt = completedAt,
-            Title = $"Task completed: {task.Title}",
+            Title = title,
             Notes = task.CompletionNotes,
             PerformedBy = task.CompletedBy,
             SourceType = "Task",
@@ -298,7 +342,8 @@ public class TaskService : ITaskService
             });
         }
 
-        if (task.EnclosureId is { } enclosureId)
+        var historicalEnclosureId = task.EnclosureId ?? task.Animal?.EnclosureId;
+        if (historicalEnclosureId is { } enclosureId)
         {
             activityEvent.Enclosures.Add(new ActivityEventEnclosure
             {
