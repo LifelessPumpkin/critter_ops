@@ -269,6 +269,11 @@ public class EnclosureTimelineService : IEnclosureTimelineService
 
     private static string ToTimelineTitle(ActivityEvent timelineEvent, int enclosureId)
     {
+        if (timelineEvent.SourceType == "Task")
+        {
+            return timelineEvent.Title;
+        }
+
         if (timelineEvent.EventType != ActivityEventType.AnimalMovement ||
             timelineEvent.AnimalMovement is not { } movement)
         {

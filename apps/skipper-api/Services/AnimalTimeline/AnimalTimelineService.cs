@@ -347,6 +347,11 @@ public class AnimalTimelineService : IAnimalTimelineService
 
     private static string ToTimelineTitle(ActivityEvent timelineEvent)
     {
+        if (timelineEvent.SourceType == "Task")
+        {
+            return timelineEvent.Title;
+        }
+
         return timelineEvent.EventType == ActivityEventType.AnimalMovement &&
             timelineEvent.AnimalMovement is { } movement
             ? $"Moved from {movement.FromEnclosure.Name} to {movement.ToEnclosure.Name}"
