@@ -270,16 +270,16 @@ public class TaskService : ITaskService
 
     private static ActivityEvent ToCompletionActivityEvent(TaskEntity task, DateTime completedAt)
     {
-        return task.TaskType switch
+        return CompletedTaskActivityTypeMapper.GetActivityEventType(task.TaskType) switch
         {
-            TaskType.Feeding => ToFeedingCompletionActivityEvent(task, completedAt),
-            TaskType.Medication => ToMedicationCompletionActivityEvent(task, completedAt),
-            TaskType.Cleaning => ToCleaningCompletionActivityEvent(task, completedAt),
-            TaskType.WaterChange => ToWaterChangeCompletionActivityEvent(task, completedAt),
-            TaskType.Inspection => ToInspectionCompletionActivityEvent(task, completedAt),
-            TaskType.Maintenance => ToMaintenanceCompletionActivityEvent(task, completedAt),
-            TaskType.Note => CreateTypedCompletionActivityEvent(task, completedAt, ActivityEventType.Note),
-            TaskType.General => CreateTypedCompletionActivityEvent(task, completedAt, ActivityEventType.General),
+            ActivityEventType.Feeding => ToFeedingCompletionActivityEvent(task, completedAt),
+            ActivityEventType.Medication => ToMedicationCompletionActivityEvent(task, completedAt),
+            ActivityEventType.Cleaning => ToCleaningCompletionActivityEvent(task, completedAt),
+            ActivityEventType.WaterChange => ToWaterChangeCompletionActivityEvent(task, completedAt),
+            ActivityEventType.Inspection => ToInspectionCompletionActivityEvent(task, completedAt),
+            ActivityEventType.Maintenance => ToMaintenanceCompletionActivityEvent(task, completedAt),
+            ActivityEventType.Note => CreateTypedCompletionActivityEvent(task, completedAt, ActivityEventType.Note),
+            ActivityEventType.General => CreateTypedCompletionActivityEvent(task, completedAt, ActivityEventType.General),
             _ => ToGenericCompletionActivityEvent(task, completedAt),
         };
     }
