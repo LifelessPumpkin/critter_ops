@@ -67,3 +67,18 @@ public class ActivitySearchCleaningDetailsDto
 
     public string? EquipmentCleaned { get; set; }
 }
+
+public class ActivitySearchWaterChangeDetailsDto
+{
+    public decimal? WaterChangePercent { get; set; }
+}
+
+public class ActivitySearchInspectionDetailsDto
+{
+    public InspectionResult Result { get; set; }
+}
+
+public class ActivitySearchMaintenanceDetailsDto
+{
+    public required string Description { get; set; }
+}

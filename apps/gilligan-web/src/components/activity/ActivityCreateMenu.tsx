@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 
-const activityOptions = ["Feeding", "Treatment", "Movement", "Cleaning", "Note"] as const;
+const activityOptions = ["Feeding", "Treatment", "Movement", "Cleaning", "Water Change", "Inspection", "Maintenance", "Note", "General"] as const;
 
 export function ActivityCreateMenu() {
   const [placeholder, setPlaceholder] = useState("");

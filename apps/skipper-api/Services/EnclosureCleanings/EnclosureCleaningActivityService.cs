@@ -77,7 +77,9 @@ public class EnclosureCleaningActivityService : IEnclosureCleaningActivityServic
         };
         var activityEvent = new ActivityEvent
         {
-            EventType = ActivityEventType.Cleaning,
+            EventType = request.CleaningType == EnclosureCleaningType.WaterChange
+                ? ActivityEventType.WaterChange
+                : ActivityEventType.Cleaning,
             OccurredAt = request.OccurredAt!.Value,
             Title = ToTimelineTitle(cleaning),
             Notes = request.Notes,
@@ -92,7 +94,15 @@ public class EnclosureCleaningActivityService : IEnclosureCleaningActivityServic
                     RelationshipType = ActivityEventEnclosureRelationshipType.Primary,
                 },
             ],
-            EnclosureCleaning = cleaning,
+            EnclosureCleaning = request.CleaningType == EnclosureCleaningType.WaterChange
+                ? null
+                : cleaning,
+            EnclosureWaterChange = request.CleaningType == EnclosureCleaningType.WaterChange
+                ? new EnclosureWaterChangeActivity
+                {
+                    WaterChangePercent = request.WaterChangePercent,
+                }
+                : null,
         };
 
         _dbContext.ActivityEvents.Add(activityEvent);
@@ -113,26 +123,44 @@ public class EnclosureCleaningActivityService : IEnclosureCleaningActivityServic
     {
         var cleaningEvent = await _dbContext.ActivityEvents
             .Include(activityEvent => activityEvent.EnclosureCleaning)
+            .Include(activityEvent => activityEvent.EnclosureWaterChange)
             .Include(activityEvent => activityEvent.Enclosures)
                 .ThenInclude(association => association.Enclosure)
             .SingleOrDefaultAsync(
                 activityEvent =>
                     activityEvent.Id == activityId &&
-                    activityEvent.EventType == ActivityEventType.Cleaning &&
+                    (activityEvent.EventType == ActivityEventType.Cleaning ||
+                        activityEvent.EventType == ActivityEventType.WaterChange) &&
                     activityEvent.Enclosures.Any(association => association.EnclosureId == enclosureId),
                 cancellationToken);
 
-        if (cleaningEvent?.EnclosureCleaning is null)
+        if (cleaningEvent is null ||
+            (cleaningEvent.EnclosureCleaning is null && cleaningEvent.EnclosureWaterChange is null))
         {
             return UpdateEnclosureCleaningActivityResult.NotFound();
         }
 
-        cleaningEvent.EnclosureCleaning.CleaningType = request.CleaningType!.Value;
-        cleaningEvent.EnclosureCleaning.WaterChangePercent = request.WaterChangePercent;
-        cleaningEvent.EnclosureCleaning.SubstrateChanged = request.SubstrateChanged;
-        cleaningEvent.EnclosureCleaning.EquipmentCleaned = request.EquipmentCleaned;
+        var cleaning = new EnclosureCleaningActivity
+        {
+            CleaningType = request.CleaningType!.Value,
+            WaterChangePercent = request.WaterChangePercent,
+            SubstrateChanged = request.SubstrateChanged,
+            EquipmentCleaned = request.EquipmentCleaned,
+        };
+        cleaningEvent.EventType = request.CleaningType == EnclosureCleaningType.WaterChange
+            ? ActivityEventType.WaterChange
+            : ActivityEventType.Cleaning;
+        cleaningEvent.EnclosureCleaning = request.CleaningType == EnclosureCleaningType.WaterChange
+            ? null
+            : cleaning;
+        cleaningEvent.EnclosureWaterChange = request.CleaningType == EnclosureCleaningType.WaterChange
+            ? new EnclosureWaterChangeActivity
+            {
+                WaterChangePercent = request.WaterChangePercent,
+            }
+            : null;
         cleaningEvent.OccurredAt = request.OccurredAt!.Value;
-        cleaningEvent.Title = ToTimelineTitle(cleaningEvent.EnclosureCleaning);
+        cleaningEvent.Title = ToTimelineTitle(cleaning);
         cleaningEvent.Notes = request.Notes;
         cleaningEvent.PerformedBy = request.PerformedBy;
         cleaningEvent.UpdatedAt = DateTime.UtcNow;
@@ -151,15 +179,18 @@ public class EnclosureCleaningActivityService : IEnclosureCleaningActivityServic
 
         var cleaningEvent = await _dbContext.ActivityEvents
             .Include(activityEvent => activityEvent.EnclosureCleaning)
+            .Include(activityEvent => activityEvent.EnclosureWaterChange)
             .Include(activityEvent => activityEvent.Enclosures)
             .SingleOrDefaultAsync(
                 activityEvent =>
                     activityEvent.Id == activityId &&
-                    activityEvent.EventType == ActivityEventType.Cleaning &&
+                    (activityEvent.EventType == ActivityEventType.Cleaning ||
+                        activityEvent.EventType == ActivityEventType.WaterChange) &&
                     activityEvent.Enclosures.Any(association => association.EnclosureId == enclosureId),
                 cancellationToken);
 
-        if (cleaningEvent?.EnclosureCleaning is null)
+        if (cleaningEvent is null ||
+            (cleaningEvent.EnclosureCleaning is null && cleaningEvent.EnclosureWaterChange is null))
         {
             return DeleteEnclosureCleaningActivityResult.NotFound;
         }
@@ -176,10 +207,12 @@ public class EnclosureCleaningActivityService : IEnclosureCleaningActivityServic
         return _dbContext.ActivityEvents
             .AsNoTracking()
             .Include(activityEvent => activityEvent.EnclosureCleaning)
+            .Include(activityEvent => activityEvent.EnclosureWaterChange)
             .Include(activityEvent => activityEvent.Enclosures)
                 .ThenInclude(association => association.Enclosure)
-            .Where(activityEvent => activityEvent.EventType == ActivityEventType.Cleaning &&
-                activityEvent.EnclosureCleaning != null);
+            .Where(activityEvent =>
+                (activityEvent.EventType == ActivityEventType.Cleaning && activityEvent.EnclosureCleaning != null) ||
+                (activityEvent.EventType == ActivityEventType.WaterChange && activityEvent.EnclosureWaterChange != null));
     }
 
     private static EnclosureCleaningActivityDto ToDto(ActivityEvent activityEvent, int enclosureId)
@@ -197,17 +230,18 @@ public class EnclosureCleaningActivityService : IEnclosureCleaningActivityServic
         int enclosureId,
         string enclosureName)
     {
-        var cleaning = activityEvent.EnclosureCleaning!;
+        var cleaning = activityEvent.EnclosureCleaning;
+        var waterChange = activityEvent.EnclosureWaterChange;
 
         return new EnclosureCleaningActivityDto
         {
             ActivityEventId = activityEvent.Id,
             EnclosureId = enclosureId,
             EnclosureName = enclosureName,
-            CleaningType = cleaning.CleaningType,
-            WaterChangePercent = cleaning.WaterChangePercent,
-            SubstrateChanged = cleaning.SubstrateChanged,
-            EquipmentCleaned = cleaning.EquipmentCleaned,
+            CleaningType = cleaning?.CleaningType ?? EnclosureCleaningType.WaterChange,
+            WaterChangePercent = cleaning?.WaterChangePercent ?? waterChange?.WaterChangePercent,
+            SubstrateChanged = cleaning?.SubstrateChanged ?? false,
+            EquipmentCleaned = cleaning?.EquipmentCleaned,
             OccurredAt = activityEvent.OccurredAt,
             Notes = activityEvent.Notes,
             PerformedBy = activityEvent.PerformedBy,

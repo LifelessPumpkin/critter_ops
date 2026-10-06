@@ -63,4 +63,13 @@ public class ActivityEvent
 
     /// <summary>Structured enclosure cleaning detail, when this event is cleaning.</summary>
     public EnclosureCleaningActivity? EnclosureCleaning { get; set; }
+
+    /// <summary>Structured enclosure water change detail, when this event is a water change.</summary>
+    public EnclosureWaterChangeActivity? EnclosureWaterChange { get; set; }
+
+    /// <summary>Structured inspection detail, when this event is an inspection.</summary>
+    public InspectionActivity? Inspection { get; set; }
+
+    /// <summary>Structured maintenance detail, when this event is maintenance.</summary>
+    public MaintenanceActivity? Maintenance { get; set; }
 }

@@ -32,6 +32,9 @@ const typeFilters: Array<{ label: string; value: ActivityEventType }> = [
   { label: "Feedings", value: "Feeding" },
   { label: "Treatments", value: "Treatment" },
   { label: "Cleaning", value: "Cleaning" },
+  { label: "Water changes", value: "WaterChange" },
+  { label: "Inspections", value: "Inspection" },
+  { label: "Maintenance", value: "Maintenance" },
   { label: "Tasks", value: "Task" },
 ];
 

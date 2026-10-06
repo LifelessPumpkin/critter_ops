@@ -37,6 +37,12 @@ public class ProfessorDbContext : DbContext
 
     public DbSet<EnclosureCleaningActivity> EnclosureCleaningActivities => Set<EnclosureCleaningActivity>();
 
+    public DbSet<EnclosureWaterChangeActivity> EnclosureWaterChangeActivities => Set<EnclosureWaterChangeActivity>();
+
+    public DbSet<InspectionActivity> InspectionActivities => Set<InspectionActivity>();
+
+    public DbSet<MaintenanceActivity> MaintenanceActivities => Set<MaintenanceActivity>();
+
     public DbSet<Enclosure> Enclosures => Set<Enclosure>();
 
     public DbSet<TaskEntity> Tasks => Set<TaskEntity>();

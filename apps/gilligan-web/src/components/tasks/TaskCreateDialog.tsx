@@ -27,7 +27,7 @@ type TaskFormState = {
 
 type FieldErrors = Partial<Record<keyof TaskFormState, string>>;
 
-const taskTypeOptions = ["Feeding", "Cleaning", "WaterChange", "Medication", "Inspection", "Maintenance", "General", "Other"].map(
+const taskTypeOptions = ["Feeding", "Cleaning", "WaterChange", "Medication", "Inspection", "Maintenance", "Note", "General", "Other"].map(
   (value) => ({
     label: formatEnumLabel(value),
     value,

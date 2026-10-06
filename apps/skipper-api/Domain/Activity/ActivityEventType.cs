@@ -11,8 +11,12 @@ public enum ActivityEventType
     Treatment,
     AnimalDisposition,
     Cleaning,
+    WaterChange,
+    Inspection,
+    Maintenance,
     WaterTest,
     Task,
     Note,
+    General,
     Other,
 }

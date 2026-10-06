@@ -10,7 +10,12 @@ public enum AnimalTimelineEventType
     AnimalDisposition,
     Medication,
     Treatment,
+    Cleaning,
+    WaterChange,
+    Inspection,
+    Maintenance,
     Note,
+    General,
     Task,
     Other,
 }
