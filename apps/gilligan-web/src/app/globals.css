@@ -1365,14 +1365,17 @@ textarea {
 }
 
 .activity-type-feeding,
-.activity-type-cleaning {
+.activity-type-cleaning,
+.activity-type-waterchange,
+.activity-type-inspection {
   background: #eef6f1;
   border-color: #d0e4d7;
   color: var(--accent-green);
 }
 
 .activity-type-medication,
-.activity-type-treatment {
+.activity-type-treatment,
+.activity-type-maintenance {
   background: #f7f1e8;
   border-color: #e8d8bc;
   color: var(--color-warning);

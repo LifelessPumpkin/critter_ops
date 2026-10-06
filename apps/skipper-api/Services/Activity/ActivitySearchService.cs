@@ -38,7 +38,10 @@ public class ActivitySearchService : IActivitySearchService
             .Include(activityEvent => activityEvent.AnimalDisposition)
             .Include(activityEvent => activityEvent.AnimalMedication)
             .Include(activityEvent => activityEvent.AnimalTreatment)
-            .Include(activityEvent => activityEvent.EnclosureCleaning);
+            .Include(activityEvent => activityEvent.EnclosureCleaning)
+            .Include(activityEvent => activityEvent.EnclosureWaterChange)
+            .Include(activityEvent => activityEvent.Inspection)
+            .Include(activityEvent => activityEvent.Maintenance);
 
         var orderedQuery = ApplyOrdering(detailedQuery, request.Sort);
 
@@ -275,6 +278,24 @@ public class ActivitySearchService : IActivitySearchService
                     WaterChangePercent = cleaning.WaterChangePercent,
                     SubstrateChanged = cleaning.SubstrateChanged,
                     EquipmentCleaned = cleaning.EquipmentCleaned,
+                }
+                : null,
+            WaterChange = activityEvent.EnclosureWaterChange is { } waterChange
+                ? new ActivitySearchWaterChangeDetailsDto
+                {
+                    WaterChangePercent = waterChange.WaterChangePercent,
+                }
+                : null,
+            Inspection = activityEvent.Inspection is { } inspection
+                ? new ActivitySearchInspectionDetailsDto
+                {
+                    Result = inspection.Result,
+                }
+                : null,
+            Maintenance = activityEvent.Maintenance is { } maintenance
+                ? new ActivitySearchMaintenanceDetailsDto
+                {
+                    Description = maintenance.Description,
                 }
                 : null,
         };

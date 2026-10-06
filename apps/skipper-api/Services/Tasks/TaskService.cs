@@ -273,6 +273,13 @@ public class TaskService : ITaskService
         return task.TaskType switch
         {
             TaskType.Feeding => ToFeedingCompletionActivityEvent(task, completedAt),
+            TaskType.Medication => ToMedicationCompletionActivityEvent(task, completedAt),
+            TaskType.Cleaning => ToCleaningCompletionActivityEvent(task, completedAt),
+            TaskType.WaterChange => ToWaterChangeCompletionActivityEvent(task, completedAt),
+            TaskType.Inspection => ToInspectionCompletionActivityEvent(task, completedAt),
+            TaskType.Maintenance => ToMaintenanceCompletionActivityEvent(task, completedAt),
+            TaskType.Note => CreateTypedCompletionActivityEvent(task, completedAt, ActivityEventType.Note),
+            TaskType.General => CreateTypedCompletionActivityEvent(task, completedAt, ActivityEventType.General),
             _ => ToGenericCompletionActivityEvent(task, completedAt),
         };
     }
@@ -298,6 +305,69 @@ public class TaskService : ITaskService
         return activityEvent;
     }
 
+    private static ActivityEvent ToMedicationCompletionActivityEvent(TaskEntity task, DateTime completedAt)
+    {
+        var activityEvent = CreateTypedCompletionActivityEvent(task, completedAt, ActivityEventType.Medication);
+        activityEvent.AnimalMedication = new AnimalMedicationActivity
+        {
+            MedicationName = task.Title,
+            Dose = 0,
+            DoseUnit = "Unspecified",
+            Route = AnimalMedicationRoute.Other,
+        };
+
+        return activityEvent;
+    }
+
+    private static ActivityEvent ToCleaningCompletionActivityEvent(TaskEntity task, DateTime completedAt)
+    {
+        var activityEvent = CreateTypedCompletionActivityEvent(task, completedAt, ActivityEventType.Cleaning);
+        activityEvent.EnclosureCleaning = new EnclosureCleaningActivity
+        {
+            CleaningType = EnclosureCleaningType.Other,
+        };
+
+        return activityEvent;
+    }
+
+    private static ActivityEvent ToWaterChangeCompletionActivityEvent(TaskEntity task, DateTime completedAt)
+    {
+        var activityEvent = CreateTypedCompletionActivityEvent(task, completedAt, ActivityEventType.WaterChange);
+        activityEvent.EnclosureWaterChange = new EnclosureWaterChangeActivity();
+
+        return activityEvent;
+    }
+
+    private static ActivityEvent ToInspectionCompletionActivityEvent(TaskEntity task, DateTime completedAt)
+    {
+        var activityEvent = CreateTypedCompletionActivityEvent(task, completedAt, ActivityEventType.Inspection);
+        activityEvent.Inspection = new InspectionActivity
+        {
+            Result = InspectionResult.NotObserved,
+        };
+
+        return activityEvent;
+    }
+
+    private static ActivityEvent ToMaintenanceCompletionActivityEvent(TaskEntity task, DateTime completedAt)
+    {
+        var activityEvent = CreateTypedCompletionActivityEvent(task, completedAt, ActivityEventType.Maintenance);
+        activityEvent.Maintenance = new MaintenanceActivity
+        {
+            Description = task.Description ?? task.Title,
+        };
+
+        return activityEvent;
+    }
+
+    private static ActivityEvent CreateTypedCompletionActivityEvent(
+        TaskEntity task,
+        DateTime completedAt,
+        ActivityEventType eventType)
+    {
+        return CreateCompletionActivityEvent(task, completedAt, eventType, task.Title);
+    }
+
     private static ActivityEvent ToGenericCompletionActivityEvent(TaskEntity task, DateTime completedAt)
     {
         return CreateCompletionActivityEvent(
@@ -318,13 +388,14 @@ public class TaskService : ITaskService
             EventType = eventType,
             OccurredAt = completedAt,
             Title = title,
-            Notes = task.CompletionNotes,
+            Notes = task.CompletionNotes ?? task.Description,
             PerformedBy = task.CompletedBy,
             SourceType = "Task",
             Metadata = JsonSerializer.SerializeToDocument(new
             {
                 taskId = task.Id,
                 taskType = task.TaskType.ToString(),
+                taskDescription = task.Description,
                 dueAt = task.DueAt,
                 recurrenceType = task.RecurrenceType.ToString(),
                 recurrenceInterval = task.RecurrenceInterval,

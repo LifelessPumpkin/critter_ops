@@ -5,9 +5,13 @@ export const activityEventTypes = [
   "Treatment",
   "AnimalDisposition",
   "Cleaning",
+  "WaterChange",
+  "Inspection",
+  "Maintenance",
   "WaterTest",
   "Task",
   "Note",
+  "General",
   "Other",
 ] as const;
 
@@ -72,6 +76,15 @@ export type ActivityDetails = {
     waterChangePercent?: number | null;
     substrateChanged: boolean;
     equipmentCleaned?: string | null;
+  } | null;
+  waterChange?: {
+    waterChangePercent?: number | null;
+  } | null;
+  inspection?: {
+    result: string;
+  } | null;
+  maintenance?: {
+    description: string;
   } | null;
 };
 
@@ -186,6 +199,10 @@ function normalizeActivity(activity: ActivitySearchResultDto): ActivityRecord {
 }
 
 function formatActivityDescription(activity: ActivitySearchResultDto) {
+  if (activity.sourceType === "Task") {
+    return [activity.title, activity.notes].filter(Boolean).join(" — ");
+  }
+
   const { details } = activity;
   let structuredDetail: string | undefined;
 
@@ -214,6 +231,14 @@ function formatActivityDescription(activity: ActivitySearchResultDto) {
     ]
       .filter(Boolean)
       .join(" · ");
+  } else if (details.waterChange) {
+    structuredDetail = details.waterChange.waterChangePercent != null
+      ? `${formatNumber(details.waterChange.waterChangePercent)}% water change`
+      : "Water change";
+  } else if (details.inspection) {
+    structuredDetail = formatEnumLabel(details.inspection.result);
+  } else if (details.maintenance) {
+    structuredDetail = details.maintenance.description;
   }
 
   return [structuredDetail || activity.title, activity.notes].filter(Boolean).join(" — ");

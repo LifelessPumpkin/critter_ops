@@ -76,9 +76,9 @@ Results are ordered by `OccurredAt` descending, then activity ID descending. The
 
 ## Specialized Details
 
-The ledger intentionally does not model every future event detail directly on `ActivityEvent`.
+The ledger intentionally does not model every event detail directly on `ActivityEvent`.
 
-Future structured categories can add dedicated tables such as `AnimalMovementEvent`, `FeedingEvent`, `MedicationEvent`, or `WaterTestEvent` that reference the parent `ActivityEvent`.
+Categories with data beyond the shared title, notes, performer, timestamp, and associations use one-to-one detail tables that reference the parent `ActivityEvent`. Categories without unique fields, including `Note` and `General`, remain represented by the shared event with a distinct `EventType`.
 
 Until those tables are needed, existing timeline metadata continues to live in the `Metadata` jsonb column.
 
@@ -228,7 +228,7 @@ EquipmentCleaned Optional bounded equipment description
 
 Cleaning types are stored as strings and currently include `SpotClean`, `PartialClean`, `FullClean`, `DeepClean`, `Disinfection`, `WaterChange`, `SubstrateChange`, and `Other`.
 
-Cleaning creation writes one `ActivityEvent` with `EventType = Cleaning`, one primary enclosure association, and one `EnclosureCleaningActivity` detail row. Cleaning events do not create animal associations.
+Cleaning creation writes one `ActivityEvent` with `EventType = Cleaning`, one primary enclosure association, and one `EnclosureCleaningActivity` detail row. Requests using `CleaningType = WaterChange` instead write `EventType = WaterChange` with an `EnclosureWaterChangeActivity` detail row so water changes remain independently filterable. These enclosure-oriented events do not create animal associations through the cleaning endpoint.
 
 Cleaning endpoints:
 
@@ -239,3 +239,17 @@ Cleaning endpoints:
 * `DELETE /api/enclosures/{enclosureId}/cleanings/{activityId}`
 
 Cleaning `PUT` updates descriptive and structured cleaning fields: `OccurredAt`, `PerformedBy`, `CleaningType`, `WaterChangePercent`, `SubstrateChanged`, `EquipmentCleaned`, and `Notes`. The generic enclosure timeline endpoint can display cleaning events but does not create, update, or delete structured cleaning events.
+
+## Operational Activities
+
+Water changes, inspections, and maintenance use the shared ledger plus dedicated one-to-one detail records:
+
+* `EnclosureWaterChangeActivity` stores the optional percentage of water replaced.
+* `InspectionActivity` stores a strongly typed result: `Satisfactory`, `AttentionRequired`, `Failed`, `NotObserved`, or `Other`.
+* `MaintenanceActivity` stores the description of work performed.
+
+Their shared timestamps, titles, notes, performers, source metadata, animal associations, and enclosure associations remain on `ActivityEvent` and its association tables. Manual records can be created and updated through the applicable animal or enclosure timeline endpoint. Those request models expose `WaterChangePercent`, `InspectionResult`, and `MaintenanceDescription` for the matching event type.
+
+`Note` and `General` are distinct activity event types but do not have dedicated detail tables because all of their current data is already represented by `ActivityEvent`.
+
+Task completion maps `Feeding`, `Medication`, `Cleaning`, `WaterChange`, `Inspection`, `Maintenance`, `Note`, and `General` tasks to their corresponding activity types. `Other` remains a generic `Task` activity. The completed task remains stored independently from its historical activity record.
