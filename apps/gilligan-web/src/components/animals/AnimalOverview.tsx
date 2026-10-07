@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AnimalCard } from "@/components/animals/AnimalCard";
+import { AnimalTable } from "@/components/animals/AnimalTable";
 import { type Animal, fetchAnimals } from "@/lib/api/animals";
 
 type LoadState = "loading" | "loaded" | "error";
@@ -94,11 +94,7 @@ export function AnimalOverview() {
           <h2>{emptyMessage}</h2>
         </div>
       ) : (
-        <section className="enclosure-grid" aria-label={getTabAriaLabel(selectedTab)}>
-          {visibleAnimals.map((animal) => (
-            <AnimalCard key={animal.id} animal={animal} variant={selectedTab} />
-          ))}
-        </section>
+        <AnimalTable animals={visibleAnimals} ariaLabel={getTabAriaLabel(selectedTab)} />
       )}
     </>
   );

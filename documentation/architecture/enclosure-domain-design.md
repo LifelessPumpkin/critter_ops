@@ -21,26 +21,26 @@ This approach keeps the core entity small, understandable, and extensible.
 
 The base entity stores general information shared by all enclosure types.
 
-Field	Purpose
-Id	Primary key
-Name	Human-readable enclosure name
-Type	Broad enclosure category
-Location	Physical location of the enclosure
-SizeLabel	Human-readable size (e.g. “40 Gallon Breeder”)
-Length	Physical length
-Width	Physical width
-Height	Physical height
-DimensionUnit	Unit for dimensions
-Volume	Capacity where applicable
-VolumeUnit	Gallons, liters, etc.
-Material	Primary enclosure construction material
-MaxAnimalCapacity	Intended maximum occupancy
-Mobility	Whether the enclosure is fixed or movable
-Status	Current operational state
-SafetyRating	General containment/security rating
-Notes	Free-form notes
-CreatedDate	Record creation timestamp
-UpdatedDate	Last modification timestamp
+Field Purpose
+Id Primary key
+Name Human-readable enclosure name
+Type Broad enclosure category
+Location Physical location of the enclosure
+SizeLabel Human-readable size (e.g. “40 Gallon Breeder”)
+Length Physical length
+Width Physical width
+Height Physical height
+DimensionUnit Unit for dimensions
+Volume Capacity where applicable
+VolumeUnit Gallons, liters, etc.
+Material Primary enclosure construction material
+MaxAnimalCapacity Intended maximum occupancy
+Mobility Whether the enclosure is fixed or movable
+Status Current operational state
+SafetyRating General containment/security rating
+Notes Free-form notes
+CreatedDate Record creation timestamp
+UpdatedDate Last modification timestamp
 
 ## Enclosure Types
 

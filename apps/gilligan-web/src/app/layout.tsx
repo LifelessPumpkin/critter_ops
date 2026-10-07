@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { AppLayout } from "@/components/layout/AppLayout";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -13,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "CritterOps Command Center",
-  description: "Operational management and telemetry dashboard for CritterOps.",
+  title: "CritterOps",
+  description: "Operational management for CritterOps.",
 };
 
 export default function RootLayout({
@@ -25,7 +26,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
       <body className="antialiased">
-        {children}
+        <AppLayout>{children}</AppLayout>
       </body>
     </html>
   );

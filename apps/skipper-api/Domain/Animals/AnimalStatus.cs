@@ -32,6 +32,9 @@ public enum AnimalStatus
     /// <summary>The animal has been released.</summary>
     Released,
 
+    /// <summary>The animal has been surrendered out of the collection.</summary>
+    Surrendered,
+
     /// <summary>The animal is inactive in the collection.</summary>
     Inactive,
 }

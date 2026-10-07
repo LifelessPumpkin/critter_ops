@@ -8,6 +8,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="bin/**;obj/**;tests/**" />
+    <Content Remove="bin/**;obj/**;tests/**" />
+    <EmbeddedResource Remove="bin/**;obj/**;tests/**" />
+    <None Remove="bin/**;obj/**;tests/**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.11" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.11">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

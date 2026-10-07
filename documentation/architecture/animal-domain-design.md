@@ -33,15 +33,15 @@ This keeps the primary animal record small, understandable, and maintainable.
 
 Every animal has a stable identity consisting of:
 
-Field	Purpose
-Id	Primary key
-Name	Display name
-Species	Biological species
-SubspeciesOrMorph	Morph, locality, or subspecies information
-AnimalType	Broad biological grouping
-Sex	Biological sex
-Status	Current operational status
-Notes	General descriptive information
+Field Purpose
+Id Primary key
+Name Display name
+Species Biological species
+SubspeciesOrMorph Morph, locality, or subspecies information
+AnimalType Broad biological grouping
+Sex Biological sex
+Status Current operational status
+Notes General descriptive information
 
 These fields describe what the animal is, not what has happened to it.
 
@@ -352,6 +352,7 @@ Rather than overwriting enclosure assignments, future movement should be recorde
 Example:
 
 AnimalMovement
+
 --------------
 AnimalId
 FromEnclosureId
