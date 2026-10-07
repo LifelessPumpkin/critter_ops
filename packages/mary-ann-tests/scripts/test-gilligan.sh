@@ -11,11 +11,12 @@ if [ ! -d "node_modules" ]; then
   exit 1
 fi
 
-if command -v npm >/dev/null 2>&1; then
-  npm test
-elif command -v zsh >/dev/null 2>&1; then
-  APP_DIR="$app_dir" zsh -lc 'cd "$APP_DIR" && npm test'
-else
-  echo "npm is required to run Gilligan tests." >&2
+if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
+  echo "Node.js and npm are required to run Gilligan tests." >&2
   exit 1
 fi
+if [ ! -x node_modules/.bin/vitest ]; then
+  echo "Gilligan test dependencies are incomplete. Run npm ci in apps/gilligan-web." >&2
+  exit 1
+fi
+npm test

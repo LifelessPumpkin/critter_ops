@@ -1,0 +1,54 @@
+name: Mary Ann - Regression Testing
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+
+permissions:
+  contents: read
+
+jobs:
+  skipper-unit:
+    name: Skipper Build / Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Build Skipper
+        run: dotnet build apps/skipper-api/skipper-api.csproj --configuration Release
+      - name: Skipper unit tests
+        run: ./packages/mary-ann-tests/scripts/test-skipper.sh unit --configuration Release
+
+  skipper-integration:
+    name: Skipper Integration Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Skipper PostgreSQL integration tests
+        run: ./packages/mary-ann-tests/scripts/test-skipper.sh integration --configuration Release
+
+  gilligan:
+    name: Gilligan Build / Regression Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/gilligan-web/package-lock.json
+      - name: Install Gilligan dependencies
+        working-directory: apps/gilligan-web
+        run: npm ci
+      - name: Build Gilligan
+        working-directory: apps/gilligan-web
+        run: npm run build
+      - name: Gilligan regression tests
+        run: ./packages/mary-ann-tests/scripts/test-gilligan.sh
