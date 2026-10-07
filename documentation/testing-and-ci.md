@@ -72,10 +72,9 @@ this change.
 
 Task/activity tests live in `tests/skipper/Integration` and use the shared PostgreSQL
 fixture. They cover completion metadata, relationships, idempotency, and recurrence.
-The former local test file referenced mapping and operational activity APIs absent
-from this checkout. Those cases were removed during integration; add their regression
-coverage with the corresponding application features. Current task completion records
-use `ActivityEventType.Task`.
+Typed task completion records use their corresponding activity types (including
+Feeding and Cleaning); Other tasks retain the generic Task activity. Integration
+assertions protect structured details as well as completion metadata and relationships.
 
 ## Validation in GitHub
 

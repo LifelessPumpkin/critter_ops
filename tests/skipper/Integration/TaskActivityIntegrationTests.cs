@@ -39,12 +39,13 @@ public sealed class TaskActivityIntegrationTests : IClassFixture<PostgresFixture
         Assert.True(completedTask.IsCompleted);
         Assert.InRange(completedTask.CompletedAt!.Value, beforeCompletion, DateTime.UtcNow);
         Assert.Equal(completedTask.CompletedAt, activity.OccurredAt);
-        Assert.Equal(ActivityEventType.Task, activity.EventType);
-        Assert.Equal($"Task completed: {task.Title}", activity.Title);
+        Assert.Equal(ActivityEventType.Feeding, activity.EventType);
+        Assert.Equal(task.Title, activity.Title);
         Assert.Equal("Food and water refreshed.", activity.Notes);
         Assert.Equal("Logan", activity.PerformedBy);
         Assert.Equal(task.AnimalId, Assert.Single(activity.Animals).AnimalId);
         Assert.Equal(fixture.OtherEnclosure.Id, Assert.Single(activity.Enclosures).EnclosureId);
+        Assert.NotNull(activity.AnimalFeeding);
         Assert.Equal(task.Id, activity.Metadata!.RootElement.GetProperty("taskId").GetInt32());
         Assert.Equal(TaskType.Feeding.ToString(), activity.Metadata.RootElement.GetProperty("taskType").GetString());
     }
@@ -81,7 +82,8 @@ public sealed class TaskActivityIntegrationTests : IClassFixture<PostgresFixture
 
         var activity = await fixture.ActivityWithDetails().SingleAsync();
 
-        Assert.Equal(ActivityEventType.Task, activity.EventType);
+        Assert.Equal(ActivityEventType.Cleaning, activity.EventType);
+        Assert.NotNull(activity.EnclosureCleaning);
         Assert.Empty(activity.Animals);
         Assert.Equal(fixture.OtherEnclosure.Id, Assert.Single(activity.Enclosures).EnclosureId);
     }
