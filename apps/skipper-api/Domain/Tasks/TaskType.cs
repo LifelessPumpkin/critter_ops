@@ -11,6 +11,7 @@ public enum TaskType
     Medication,
     Inspection,
     Maintenance,
+    Note,
     General,
     Other,
 }

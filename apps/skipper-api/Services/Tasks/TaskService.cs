@@ -162,6 +162,7 @@ public class TaskService : ITaskService
         await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
 
         var task = await _dbContext.Tasks
+            .Include(task => task.Animal)
             .SingleOrDefaultAsync(task => task.Id == id, cancellationToken);
 
         if (task is null)
@@ -269,18 +270,132 @@ public class TaskService : ITaskService
 
     private static ActivityEvent ToCompletionActivityEvent(TaskEntity task, DateTime completedAt)
     {
+        return CompletedTaskActivityTypeMapper.GetActivityEventType(task.TaskType) switch
+        {
+            ActivityEventType.Feeding => ToFeedingCompletionActivityEvent(task, completedAt),
+            ActivityEventType.Medication => ToMedicationCompletionActivityEvent(task, completedAt),
+            ActivityEventType.Cleaning => ToCleaningCompletionActivityEvent(task, completedAt),
+            ActivityEventType.WaterChange => ToWaterChangeCompletionActivityEvent(task, completedAt),
+            ActivityEventType.Inspection => ToInspectionCompletionActivityEvent(task, completedAt),
+            ActivityEventType.Maintenance => ToMaintenanceCompletionActivityEvent(task, completedAt),
+            ActivityEventType.Note => CreateTypedCompletionActivityEvent(task, completedAt, ActivityEventType.Note),
+            ActivityEventType.General => CreateTypedCompletionActivityEvent(task, completedAt, ActivityEventType.General),
+            _ => ToGenericCompletionActivityEvent(task, completedAt),
+        };
+    }
+
+    private static ActivityEvent ToFeedingCompletionActivityEvent(TaskEntity task, DateTime completedAt)
+    {
+        var activityEvent = CreateCompletionActivityEvent(
+            task,
+            completedAt,
+            ActivityEventType.Feeding,
+            task.Title);
+
+        activityEvent.AnimalFeeding = new AnimalFeedingActivity
+        {
+            // Tasks do not currently capture a structured food amount. Preserve the
+            // task's description of the feeding without claiming an observed result.
+            Food = task.Title,
+            Quantity = 1,
+            Unit = AnimalFeedingQuantityUnit.Other,
+            Result = AnimalFeedingResult.NotObserved,
+        };
+
+        return activityEvent;
+    }
+
+    private static ActivityEvent ToMedicationCompletionActivityEvent(TaskEntity task, DateTime completedAt)
+    {
+        var activityEvent = CreateTypedCompletionActivityEvent(task, completedAt, ActivityEventType.Medication);
+        activityEvent.AnimalMedication = new AnimalMedicationActivity
+        {
+            MedicationName = task.Title,
+            Dose = 0,
+            DoseUnit = "Unspecified",
+            Route = AnimalMedicationRoute.Other,
+        };
+
+        return activityEvent;
+    }
+
+    private static ActivityEvent ToCleaningCompletionActivityEvent(TaskEntity task, DateTime completedAt)
+    {
+        var activityEvent = CreateTypedCompletionActivityEvent(task, completedAt, ActivityEventType.Cleaning);
+        activityEvent.EnclosureCleaning = new EnclosureCleaningActivity
+        {
+            CleaningType = EnclosureCleaningType.Other,
+        };
+
+        return activityEvent;
+    }
+
+    private static ActivityEvent ToWaterChangeCompletionActivityEvent(TaskEntity task, DateTime completedAt)
+    {
+        var activityEvent = CreateTypedCompletionActivityEvent(task, completedAt, ActivityEventType.WaterChange);
+        activityEvent.EnclosureWaterChange = new EnclosureWaterChangeActivity();
+
+        return activityEvent;
+    }
+
+    private static ActivityEvent ToInspectionCompletionActivityEvent(TaskEntity task, DateTime completedAt)
+    {
+        var activityEvent = CreateTypedCompletionActivityEvent(task, completedAt, ActivityEventType.Inspection);
+        activityEvent.Inspection = new InspectionActivity
+        {
+            Result = InspectionResult.NotObserved,
+        };
+
+        return activityEvent;
+    }
+
+    private static ActivityEvent ToMaintenanceCompletionActivityEvent(TaskEntity task, DateTime completedAt)
+    {
+        var activityEvent = CreateTypedCompletionActivityEvent(task, completedAt, ActivityEventType.Maintenance);
+        activityEvent.Maintenance = new MaintenanceActivity
+        {
+            Description = task.Description ?? task.Title,
+        };
+
+        return activityEvent;
+    }
+
+    private static ActivityEvent CreateTypedCompletionActivityEvent(
+        TaskEntity task,
+        DateTime completedAt,
+        ActivityEventType eventType)
+    {
+        return CreateCompletionActivityEvent(task, completedAt, eventType, task.Title);
+    }
+
+    private static ActivityEvent ToGenericCompletionActivityEvent(TaskEntity task, DateTime completedAt)
+    {
+        return CreateCompletionActivityEvent(
+            task,
+            completedAt,
+            ActivityEventType.Task,
+            $"Task completed: {task.Title}");
+    }
+
+    private static ActivityEvent CreateCompletionActivityEvent(
+        TaskEntity task,
+        DateTime completedAt,
+        ActivityEventType eventType,
+        string title)
+    {
         var activityEvent = new ActivityEvent
         {
-            EventType = ActivityEventType.Task,
+            EventType = eventType,
             OccurredAt = completedAt,
-            Title = $"Task completed: {task.Title}",
-            Notes = task.CompletionNotes,
+            Title = title,
+            Notes = task.CompletionNotes ?? task.Description,
             PerformedBy = task.CompletedBy,
             SourceType = "Task",
             Metadata = JsonSerializer.SerializeToDocument(new
             {
                 taskId = task.Id,
                 taskType = task.TaskType.ToString(),
+                taskDescription = task.Description,
                 dueAt = task.DueAt,
                 recurrenceType = task.RecurrenceType.ToString(),
                 recurrenceInterval = task.RecurrenceInterval,
@@ -298,7 +413,8 @@ public class TaskService : ITaskService
             });
         }
 
-        if (task.EnclosureId is { } enclosureId)
+        var historicalEnclosureId = task.EnclosureId ?? task.Animal?.EnclosureId;
+        if (historicalEnclosureId is { } enclosureId)
         {
             activityEvent.Enclosures.Add(new ActivityEventEnclosure
             {

@@ -1,4 +1,5 @@
 import type { Enclosure } from "@/lib/api/enclosures";
+import Link from "next/link";
 import { Badge, Table, type TableColumn, getStatusBadgeVariant } from "@/components/ui";
 
 type EnclosureTableProps = {
@@ -20,7 +21,7 @@ export function EnclosureTable({ enclosures }: EnclosureTableProps) {
 const columns: TableColumn<Enclosure>[] = [
   {
     header: "Name",
-    render: (enclosure) => <span className="table-primary-text">{enclosure.name}</span>,
+    render: (enclosure) => <Link className="table-primary-link" href={`/enclosures/${enclosure.id}/activity`}>{enclosure.name}</Link>,
   },
   {
     header: "Type",

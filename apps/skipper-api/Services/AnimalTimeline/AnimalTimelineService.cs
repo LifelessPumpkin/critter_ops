@@ -43,6 +43,9 @@ public class AnimalTimelineService : IAnimalTimelineService
             .Include(activityEvent => activityEvent.AnimalDisposition)
             .Include(activityEvent => activityEvent.AnimalMedication)
             .Include(activityEvent => activityEvent.AnimalTreatment)
+            .Include(activityEvent => activityEvent.EnclosureWaterChange)
+            .Include(activityEvent => activityEvent.Inspection)
+            .Include(activityEvent => activityEvent.Maintenance)
             .Where(activityEvent => activityEvent.Animals.Any(association => association.AnimalId == animalId))
             .OrderByDescending(activityEvent => activityEvent.OccurredAt)
             .ThenByDescending(activityEvent => activityEvent.Id)
@@ -70,6 +73,9 @@ public class AnimalTimelineService : IAnimalTimelineService
             .Include(activityEvent => activityEvent.AnimalDisposition)
             .Include(activityEvent => activityEvent.AnimalMedication)
             .Include(activityEvent => activityEvent.AnimalTreatment)
+            .Include(activityEvent => activityEvent.EnclosureWaterChange)
+            .Include(activityEvent => activityEvent.Inspection)
+            .Include(activityEvent => activityEvent.Maintenance)
             .Where(activityEvent =>
                 activityEvent.Id == eventId &&
                 activityEvent.Animals.Any(association => association.AnimalId == animalId))
@@ -89,7 +95,8 @@ public class AnimalTimelineService : IAnimalTimelineService
             or AnimalTimelineEventType.Feeding
             or AnimalTimelineEventType.AnimalDisposition
             or AnimalTimelineEventType.Medication
-            or AnimalTimelineEventType.Treatment)
+            or AnimalTimelineEventType.Treatment
+            or AnimalTimelineEventType.Cleaning)
         {
             return CreateAnimalTimelineEventResult.UnsupportedEventType();
         }
@@ -104,19 +111,18 @@ public class AnimalTimelineService : IAnimalTimelineService
             return CreateAnimalTimelineEventResult.AnimalNotFound();
         }
 
-        if (request.EnclosureId is not { } enclosureId)
+        string? enclosureName = null;
+        if (request.EnclosureId is { } enclosureId)
         {
-            return CreateAnimalTimelineEventResult.EnclosureNotFound();
-        }
+            enclosureName = await _dbContext.Enclosures
+                .Where(enclosure => enclosure.Id == enclosureId)
+                .Select(enclosure => enclosure.Name)
+                .SingleOrDefaultAsync(cancellationToken);
 
-        var enclosureName = await _dbContext.Enclosures
-            .Where(enclosure => enclosure.Id == enclosureId)
-            .Select(enclosure => enclosure.Name)
-            .SingleOrDefaultAsync(cancellationToken);
-
-        if (enclosureName is null)
-        {
-            return CreateAnimalTimelineEventResult.EnclosureNotFound();
+            if (enclosureName is null)
+            {
+                return CreateAnimalTimelineEventResult.EnclosureNotFound();
+            }
         }
 
         var now = DateTime.UtcNow;
@@ -140,20 +146,32 @@ public class AnimalTimelineService : IAnimalTimelineService
                     RelationshipType = ActivityEventAnimalRelationshipType.Primary,
                 },
             ],
-            Enclosures =
-            [
-                new ActivityEventEnclosure
-                {
-                    EnclosureId = enclosureId,
-                    RelationshipType = ActivityEventEnclosureRelationshipType.Primary,
-                },
-            ],
         };
+
+        if (request.EnclosureId is { } resolvedEnclosureId)
+        {
+            timelineEvent.Enclosures.Add(new ActivityEventEnclosure
+            {
+                EnclosureId = resolvedEnclosureId,
+                RelationshipType = ActivityEventEnclosureRelationshipType.Primary,
+            });
+        }
+
+        ApplyStructuredDetails(
+            timelineEvent,
+            request.WaterChangePercent,
+            request.InspectionResult,
+            request.MaintenanceDescription ?? request.Description ?? request.Title!);
 
         _dbContext.ActivityEvents.Add(timelineEvent);
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        return CreateAnimalTimelineEventResult.Created(ToDto(timelineEvent, animalId, animalName, enclosureId, enclosureName));
+        return CreateAnimalTimelineEventResult.Created(ToDto(
+            timelineEvent,
+            animalId,
+            animalName,
+            request.EnclosureId,
+            enclosureName));
     }
 
     public async Task<UpdateAnimalTimelineEventResult> UpdateAsync(
@@ -165,6 +183,9 @@ public class AnimalTimelineService : IAnimalTimelineService
         var timelineEvent = await _dbContext.ActivityEvents
             .Include(activityEvent => activityEvent.Animals)
             .Include(activityEvent => activityEvent.Enclosures)
+            .Include(activityEvent => activityEvent.EnclosureWaterChange)
+            .Include(activityEvent => activityEvent.Inspection)
+            .Include(activityEvent => activityEvent.Maintenance)
             .SingleOrDefaultAsync(
                 activityEvent =>
                     activityEvent.Id == eventId &&
@@ -185,24 +206,24 @@ public class AnimalTimelineService : IAnimalTimelineService
                 or AnimalTimelineEventType.Feeding
                 or AnimalTimelineEventType.AnimalDisposition
                 or AnimalTimelineEventType.Medication
-                or AnimalTimelineEventType.Treatment)
+                or AnimalTimelineEventType.Treatment
+                or AnimalTimelineEventType.Cleaning)
         {
             return UpdateAnimalTimelineEventResult.UnsupportedEventType();
         }
 
-        if (request.EnclosureId is not { } enclosureId)
+        string? enclosureName = null;
+        if (request.EnclosureId is { } enclosureId)
         {
-            return UpdateAnimalTimelineEventResult.EnclosureNotFound();
-        }
+            enclosureName = await _dbContext.Enclosures
+                .Where(enclosure => enclosure.Id == enclosureId)
+                .Select(enclosure => enclosure.Name)
+                .SingleOrDefaultAsync(cancellationToken);
 
-        var enclosureName = await _dbContext.Enclosures
-            .Where(enclosure => enclosure.Id == enclosureId)
-            .Select(enclosure => enclosure.Name)
-            .SingleOrDefaultAsync(cancellationToken);
-
-        if (enclosureName is null)
-        {
-            return UpdateAnimalTimelineEventResult.EnclosureNotFound();
+            if (enclosureName is null)
+            {
+                return UpdateAnimalTimelineEventResult.EnclosureNotFound();
+            }
         }
 
         timelineEvent.EventType = ToActivityEventType(request.EventType!.Value);
@@ -212,14 +233,22 @@ public class AnimalTimelineService : IAnimalTimelineService
         timelineEvent.PerformedBy = request.PerformedBy;
         timelineEvent.Metadata = ToJsonDocument(request.Metadata);
         timelineEvent.UpdatedAt = DateTime.UtcNow;
+        ApplyStructuredDetails(
+            timelineEvent,
+            request.WaterChangePercent,
+            request.InspectionResult,
+            request.MaintenanceDescription ?? request.Description ?? request.Title!);
 
         timelineEvent.Enclosures.Clear();
-        timelineEvent.Enclosures.Add(new ActivityEventEnclosure
+        if (request.EnclosureId is { } resolvedEnclosureId)
         {
-            ActivityEventId = timelineEvent.Id,
-            EnclosureId = enclosureId,
-            RelationshipType = ActivityEventEnclosureRelationshipType.Primary,
-        });
+            timelineEvent.Enclosures.Add(new ActivityEventEnclosure
+            {
+                ActivityEventId = timelineEvent.Id,
+                EnclosureId = resolvedEnclosureId,
+                RelationshipType = ActivityEventEnclosureRelationshipType.Primary,
+            });
+        }
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 
@@ -228,7 +257,12 @@ public class AnimalTimelineService : IAnimalTimelineService
             .Select(animal => animal.Name)
             .SingleAsync(cancellationToken);
 
-        return UpdateAnimalTimelineEventResult.Updated(ToDto(timelineEvent, animalId, animalName, enclosureId, enclosureName));
+        return UpdateAnimalTimelineEventResult.Updated(ToDto(
+            timelineEvent,
+            animalId,
+            animalName,
+            request.EnclosureId,
+            enclosureName));
     }
 
     public async Task<DeleteAnimalTimelineEventResult> DeleteAsync(
@@ -276,22 +310,22 @@ public class AnimalTimelineService : IAnimalTimelineService
         var animalAssociation = timelineEvent.Animals.Single(association => association.AnimalId == animalId);
         var enclosureAssociation = timelineEvent.Enclosures
             .OrderBy(association => association.RelationshipType == ActivityEventEnclosureRelationshipType.Primary ? 0 : 1)
-            .First();
+            .FirstOrDefault();
 
         return ToDto(
             timelineEvent,
             animalAssociation.AnimalId,
             animalAssociation.Animal.Name,
-            enclosureAssociation.EnclosureId,
-            enclosureAssociation.Enclosure.Name);
+            enclosureAssociation?.EnclosureId,
+            enclosureAssociation?.Enclosure.Name);
     }
 
     private static AnimalTimelineEventDto ToDto(
         ActivityEvent timelineEvent,
         int animalId,
         string animalName,
-        int enclosureId,
-        string enclosureName)
+        int? enclosureId,
+        string? enclosureName)
     {
         return new AnimalTimelineEventDto
         {
@@ -322,7 +356,12 @@ public class AnimalTimelineService : IAnimalTimelineService
             AnimalTimelineEventType.AnimalDisposition => ActivityEventType.AnimalDisposition,
             AnimalTimelineEventType.Medication => ActivityEventType.Medication,
             AnimalTimelineEventType.Treatment => ActivityEventType.Treatment,
+            AnimalTimelineEventType.Cleaning => ActivityEventType.Cleaning,
+            AnimalTimelineEventType.WaterChange => ActivityEventType.WaterChange,
+            AnimalTimelineEventType.Inspection => ActivityEventType.Inspection,
+            AnimalTimelineEventType.Maintenance => ActivityEventType.Maintenance,
             AnimalTimelineEventType.Note => ActivityEventType.Note,
+            AnimalTimelineEventType.General => ActivityEventType.General,
             AnimalTimelineEventType.Task => ActivityEventType.Task,
             AnimalTimelineEventType.Other => ActivityEventType.Other,
             _ => ActivityEventType.Other,
@@ -338,7 +377,12 @@ public class AnimalTimelineService : IAnimalTimelineService
             ActivityEventType.AnimalDisposition => AnimalTimelineEventType.AnimalDisposition,
             ActivityEventType.Medication => AnimalTimelineEventType.Medication,
             ActivityEventType.Treatment => AnimalTimelineEventType.Treatment,
+            ActivityEventType.Cleaning => AnimalTimelineEventType.Cleaning,
+            ActivityEventType.WaterChange => AnimalTimelineEventType.WaterChange,
+            ActivityEventType.Inspection => AnimalTimelineEventType.Inspection,
+            ActivityEventType.Maintenance => AnimalTimelineEventType.Maintenance,
             ActivityEventType.Note => AnimalTimelineEventType.Note,
+            ActivityEventType.General => AnimalTimelineEventType.General,
             ActivityEventType.Task => AnimalTimelineEventType.Task,
             ActivityEventType.Other => AnimalTimelineEventType.Other,
             _ => AnimalTimelineEventType.Other,
@@ -347,6 +391,11 @@ public class AnimalTimelineService : IAnimalTimelineService
 
     private static string ToTimelineTitle(ActivityEvent timelineEvent)
     {
+        if (timelineEvent.SourceType == "Task")
+        {
+            return timelineEvent.Title;
+        }
+
         return timelineEvent.EventType == ActivityEventType.AnimalMovement &&
             timelineEvent.AnimalMovement is { } movement
             ? $"Moved from {movement.FromEnclosure.Name} to {movement.ToEnclosure.Name}"
@@ -363,6 +412,23 @@ public class AnimalTimelineService : IAnimalTimelineService
                             timelineEvent.AnimalTreatment is { } treatment
                             ? treatment.TreatmentName
                             : timelineEvent.Title;
+    }
+
+    private static void ApplyStructuredDetails(
+        ActivityEvent activityEvent,
+        decimal? waterChangePercent,
+        InspectionResult? inspectionResult,
+        string maintenanceDescription)
+    {
+        activityEvent.EnclosureWaterChange = activityEvent.EventType == ActivityEventType.WaterChange
+            ? new EnclosureWaterChangeActivity { WaterChangePercent = waterChangePercent }
+            : null;
+        activityEvent.Inspection = activityEvent.EventType == ActivityEventType.Inspection
+            ? new InspectionActivity { Result = inspectionResult ?? InspectionResult.NotObserved }
+            : null;
+        activityEvent.Maintenance = activityEvent.EventType == ActivityEventType.Maintenance
+            ? new MaintenanceActivity { Description = maintenanceDescription }
+            : null;
     }
 
     private static string FormatFeedingAmount(decimal quantity, AnimalFeedingQuantityUnit unit, string food)

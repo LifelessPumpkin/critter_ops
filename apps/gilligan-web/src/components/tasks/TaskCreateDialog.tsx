@@ -1,7 +1,7 @@
 "use client";
 
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { Button, Input, Select, Textarea } from "@/components/ui";
+import { Button, Combobox, Input, Select, Textarea } from "@/components/ui";
 import { type Animal, fetchAnimals } from "@/lib/api/animals";
 import { type Enclosure, fetchEnclosures } from "@/lib/api/enclosures";
 import { TaskApiError, type CreateTaskRequest, type HusbandryTask, createTask } from "@/lib/api/tasks";
@@ -27,7 +27,7 @@ type TaskFormState = {
 
 type FieldErrors = Partial<Record<keyof TaskFormState, string>>;
 
-const taskTypeOptions = ["Feeding", "Cleaning", "WaterChange", "Medication", "Inspection", "Maintenance", "General", "Other"].map(
+const taskTypeOptions = ["Feeding", "Cleaning", "WaterChange", "Medication", "Inspection", "Maintenance", "Note", "General", "Other"].map(
   (value) => ({
     label: formatEnumLabel(value),
     value,
@@ -277,7 +277,7 @@ export function TaskCreateDialog({ isOpen, onClose, onCreated }: TaskCreateDialo
               placeholder="Select task type"
               required
               error={fieldErrors.taskType}
-              onChange={(event) => updateField("taskType", event.target.value)}
+              onValueChange={(value) => updateField("taskType", value)}
             />
             <Textarea
               label="Description"
@@ -301,7 +301,7 @@ export function TaskCreateDialog({ isOpen, onClose, onCreated }: TaskCreateDialo
                 { label: "Recurring task", value: "recurring" },
               ]}
               required
-              onChange={(event) => updateField("scheduleType", event.target.value)}
+              onValueChange={(value) => updateField("scheduleType", value)}
             />
             <Input
               label={formState.scheduleType === "recurring" ? "Start Date" : "Due Date"}
@@ -331,7 +331,7 @@ export function TaskCreateDialog({ isOpen, onClose, onCreated }: TaskCreateDialo
                   options={recurrenceOptions}
                   required
                   error={fieldErrors.recurrenceType}
-                  onChange={(event) => updateField("recurrenceType", event.target.value)}
+                  onValueChange={(value) => updateField("recurrenceType", value)}
                 />
                 <Input
                   label={getRecurrenceIntervalLabel(formState.recurrenceType)}
@@ -352,25 +352,31 @@ export function TaskCreateDialog({ isOpen, onClose, onCreated }: TaskCreateDialo
         <section className="form-section">
           <h3>Association</h3>
           <div className="form-grid">
-            <Select
+            <Combobox
               label="Animal"
               name="animalId"
               value={formState.animalId}
               options={animalOptions}
               placeholder={getAssociationPlaceholder(isLoadingAssociations, animals.length, "animal")}
+              searchPlaceholder="Search animals..."
+              emptyMessage="No animals available."
+              loading={isLoadingAssociations}
               disabled={isLoadingAssociations || animals.length === 0}
               error={fieldErrors.animalId}
-              onChange={(event) => updateField("animalId", event.target.value)}
+              onValueChange={(value) => updateField("animalId", value)}
             />
-            <Select
+            <Combobox
               label="Enclosure"
               name="enclosureId"
               value={formState.enclosureId}
               options={enclosureOptions}
               placeholder={getAssociationPlaceholder(isLoadingAssociations, enclosures.length, "enclosure")}
+              searchPlaceholder="Search enclosures..."
+              emptyMessage="No enclosures available."
+              loading={isLoadingAssociations}
               disabled={isLoadingAssociations || enclosures.length === 0}
               error={fieldErrors.enclosureId}
-              onChange={(event) => updateField("enclosureId", event.target.value)}
+              onValueChange={(value) => updateField("enclosureId", value)}
             />
           </div>
         </section>

@@ -310,6 +310,52 @@ namespace skipper_api.Data.Migrations
                     b.ToTable("EnclosureCleaningActivities", (string)null);
                 });
 
+            modelBuilder.Entity("skipper_api.Domain.Activity.EnclosureWaterChangeActivity", b =>
+                {
+                    b.Property<long>("ActivityEventId")
+                        .HasColumnType("bigint");
+
+                    b.Property<decimal?>("WaterChangePercent")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)");
+
+                    b.HasKey("ActivityEventId");
+
+                    b.ToTable("EnclosureWaterChangeActivities", (string)null);
+                });
+
+            modelBuilder.Entity("skipper_api.Domain.Activity.InspectionActivity", b =>
+                {
+                    b.Property<long>("ActivityEventId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Result")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.HasKey("ActivityEventId");
+
+                    b.HasIndex("Result")
+                        .HasDatabaseName("IX_InspectionActivities_Result");
+
+                    b.ToTable("InspectionActivities", (string)null);
+                });
+
+            modelBuilder.Entity("skipper_api.Domain.Activity.MaintenanceActivity", b =>
+                {
+                    b.Property<long>("ActivityEventId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("ActivityEventId");
+
+                    b.ToTable("MaintenanceActivities", (string)null);
+                });
+
             modelBuilder.Entity("skipper_api.Domain.Animals.Animal", b =>
                 {
                     b.Property<int>("Id")
@@ -712,6 +758,39 @@ namespace skipper_api.Data.Migrations
                     b.Navigation("ActivityEvent");
                 });
 
+            modelBuilder.Entity("skipper_api.Domain.Activity.EnclosureWaterChangeActivity", b =>
+                {
+                    b.HasOne("skipper_api.Domain.Activity.ActivityEvent", "ActivityEvent")
+                        .WithOne("EnclosureWaterChange")
+                        .HasForeignKey("skipper_api.Domain.Activity.EnclosureWaterChangeActivity", "ActivityEventId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ActivityEvent");
+                });
+
+            modelBuilder.Entity("skipper_api.Domain.Activity.InspectionActivity", b =>
+                {
+                    b.HasOne("skipper_api.Domain.Activity.ActivityEvent", "ActivityEvent")
+                        .WithOne("Inspection")
+                        .HasForeignKey("skipper_api.Domain.Activity.InspectionActivity", "ActivityEventId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ActivityEvent");
+                });
+
+            modelBuilder.Entity("skipper_api.Domain.Activity.MaintenanceActivity", b =>
+                {
+                    b.HasOne("skipper_api.Domain.Activity.ActivityEvent", "ActivityEvent")
+                        .WithOne("Maintenance")
+                        .HasForeignKey("skipper_api.Domain.Activity.MaintenanceActivity", "ActivityEventId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ActivityEvent");
+                });
+
             modelBuilder.Entity("skipper_api.Domain.Animals.Animal", b =>
                 {
                     b.HasOne("skipper_api.Domain.Enclosures.Enclosure", "Enclosure")
@@ -756,7 +835,13 @@ namespace skipper_api.Data.Migrations
 
                     b.Navigation("EnclosureCleaning");
 
+                    b.Navigation("EnclosureWaterChange");
+
                     b.Navigation("Enclosures");
+
+                    b.Navigation("Inspection");
+
+                    b.Navigation("Maintenance");
                 });
 
             modelBuilder.Entity("skipper_api.Domain.Animals.Animal", b =>

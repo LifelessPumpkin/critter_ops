@@ -14,9 +14,9 @@ public class AnimalTimelineEventDto
 
     public required string AnimalName { get; set; }
 
-    public int EnclosureId { get; set; }
+    public int? EnclosureId { get; set; }
 
-    public required string EnclosureName { get; set; }
+    public string? EnclosureName { get; set; }
 
     public AnimalTimelineEventType EventType { get; set; }
 

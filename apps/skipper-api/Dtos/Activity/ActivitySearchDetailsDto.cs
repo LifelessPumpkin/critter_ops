@@ -16,4 +16,10 @@ public class ActivitySearchDetailsDto
     public ActivitySearchTreatmentDetailsDto? Treatment { get; set; }
 
     public ActivitySearchCleaningDetailsDto? Cleaning { get; set; }
+
+    public ActivitySearchWaterChangeDetailsDto? WaterChange { get; set; }
+
+    public ActivitySearchInspectionDetailsDto? Inspection { get; set; }
+
+    public ActivitySearchMaintenanceDetailsDto? Maintenance { get; set; }
 }

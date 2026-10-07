@@ -24,7 +24,7 @@ public class ActivitySearchService : IActivitySearchService
         var pageSize = Math.Clamp(request.PageSize, 1, MaximumPageSize);
         var query = ApplyFilters(_dbContext.ActivityEvents.AsNoTracking(), request);
         var totalCount = await query.CountAsync(cancellationToken);
-        var activityEvents = await query
+        var detailedQuery = query
             .AsSplitQuery()
             .Include(activityEvent => activityEvent.Animals)
                 .ThenInclude(association => association.Animal)
@@ -39,8 +39,13 @@ public class ActivitySearchService : IActivitySearchService
             .Include(activityEvent => activityEvent.AnimalMedication)
             .Include(activityEvent => activityEvent.AnimalTreatment)
             .Include(activityEvent => activityEvent.EnclosureCleaning)
-            .OrderByDescending(activityEvent => activityEvent.OccurredAt)
-            .ThenByDescending(activityEvent => activityEvent.Id)
+            .Include(activityEvent => activityEvent.EnclosureWaterChange)
+            .Include(activityEvent => activityEvent.Inspection)
+            .Include(activityEvent => activityEvent.Maintenance);
+
+        var orderedQuery = ApplyOrdering(detailedQuery, request.Sort);
+
+        var activityEvents = await orderedQuery
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(cancellationToken);
@@ -57,11 +62,90 @@ public class ActivitySearchService : IActivitySearchService
         };
     }
 
+    private static IOrderedQueryable<ActivityEvent> ApplyOrdering(
+        IQueryable<ActivityEvent> query,
+        ActivitySortDirection sort)
+    {
+        return sort switch
+        {
+            ActivitySortDirection.Oldest => query
+                .OrderBy(activityEvent => activityEvent.OccurredAt)
+                .ThenBy(activityEvent => activityEvent.Id),
+            ActivitySortDirection.TypeAscending => query
+                .OrderBy(activityEvent => activityEvent.EventType)
+                .ThenByDescending(activityEvent => activityEvent.OccurredAt)
+                .ThenByDescending(activityEvent => activityEvent.Id),
+            ActivitySortDirection.TypeDescending => query
+                .OrderByDescending(activityEvent => activityEvent.EventType)
+                .ThenByDescending(activityEvent => activityEvent.OccurredAt)
+                .ThenByDescending(activityEvent => activityEvent.Id),
+            ActivitySortDirection.AnimalAscending => query
+                .OrderBy(activityEvent => activityEvent.Animals
+                    .OrderBy(association => association.RelationshipType)
+                    .ThenBy(association => association.Animal.Name)
+                    .Select(association => association.Animal.Name)
+                    .FirstOrDefault())
+                .ThenByDescending(activityEvent => activityEvent.OccurredAt)
+                .ThenByDescending(activityEvent => activityEvent.Id),
+            ActivitySortDirection.AnimalDescending => query
+                .OrderByDescending(activityEvent => activityEvent.Animals
+                    .OrderBy(association => association.RelationshipType)
+                    .ThenBy(association => association.Animal.Name)
+                    .Select(association => association.Animal.Name)
+                    .FirstOrDefault())
+                .ThenByDescending(activityEvent => activityEvent.OccurredAt)
+                .ThenByDescending(activityEvent => activityEvent.Id),
+            ActivitySortDirection.EnclosureAscending => query
+                .OrderBy(activityEvent => activityEvent.Enclosures
+                    .OrderBy(association => association.RelationshipType)
+                    .ThenBy(association => association.Enclosure.Name)
+                    .Select(association => association.Enclosure.Name)
+                    .FirstOrDefault())
+                .ThenByDescending(activityEvent => activityEvent.OccurredAt)
+                .ThenByDescending(activityEvent => activityEvent.Id),
+            ActivitySortDirection.EnclosureDescending => query
+                .OrderByDescending(activityEvent => activityEvent.Enclosures
+                    .OrderBy(association => association.RelationshipType)
+                    .ThenBy(association => association.Enclosure.Name)
+                    .Select(association => association.Enclosure.Name)
+                    .FirstOrDefault())
+                .ThenByDescending(activityEvent => activityEvent.OccurredAt)
+                .ThenByDescending(activityEvent => activityEvent.Id),
+            ActivitySortDirection.PerformerAscending => query
+                .OrderBy(activityEvent => activityEvent.PerformedBy)
+                .ThenByDescending(activityEvent => activityEvent.OccurredAt)
+                .ThenByDescending(activityEvent => activityEvent.Id),
+            ActivitySortDirection.PerformerDescending => query
+                .OrderByDescending(activityEvent => activityEvent.PerformedBy)
+                .ThenByDescending(activityEvent => activityEvent.OccurredAt)
+                .ThenByDescending(activityEvent => activityEvent.Id),
+            _ => query
+                .OrderByDescending(activityEvent => activityEvent.OccurredAt)
+                .ThenByDescending(activityEvent => activityEvent.Id),
+        };
+    }
+
     private static IQueryable<ActivityEvent> ApplyFilters(
         IQueryable<ActivityEvent> query,
         ActivitySearchRequestDto request)
     {
-        if (request.EventType.HasValue)
+        if (!string.IsNullOrWhiteSpace(request.Search))
+        {
+            var search = request.Search.Trim();
+            var pattern = $"%{search}%";
+            query = query.Where(activityEvent =>
+                EF.Functions.ILike(activityEvent.Title, pattern) ||
+                (activityEvent.Notes != null && EF.Functions.ILike(activityEvent.Notes, pattern)) ||
+                (activityEvent.PerformedBy != null && EF.Functions.ILike(activityEvent.PerformedBy, pattern)) ||
+                activityEvent.Animals.Any(association => EF.Functions.ILike(association.Animal.Name, pattern)) ||
+                activityEvent.Enclosures.Any(association => EF.Functions.ILike(association.Enclosure.Name, pattern)));
+        }
+
+        if (request.EventTypes.Count > 0)
+        {
+            query = query.Where(activityEvent => request.EventTypes.Contains(activityEvent.EventType));
+        }
+        else if (request.EventType.HasValue)
         {
             query = query.Where(activityEvent => activityEvent.EventType == request.EventType.Value);
         }
@@ -194,6 +278,24 @@ public class ActivitySearchService : IActivitySearchService
                     WaterChangePercent = cleaning.WaterChangePercent,
                     SubstrateChanged = cleaning.SubstrateChanged,
                     EquipmentCleaned = cleaning.EquipmentCleaned,
+                }
+                : null,
+            WaterChange = activityEvent.EnclosureWaterChange is { } waterChange
+                ? new ActivitySearchWaterChangeDetailsDto
+                {
+                    WaterChangePercent = waterChange.WaterChangePercent,
+                }
+                : null,
+            Inspection = activityEvent.Inspection is { } inspection
+                ? new ActivitySearchInspectionDetailsDto
+                {
+                    Result = inspection.Result,
+                }
+                : null,
+            Maintenance = activityEvent.Maintenance is { } maintenance
+                ? new ActivitySearchMaintenanceDetailsDto
+                {
+                    Description = maintenance.Description,
                 }
                 : null,
         };

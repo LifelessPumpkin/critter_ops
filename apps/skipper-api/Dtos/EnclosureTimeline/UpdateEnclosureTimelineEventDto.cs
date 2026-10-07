@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using skipper_api.Domain.EnclosureTimeline;
+using skipper_api.Domain.Activity;
 
 namespace skipper_api.Dtos.EnclosureTimeline;
 
@@ -27,4 +28,11 @@ public class UpdateEnclosureTimelineEventDto
     public string? PerformedBy { get; set; }
 
     public JsonElement? Metadata { get; set; }
+
+    [Range(typeof(decimal), "0", "100")]
+    public decimal? WaterChangePercent { get; set; }
+
+    public InspectionResult? InspectionResult { get; set; }
+
+    public string? MaintenanceDescription { get; set; }
 }
