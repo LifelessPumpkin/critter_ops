@@ -1,14 +1,113 @@
 # Repository Security Scanning
 
-CritterOps runs the **Security Scanning** GitHub Actions workflow on every push to `develop`, including pull requests merged into that branch. Maintainers can also run it manually with `workflow_dispatch` from the Actions tab.
+**Mary Ann - Security Scanning** runs on `pull_request` events targeting `develop`
+and `main`, and on manual `workflow_dispatch`. **Mary Ann - Regression Testing**
+runs independently on PRs to both branches. Neither workflow runs on pushes or on
+a schedule. This follows the additional CI/CD requirement: validate before merge,
+with no redundant post-merge suite and no deployment functionality in this ticket.
+Manual security runs support new advisories and exception reviews.
 
-The workflow runs three independent, blocking jobs so one scanner failure does not prevent the others from reporting results:
+Checkout's default PR merge ref validates the proposed merge, including target
+branch integration; new PR commits rerun checks. TruffleHog fetches full history.
+No path filters skip required validation. No `pull_request_target` is used.
 
-- **Semgrep SAST** scans the monorepo's supported source and configuration files with Semgrep's maintained default ruleset. Generated dependencies, build output, and coverage directories are excluded.
-- **Trivy Dependency Scan** scans repository dependency metadata, including development dependencies, for `HIGH` and `CRITICAL` vulnerabilities. The job restores Skipper's NuGet metadata before scanning. A final policy gate fails for unapproved findings, invalid/expired/stale exceptions, or scanner errors. Accepted risks remain visible in the summary.
-- **TruffleHog Secret Scan** checks the complete Git history and current repository contents. Verified secrets fail the job, and scanner errors are also blocking.
+## Enforcement and reporting
 
-The workflow uses read-only repository permissions, requires no paid scanner service, and does not build, deploy, or scan container images. Scanner findings and execution errors are reported in each job's GitHub Actions log. Developers do not need to install these scanners for normal local development.
+Three existing independent checks retain their names and policies:
+
+- **Semgrep SAST** uses pinned Semgrep 1.179.0 and `p/default`, with `--error` and
+  `--strict`. Native JSON and SARIF come from one scan. All reported findings block.
+- **Trivy Dependency Scan** uses Trivy 0.70.0 to scan monorepo dependency metadata,
+  including Gilligan npm development dependencies and restored Skipper NuGet
+  lockfiles. Unapproved HIGH/CRITICAL vulnerabilities block, including unfixed
+  findings. The existing `security/evaluate.py` policy is the only classification
+  source; approved exact exceptions remain visible. Invalid, expired, stale or
+  inconsistent exceptions block. No new exception mechanism is introduced.
+- **TruffleHog Secret Scan** retains verified-only scanning, `--fail` and
+  `--fail-on-scan-errors`. The wrapper captures stdout/stderr into temporary files
+  outside the workspace and deletes them on exit. Only status and verified count
+  are published; never raw values, detector payloads or scanner diagnostics.
+
+**Mary Ann Security Scanning** waits for all three jobs with `always()` and fails
+if any fails, is skipped/cancelled, or dependency summary evidence is unavailable.
+Its Actions summary shows overall/job results, Semgrep and secret counts, and the
+existing dependency summary with accepted/blocking counts, CVEs, packages, severity,
+policy errors, and review dates. PASS with accepted findings is not vulnerability-free.
+Execution/evaluation failures show unavailable counts rather than zero findings.
+A job may also fail because report generation, validation or artifact upload failed;
+inspect its failed step alongside the scanner status.
+
+Semgrep/Trivy native SARIF is checked for required envelope/scanner/finding fields;
+GitHub performs full ingestion validation. Trivy converts the same JSON scan rather
+than rescanning. A reporting-only JSON copy restores VEX-suppressed original rows
+before conversion, so accepted findings remain visible. It never changes policy
+classification. SARIF retains native IDs, severity and available dependency locations;
+the policy JSON/summary is authoritative for acceptance, which is not automatically
+translated into GitHub alert dismissal. Existing lower-severity behavior remains:
+Trivy collects HIGH/CRITICAL, while Semgrep reports its unchanged ruleset findings.
+
+Reports are retained for **seven days** in this Actions run's Artifacts:
+`mary-ann-semgrep-security` (JSON, SARIF, status),
+`mary-ann-dependency-security` (Trivy JSON/SARIF, evaluation, summary, OpenVEX),
+and `mary-ann-trufflehog-security` (sanitized status only).
+Explicit allowlists exclude environment files and raw secret scan output.
+Uploads run after findings; missing reports and scanner crashes never imply success.
+Artifact upload failures fail their scanner job and the aggregate gate.
+
+Separate **Code Scanning Reports (semgrep/trivy)** jobs download artifacts without
+checking out or executing PR scripts. Only these jobs have `security-events: write`
+and `actions: read`; scanner and gate jobs retain `contents: read`. New action pins
+were resolved against upstream release tags. Code Scanning upload failures issue a
+warning and preserve artifacts and security enforcement; upload success cannot
+change a scanner failure. Do not require these optional reporting checks as gates.
+
+Find uploaded results under **Security → Code scanning**; dependency alerts, if
+configured, remain under **Security → Dependabot**. This public repository supports
+Code Scanning, but enabled settings and actual ingestion still need a hosted run.
+Private repositories require an eligible GitHub Code Security plan. See
+[GitHub SARIF upload documentation](https://docs.github.com/en/code-security/how-tos/find-and-fix-code-vulnerabilities/integrate-with-existing-tools/upload-sarif-file).
+There is no `.github/dependabot.yml` in this checkout; this ticket adds none.
+
+Fork PRs run all scanners and gates with restricted tokens and no repository secrets.
+Code Scanning reporting jobs are skipped for forks; safe artifacts and summaries
+remain available. A maintainer may need to approve Actions execution for a new fork
+contributor. No permissions are increased to work around fork restrictions.
+
+## Required checks and protected branches
+
+Branch protection was **not changed** by this implementation. In GitHub **Settings →
+Rules → Rulesets**, edit the existing active branch rulesets targeting both `develop`
+and `main` (or **Settings → Branches** for classic protection). Preserve existing
+checks and protections, require a pull request, and add these exact GitHub Actions
+check names after a first PR run registers them:
+
+- `Mary Ann Security Scanning` (aggregate security gate)
+- `Semgrep SAST`
+- `Trivy Dependency Scan`
+- `TruffleHog Secret Scan`
+- `Skipper Build / Unit Tests`
+- `Skipper Integration Tests`
+- `Gilligan Build / Regression Tests`
+
+The workflow display names themselves are not required status-check names. Select
+GitHub Actions as the expected source where available. Require branches up to date
+before merging, dismiss stale approvals, require review for security policy/workflow
+changes, and restrict direct pushes and bypass actors according to existing policy.
+Do not weaken protections. With PR-only CI, an administrator bypass/direct push has
+no automatic validation; protection is essential. Merge/squash commits need no second
+suite in this design. Merge queues (`merge_group`) are not configured by this ticket;
+if enabled later, add their required-check triggers before enforcing the queue.
+Future CD must verify successful validation for the merged change; no CD is added.
+
+## Hosted verification still required
+
+After review/publishing, open controlled PRs to both branches; confirm all seven
+required checks, merge-ref checkout, summaries, downloadable artifacts and Code
+Scanning categories. Use synthetic fixtures on a test branch to verify blocking
+findings still publish evidence, then remove the fixture and verify green checks.
+Test fork restrictions and upload-disabled fallback, manual scanning, stale checks
+after new commits, and ruleset refusal to merge failing/stale checks. Confirm merges
+produce no redundant Mary Ann runs. Never add real secrets or unsafe dependencies.
 
 ## Action and dependency maintenance
 
@@ -18,7 +117,7 @@ the action's official repository before updating. Keep action major versions unl
 a compatibility review justifies changing them. The testing workflow retains v4
 actions (Node 20 action runtime), Node 22 for Gilligan, and .NET 8 for Skipper;
 checkout v4.4.0's safer `pull_request_target` defaults do not affect its existing
-`push` and `pull_request` triggers.
+`pull_request` trigger.
 
 Gilligan uses npm inside `apps/gilligan-web`, without npm workspaces. Inspect fresh
 scanner advisories and `npm explain` before changing dependencies. Prefer updating
@@ -46,10 +145,9 @@ docker run --rm -v "$PWD:/src:ro" -w /src \
 SECURITY_PYTHON=/tmp/critter-security-venv/bin/python \
   SECURITY_USE_DOCKER=true ./security/scan.sh
 
-docker run --rm -v "$PWD:/repo:ro" -w /repo \
+python3 security/report.py trufflehog -- docker run --rm -v "$PWD:/repo:ro" -w /repo \
   ghcr.io/trufflesecurity/trufflehog:3.97.9@sha256:52e67fef4d054ecff5c2ce4b4ae376626d1ef54aa0898b53cac19c25e92e14db \
-  git file:///repo --results verified --fail --fail-on-scan-errors \
-  --no-update --github-actions
+  git file:///repo --results verified --fail --fail-on-scan-errors --no-update --json
 ```
 
 Mary Ann explicitly includes development/test dependencies. Standard OpenVEX and
