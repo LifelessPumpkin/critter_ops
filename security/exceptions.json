@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "openvex": {
+    "@context": "https://openvex.dev/ns/v0.2.0",
+    "@id": "urn:critterops:security:exceptions:1",
+    "author": "CritterOps maintainers",
+    "role": "Repository risk assessment; approval requires pull request review",
+    "timestamp": "2026-10-10T17:00:00Z",
+    "version": 1,
+    "statements": [
+      {
+        "@id": "urn:critterops:security:braces-2026-93687",
+        "vulnerability": {
+          "name": "CVE-2026-93687",
+          "aliases": ["GHSA-vfj7-8cjw-p6xm"],
+          "@id": "https://github.com/advisories/GHSA-vfj7-8cjw-p6xm"
+        },
+        "products": [{"@id": "pkg:npm/braces@3.0.3"}],
+        "status": "affected",
+        "status_notes": "The lint dependency remains vulnerable. Temporary risk acceptance does not assert non-applicability.",
+        "action_statement": "Restrict linting to trusted repository inputs; monitor the upstream advisory and upgrade the introducing dependency as soon as a patch is available."
+      }
+    ]
+  },
+  "exceptions": [
+    {
+      "statement_id": "urn:critterops:security:braces-2026-93687",
+      "decision": "accept_temporarily",
+      "target": "apps/gilligan-web/package-lock.json",
+      "scope": "development",
+      "severity": "HIGH",
+      "reason": "No patched braces release is available. This dependency is used by development lint tooling; accept its denial-of-service risk temporarily while keeping it out of the deployed production runtime.",
+      "runtime_exposure": "Lint/build tooling can process repository glob patterns. Malicious patterns could terminate tooling. braces is marked dev-only in the npm lockfile, absent from npm ls --omit=dev, and absent from current Next production file traces. Reassess if deployment includes development tooling or untrusted lint inputs.",
+      "remediation": {
+        "available": false,
+        "details": "Official advisory lists <=3.0.3 as affected and no first patched version; npm registry latest is 3.0.3 as of 2026-10-10."
+      },
+      "reviewed_on": "2026-10-10",
+      "expires_on": "2026-11-09",
+      "follow_up": "Recheck GHSA-vfj7-8cjw-p6xm and npm releases by 2026-11-09; upgrade the parent dependency when a patch exists, then remove this stale record through pull request review.",
+      "dependency_chain": ["eslint-config-next", "@next/eslint-plugin-next", "fast-glob", "micromatch", "braces"],
+      "evidence": [
+        "https://github.com/advisories/GHSA-vfj7-8cjw-p6xm",
+        "apps/gilligan-web/package-lock.json",
+        "npm explain braces; npm ls braces --omit=dev; Next .next/**/*.nft.json inspection on 2026-10-10"
+      ]
+    }
+  ]
+}

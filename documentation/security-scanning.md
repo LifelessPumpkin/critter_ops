@@ -5,7 +5,7 @@ CritterOps runs the **Security Scanning** GitHub Actions workflow on every push 
 The workflow runs three independent, blocking jobs so one scanner failure does not prevent the others from reporting results:
 
 - **Semgrep SAST** scans the monorepo's supported source and configuration files with Semgrep's maintained default ruleset. Generated dependencies, build output, and coverage directories are excluded.
-- **Trivy Dependency Scan** scans repository dependency metadata for `HIGH` and `CRITICAL` vulnerabilities. The committed npm lock file is scanned directly; the job runs a .NET restore to create current NuGet lock metadata for `apps/skipper-api/skipper-api.csproj` before scanning. A matching vulnerability fails the job.
+- **Trivy Dependency Scan** scans repository dependency metadata, including development dependencies, for `HIGH` and `CRITICAL` vulnerabilities. The job restores Skipper's NuGet metadata before scanning. A final policy gate fails for unapproved findings, invalid/expired/stale exceptions, or scanner errors. Accepted risks remain visible in the summary.
 - **TruffleHog Secret Scan** checks the complete Git history and current repository contents. Verified secrets fail the job, and scanner errors are also blocking.
 
 The workflow uses read-only repository permissions, requires no paid scanner service, and does not build, deploy, or scan container images. Scanner findings and execution errors are reported in each job's GitHub Actions log. Developers do not need to install these scanners for normal local development.
@@ -29,7 +29,7 @@ upgrade cannot safely resolve a finding, with a documented compatibility rationa
 ## Local scanner commands
 
 Run from the repository root with Docker available. These use CI's Semgrep image,
-Trivy version (the pinned action defaults to 0.70.0), scope, severity thresholds,
+Trivy version (explicitly 0.70.0), scope, severity thresholds,
 and failure flags. Restore first so NuGet metadata is included.
 
 ```sh
@@ -42,11 +42,9 @@ docker run --rm -v "$PWD:/src:ro" -w /src \
   --exclude '**/bin/**' --exclude '**/obj/**' --exclude '**/build/**' \
   --exclude '**/dist/**' --exclude '**/coverage/**' .
 
-docker run --rm -v "$PWD:/src:ro" -w /src \
-  aquasec/trivy:0.70.0@sha256:be1190afcb28352bfddc4ddeb71470835d16462af68d310f9f4bca710961a41e \
-  fs --scanners vuln --severity HIGH,CRITICAL --exit-code 1 \
-  --ignore-unfixed=false \
-  --skip-dirs '**/node_modules,**/.next,**/bin,**/obj,**/build,**/dist,**/coverage' .
+# Virtual environment setup: see security/README.md.
+SECURITY_PYTHON=/tmp/critter-security-venv/bin/python \
+  SECURITY_USE_DOCKER=true ./security/scan.sh
 
 docker run --rm -v "$PWD:/repo:ro" -w /repo \
   ghcr.io/trufflesecurity/trufflehog:3.97.9@sha256:52e67fef4d054ecff5c2ce4b4ae376626d1ef54aa0898b53cac19c25e92e14db \
@@ -54,12 +52,16 @@ docker run --rm -v "$PWD:/repo:ro" -w /repo \
   --no-update --github-actions
 ```
 
-Trivy excludes development/test dependencies by default. To inspect them as an
-additional local check, add `--include-dev-deps`; this does not change CI policy.
+Mary Ann explicitly includes development/test dependencies. Standard OpenVEX and
+temporary risk metadata are maintained together in
+[security/exceptions.json](../security/exceptions.json). See
+[Security exceptions](../security/README.md) for approval, expiration, stale-record
+cleanup, and local evaluation. JSON collection precedes the final blocking gate;
+accepted vulnerabilities remain visible and scanner execution errors fail the job.
 Semgrep's `p/default` and the Trivy database change over time, so record versions,
 date, exit statuses, and findings when reporting results.
 
-## Remediation verification — October 10, 2026
+## Historical remediation verification — October 10, 2026 (before exception integration)
 
 All six mutable testing-action findings were resolved with verified v4 release
 SHAs. Fresh CI-equivalent Trivy scanning reproduced 13 findings (10 High,

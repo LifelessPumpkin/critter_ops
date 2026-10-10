@@ -54,17 +54,76 @@ jobs:
       - name: Resolve .NET dependencies for scanning
         run: dotnet restore apps/skipper-api/skipper-api.csproj --use-lock-file
 
+      - name: Validate security policy and prepare OpenVEX
+        id: security_policy
+        run: |
+          python3 -m venv "$RUNNER_TEMP/security-policy"
+          "$RUNNER_TEMP/security-policy/bin/pip" install -r security/requirements.txt
+          SECURITY_PYTHON="$RUNNER_TEMP/security-policy/bin/python" ./packages/mary-ann-tests/scripts/test-security.sh
+          "$RUNNER_TEMP/security-policy/bin/python" security/evaluate.py validate \
+            --vex-output artifacts/security/critterops.openvex.json
+          if [ -s artifacts/security/critterops.openvex.json ]; then
+            echo 'vex_path=artifacts/security/critterops.openvex.json' >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Scan dependency manifests and lock files
+        id: dependency_scan
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        env:
+          TRIVY_INCLUDE_DEV_DEPS: 'true'
+          TRIVY_VEX: ${{ steps.security_policy.outputs.vex_path }}
+          TRIVY_SHOW_SUPPRESSED: 'true'
+          TRIVY_IGNOREFILE: /dev/null
         with:
+          version: v0.70.0
           scan-type: fs
           scan-ref: .
           scanners: vuln
-          format: table
+          format: json
+          output: artifacts/security/trivy.json
+          list-all-pkgs: true
           severity: HIGH,CRITICAL
-          exit-code: 1
+          # Findings are gated below; scanner execution errors still fail this step.
+          exit-code: 0
           ignore-unfixed: false
           skip-dirs: '**/node_modules,**/.next,**/bin,**/obj,**/build,**/dist,**/coverage'
+
+      - name: Evaluate accepted and blocking dependencies
+        if: always()
+        env:
+          SCAN_OUTCOME: ${{ steps.dependency_scan.outcome }}
+        run: |
+          if [ "$SCAN_OUTCOME" != success ]; then
+            "$RUNNER_TEMP/security-policy/bin/python" security/evaluate.py evaluate \
+              --scanner-error 'Trivy or policy preparation did not complete successfully.' \
+              --result-output artifacts/security/evaluation.json \
+              --summary artifacts/security/summary.md
+          else
+            "$RUNNER_TEMP/security-policy/bin/python" security/evaluate.py evaluate \
+              --report artifacts/security/trivy.json \
+              --require-target apps/gilligan-web/package-lock.json \
+              --require-target apps/skipper-api/packages.lock.json \
+              --result-output artifacts/security/evaluation.json \
+              --summary artifacts/security/summary.md
+          fi
+
+      - name: Publish dependency security summary
+        if: always()
+        run: |
+          if [ ! -s artifacts/security/summary.md ]; then
+            echo '## Mary Ann Security Report — FAIL: no valid evaluation report was generated.' >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          cat artifacts/security/summary.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Preserve dependency security evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: mary-ann-dependency-security
+          path: artifacts/security/
+          retention-days: 7
+          if-no-files-found: error
 
   trufflehog:
     name: TruffleHog Secret Scan
