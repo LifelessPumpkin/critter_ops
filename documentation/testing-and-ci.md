@@ -44,7 +44,7 @@ than duplicate presentation markup. The existing enclosure-name regression is re
 
 ## GitHub Actions and required checks
 
-`Mary Ann - Regression Testing` runs on PRs and pushes to `develop` and `main`.
+`Mary Ann - Regression Testing` runs on PRs targeting `develop` and `main`, with no push trigger.
 Ubuntu runners provide Docker for integration tests. Jobs build Skipper, run isolated
 unit/integration tests through Mary Ann, and install, build, and test Gilligan. No local
 configuration files or persistent databases are needed.
@@ -55,18 +55,17 @@ Require these exact job names in branch protection or repository rulesets:
 - `Skipper Integration Tests`
 - `Gilligan Build / Regression Tests`
 
-`Mary Ann - Security Scanning` preserves the workflow from the repository's
-`64-add-automated-repository-security-scanning` branch, changing only its display name
-and filename. Semgrep, Trivy, and TruffleHog retain their pinned tools, failure flags,
-permissions, and push-to-develop/manual triggers.
+`Mary Ann - Security Scanning` runs independently on the same PR targets and supports
+manual execution. Require `Mary Ann Security Scanning`, `Semgrep SAST`,
+`Trivy Dependency Scan`, and `TruffleHog Secret Scan` alongside the three regression
+checks above. Workflow display names are not status-check names. Builds and existing
+regression coverage remain unchanged; no existing lint job was present to migrate.
 
-Neither main nor develop currently has branch protection. Protection has not been
-changed remotely as part of these uncommitted changes. Enable regression checks after
-publishing the workflow. Security checks cannot be required on PRs under the preserved
-push-only policy: first explicitly authorize PR security triggers, then require
-`Semgrep SAST`, `Trivy Dependency Scan`, and `TruffleHog Secret Scan`. Future deployment
-workflows should depend on successful regression and security runs; deployment is outside
-this change.
+Branch protection was not changed remotely. See
+[Security scanning](security-scanning.md#required-checks-and-protected-branches)
+for exact ruleset settings, reporting permissions, fork behavior and hosted validation.
+Neither workflow reruns automatically after merge. A future separate deployment
+pipeline is outside this ticket.
 
 ## Task activity coverage
 
@@ -78,6 +77,6 @@ assertions protect structured details as well as completion metadata and relatio
 
 ## Validation in GitHub
 
-After publishing, verify PRs to both branches and pushes execute these workflows. A
+After publishing, verify PRs to both branches execute these workflows and merges do not rerun them. A
 failing test must fail its job; security failures must remain separately visible. Do
 not introduce intentionally failing commits on shared protected branches to validate CI.

@@ -1,9 +1,8 @@
 name: Mary Ann - Security Scanning
 
 on:
-  push:
-    branches:
-      - develop
+  pull_request:
+    branches: [develop, main]
   workflow_dispatch:
 
 permissions:
@@ -13,6 +12,9 @@ jobs:
   semgrep:
     name: Semgrep SAST
     runs-on: ubuntu-latest
+    outputs:
+      status: ${{ steps.report.outputs.status }}
+      blocking: ${{ steps.report.outputs.blocking }}
     container:
       image: semgrep/semgrep:1.179.0@sha256:93963d9295a366f59e4850127b1550400ee7b388f04fe144e4a1f6325d96e01b
     steps:
@@ -21,21 +23,42 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Scan source code
-        run: >-
-          semgrep scan
-          --config p/default
-          --error
-          --strict
-          --metrics off
-          --exclude '**/node_modules/**'
-          --exclude '**/.next/**'
-          --exclude '**/bin/**'
-          --exclude '**/obj/**'
-          --exclude '**/build/**'
-          --exclude '**/dist/**'
-          --exclude '**/coverage/**'
-          .
+      - name: Scan source code and preserve native reports
+        id: scan
+        shell: sh
+        run: |
+          mkdir -p artifacts/security
+          set +e
+          semgrep scan --config p/default --error --strict --metrics off \
+            --exclude '**/node_modules/**' --exclude '**/.next/**' \
+            --exclude '**/bin/**' --exclude '**/obj/**' --exclude '**/build/**' \
+            --exclude '**/dist/**' --exclude '**/coverage/**' \
+            --json-output artifacts/security/semgrep.json \
+            --sarif-output artifacts/security/semgrep.sarif .
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit "$code"
+
+      - name: Report Semgrep gate
+        id: report
+        if: always()
+        run: python3 security/report.py semgrep --exit-code "${{ steps.scan.outputs.exit_code || '2' }}" --report artifacts/security/semgrep.json
+
+      - name: Validate Semgrep SARIF
+        if: always()
+        run: python3 security/report.py sarif --report artifacts/security/semgrep.sarif
+
+      - name: Preserve Semgrep evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: mary-ann-semgrep-security
+          path: |
+            artifacts/security/semgrep.json
+            artifacts/security/semgrep.sarif
+            artifacts/security/semgrep-status.json
+          retention-days: 7
+          if-no-files-found: error
 
   trivy:
     name: Trivy Dependency Scan
@@ -107,6 +130,13 @@ jobs:
               --summary artifacts/security/summary.md
           fi
 
+      - name: Convert the same Trivy results to native SARIF
+        if: always() && steps.dependency_scan.outcome == 'success'
+        run: |
+          python3 security/report.py trivy-report --report artifacts/security/trivy.json --output "$RUNNER_TEMP/trivy-sarif-input.json"
+          trivy convert --format sarif --output artifacts/security/trivy.sarif "$RUNNER_TEMP/trivy-sarif-input.json"
+          python3 security/report.py sarif --report artifacts/security/trivy.sarif
+
       - name: Publish dependency security summary
         if: always()
         run: |
@@ -121,12 +151,20 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: mary-ann-dependency-security
-          path: artifacts/security/
+          path: |
+            artifacts/security/trivy.json
+            artifacts/security/trivy.sarif
+            artifacts/security/evaluation.json
+            artifacts/security/summary.md
+            artifacts/security/critterops.openvex.json
           retention-days: 7
           if-no-files-found: error
 
   trufflehog:
     name: TruffleHog Secret Scan
+    outputs:
+      status: ${{ steps.report.outputs.status }}
+      blocking: ${{ steps.report.outputs.blocking }}
     runs-on: ubuntu-latest
     steps:
       - name: Check out full repository history
@@ -135,15 +173,124 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Scan repository and Git history for verified secrets
-        run: >-
-          docker run --rm
-          --volume "$GITHUB_WORKSPACE:/repo"
-          --workdir /repo
-          ghcr.io/trufflesecurity/trufflehog:3.97.9@sha256:52e67fef4d054ecff5c2ce4b4ae376626d1ef54aa0898b53cac19c25e92e14db
-          git file:///repo
-          --results verified
-          --fail
-          --fail-on-scan-errors
-          --no-update
-          --github-actions
+      - name: Scan verified secrets without publishing raw output
+        id: report
+        run: |
+          python3 security/report.py trufflehog -- docker run --rm \
+            --volume "$GITHUB_WORKSPACE:/repo:ro" --workdir /repo \
+            ghcr.io/trufflesecurity/trufflehog:3.97.9@sha256:52e67fef4d054ecff5c2ce4b4ae376626d1ef54aa0898b53cac19c25e92e14db \
+            git file:///repo --results verified --fail --fail-on-scan-errors --no-update --json
+
+      - name: Preserve sanitized secret scan status
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: mary-ann-trufflehog-security
+          path: artifacts/security/trufflehog-status.json
+          retention-days: 7
+          if-no-files-found: error
+
+  security-gate:
+    name: Mary Ann Security Scanning
+    if: always()
+    needs: [semgrep, trivy, trufflehog]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Collect dependency policy summary
+        id: evidence
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: mary-ann-dependency-security
+          path: reports
+
+      - name: Report and enforce all scanner jobs
+        env:
+          SEMGREP: ${{ needs.semgrep.result }}
+          TRIVY: ${{ needs.trivy.result }}
+          TRUFFLEHOG: ${{ needs.trufflehog.result }}
+          SEMGREP_STATUS: ${{ needs.semgrep.outputs.status }}
+          SECRET_STATUS: ${{ needs.trufflehog.outputs.status }}
+          SEMGREP_COUNT: ${{ needs.semgrep.outputs.blocking }}
+          SECRET_COUNT: ${{ needs.trufflehog.outputs.blocking }}
+          EVIDENCE: ${{ steps.evidence.outcome }}
+        run: |
+          python3 - <<'PYCODE'
+          import json, os, pathlib, sys
+          e = os.environ
+          summary = pathlib.Path('reports/summary.md')
+          passed = summary.is_file() and all(e[k] == 'success' for k in ('SEMGREP', 'TRIVY', 'TRUFFLEHOG', 'EVIDENCE'))
+          try:
+              evaluation = json.loads(pathlib.Path('reports/evaluation.json').read_text())
+              trivy_status = 'Scanner / Policy Execution Failure' if evaluation['errors'] else ('PASS' if evaluation['result'] == 'PASS' else 'Security Gate Failure')
+          except (OSError, ValueError, KeyError, TypeError):
+              passed = False
+              trivy_status = 'Scanner / Policy Execution Failure'
+          lines = ['# Mary Ann Security Report', '', 'Overall result: **' + ('PASS' if passed else 'FAIL') + '**', '',
+                   'Semgrep: ' + (e['SEMGREP_STATUS'] or 'Scanner Execution Failure') + ' (job: ' + e['SEMGREP'] + ')',
+                   'Trivy: ' + trivy_status + ' (job: ' + e['TRIVY'] + ')',
+                   'TruffleHog: ' + (e['SECRET_STATUS'] or 'Scanner Execution Failure') + ' (job: ' + e['TRUFFLEHOG'] + ')', '',
+                   'Semgrep blocking: ' + (e['SEMGREP_COUNT'] or 'unavailable'),
+                   'Verified secrets: ' + (e['SECRET_COUNT'] or 'unavailable')]
+          if summary.is_file():
+              lines += ['', summary.read_text()]
+          else:
+              passed = False
+              lines += ['', 'Dependency findings/accepted counts unavailable: reporting execution failed.']
+          try:
+              total = int(e['SEMGREP_COUNT']) + int(e['SECRET_COUNT']) + len(evaluation['blocking'])
+              if evaluation['errors']:
+                  raise ValueError('Evaluation error')
+              lines += ['', 'Total blocking findings: ' + str(total), 'Accepted findings: ' + str(len(evaluation['accepted']))]
+          except (ValueError, KeyError, NameError, TypeError):
+              lines += ['', 'Total blocking/accepted counts: unavailable (scanner or reporting execution failure).']
+          lines += ['', '## Detailed reports', '',
+                    'See this run’s Artifacts and scanner job summaries; Semgrep/Trivy SARIF upload status is in Code Scanning Reports.',
+                    'See Security → Code scanning for uploaded findings. Accepted risks remain unresolved; dependency policy summary is authoritative.']
+          with open(e['GITHUB_STEP_SUMMARY'], 'a') as f:
+              f.write('\n'.join(lines) + '\n')
+          sys.exit(0 if passed else 1)
+          PYCODE
+
+  code-scanning:
+    name: Code Scanning Reports (${{ matrix.scanner }})
+    needs: [semgrep, trivy]
+    # Forks retain enforcement and artifacts without elevated token permissions.
+    if: always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        scanner: [semgrep, trivy]
+    steps:
+      # No checkout or repository scripts in this privileged reporting job.
+      - name: Download scanner evidence
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: mary-ann-${{ matrix.scanner == 'trivy' && 'dependency' || 'semgrep' }}-security
+          path: reports
+
+      - name: Upload native SARIF
+        id: upload
+        if: hashFiles(format('reports/{0}.sarif', matrix.scanner)) != ''
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        with:
+          sarif_file: reports/${{ matrix.scanner }}.sarif
+          category: mary-ann-${{ matrix.scanner }}
+
+      - name: Report upload availability
+        if: always()
+        env:
+          UPLOAD: ${{ steps.upload.outcome }}
+        run: |
+          if [ "$UPLOAD" = success ]; then
+            echo 'Code Scanning upload succeeded.' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo '::warning::Code Scanning report unavailable. Review scanner checks and safe artifacts; enforcement remains blocking.'
+            echo 'Code Scanning upload unavailable or missing SARIF. Review scanner checks and safe artifacts.' >> "$GITHUB_STEP_SUMMARY"
+          fi

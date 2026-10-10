@@ -41,7 +41,7 @@ Feature branches are always created from develop.
 2. Create a branch from that issue.
 3. Implement the work.
 4. Open a Pull Request into develop.
-5. Review and merge.
+5. Require Mary Ann regression/build and security checks, then review and merge.
 6. Repeat.
 
 When a release is ready:
@@ -57,3 +57,12 @@ When a release is ready:
 * One issue equals one branch.
 * One branch should solve one problem.
 * Pull Requests should remain focused and small whenever possible.
+
+## Pre-merge validation
+
+Both `develop` and `main` require the checks documented in
+[Security scanning](security-scanning.md#required-checks-and-protected-branches).
+Repository administrators must configure these requirements in existing rulesets;
+workflow files alone do not protect branches. Mary Ann validates PR merge refs and
+does not rerun full suites on pushes. Manual security scans remain available.
+Future build/deployment automation is separate and is not implemented here.
