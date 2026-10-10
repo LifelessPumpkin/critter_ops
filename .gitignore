@@ -40,6 +40,8 @@ ScaffoldingReadMe.txt
 .env
 
 # Others
+__pycache__/
+*.py[cod]
 ~$*
 *~
 CodeCoverage/
