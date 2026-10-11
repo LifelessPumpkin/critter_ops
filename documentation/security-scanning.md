@@ -115,7 +115,7 @@ Pin every third-party `uses:` reference to a full 40-character upstream commit S
 with the exact release version in a comment. Verify the release tag and commit via
 the action's official repository before updating. Keep action major versions unless
 a compatibility review justifies changing them. The testing workflow retains v4
-actions (Node 20 action runtime), Node 22 for Gilligan, and .NET 8 for Skipper;
+actions (Node 20 action runtime), Node 22 for Gilligan, and .NET 10 for Skipper;
 checkout v4.4.0's safer `pull_request_target` defaults do not affect its existing
 `pull_request` trigger.
 

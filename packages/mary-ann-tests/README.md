@@ -13,7 +13,7 @@ make test-security
 ./packages/mary-ann-tests/scripts/test-skipper.sh integration
 ```
 
-Requires .NET 8, Node.js 22, Gilligan dependencies (`npm ci`), and a running Docker
+Requires .NET 10, Node.js 22, Gilligan dependencies (`npm ci`), and a running Docker
 daemon for disposable PostgreSQL integration tests. Missing projects or dependencies
 fail clearly. All suites are attempted and failures propagate to callers and CI.
 

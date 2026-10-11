@@ -7,7 +7,7 @@ Vitest/React Testing Library tests remain within `apps/gilligan-web`.
 
 ## Local execution
 
-Install .NET SDK 8, Node.js 22, and Gilligan dependencies (`npm ci` in
+Install .NET SDK 10, Node.js 22, and Gilligan dependencies (`npm ci` in
 `apps/gilligan-web`). Start a Docker-compatible daemon for integration tests.
 
 ```sh
@@ -48,6 +48,12 @@ than duplicate presentation markup. The existing enclosure-name regression is re
 Ubuntu runners provide Docker for integration tests. Jobs build Skipper, run isolated
 unit/integration tests through Mary Ann, and install, build, and test Gilligan. No local
 configuration files or persistent databases are needed.
+
+The Skipper unit job also validates the production Docker image with
+`docker build -f apps/skipper-api/Dockerfile -t critterops/skipper:ci .` from
+the monorepo root. This is build validation only; it does not publish or deploy.
+See [Skipper Docker instructions](../apps/skipper-api/README.md#docker-image)
+for local runtime and health validation.
 
 Require these exact job names in branch protection or repository rulesets:
 

@@ -95,7 +95,7 @@ or a follow-up PR. Nothing is deleted or accepted automatically.
 
 ## Local commands and reports
 
-From the repository root, with Python 3.10+, .NET 8, and Trivy 0.70.0 or Docker:
+From the repository root, with Python 3.10+, .NET 10, and Trivy 0.70.0 or Docker:
 
 ```sh
 python3 -m venv /tmp/critter-security-venv

@@ -2,7 +2,7 @@
 set -eu
 repo_root="$(CDPATH= cd -- "$(dirname -- "$0")/../../.." && pwd)"
 if ! command -v dotnet >/dev/null 2>&1; then
-  echo "The .NET 8 SDK is required to run Skipper tests." >&2
+  echo "The .NET 10 SDK is required to run Skipper tests." >&2
   exit 1
 fi
 suite="${1:-all}"
