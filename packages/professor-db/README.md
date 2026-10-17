@@ -100,3 +100,7 @@ psql "postgresql://postgres:postgres@localhost:5432/critterops_dev"
 ```
 
 See [Animal reference catalog and enclosure return workflow](../../documentation/architecture/animal-reference-catalog.md) for schema, compatibility, API contracts, draft behavior, and verification guidance.
+
+See [Animal catalog metadata](../../documentation/architecture/animal-catalog-metadata.md)
+for provider-neutral taxonomy references, names, synchronization history, constraints,
+curation policy, and migration/rollback behavior.

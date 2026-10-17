@@ -21,6 +21,12 @@ public class ProfessorDbContext : DbContext
     public DbSet<Species> Species => Set<Species>();
     public DbSet<AnimalVariant> AnimalVariants => Set<AnimalVariant>();
 
+    public DbSet<SpeciesCommonName> SpeciesCommonNames => Set<SpeciesCommonName>();
+    public DbSet<SpeciesAlias> SpeciesAliases => Set<SpeciesAlias>();
+    public DbSet<SpeciesExternalReference> SpeciesExternalReferences => Set<SpeciesExternalReference>();
+    public DbSet<CatalogSyncRun> CatalogSyncRuns => Set<CatalogSyncRun>();
+    public DbSet<CatalogSyncIssue> CatalogSyncIssues => Set<CatalogSyncIssue>();
+
     public DbSet<Animal> Animals => Set<Animal>();
 
     public DbSet<ActivityEvent> ActivityEvents => Set<ActivityEvent>();
