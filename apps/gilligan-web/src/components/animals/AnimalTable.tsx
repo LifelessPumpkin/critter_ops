@@ -42,7 +42,7 @@ const columns: TableColumn<AnimalListItem>[] = [
   },
   {
     header: "Species",
-    render: (animal) => animal.species,
+    render: (animal) => <span>{animal.species}{animal.speciesScientificName ? <span className="animal-cell-metadata"><i>{animal.speciesScientificName}</i></span> : null}</span>,
   },
   {
     header: "Age / DOB",

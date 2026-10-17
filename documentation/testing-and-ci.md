@@ -86,3 +86,5 @@ assertions protect structured details as well as completion metadata and relatio
 After publishing, verify PRs to both branches execute these workflows and merges do not rerun them. A
 failing test must fail its job; security failures must remain separately visible. Do
 not introduce intentionally failing commits on shared protected branches to validate CI.
+
+See [Animal reference catalog and enclosure return workflow](architecture/animal-reference-catalog.md) for schema, compatibility, API contracts, draft behavior, and verification guidance.

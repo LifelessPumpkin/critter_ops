@@ -24,7 +24,7 @@ export function AnimalCard({ animal, variant = "active" }: AnimalCardProps) {
       <div>
         <div className="enclosure-card-header">
           <div>
-            <p className="eyebrow-text">{animal.animalType}</p>
+            <p className="eyebrow-text">{animal.animalGroupName ?? animal.animalType}</p>
             <h2 className="card-title">{animal.name}</h2>
           </div>
           <span className="status-pill">{animal.status}</span>

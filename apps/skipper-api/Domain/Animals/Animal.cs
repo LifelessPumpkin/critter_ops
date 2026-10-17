@@ -31,6 +31,13 @@ public class Animal
     /// <summary>Broad animal category.</summary>
     public required AnimalType AnimalType { get; set; }
 
+    public int? AnimalGroupId { get; set; }
+    public AnimalGroup? AnimalGroup { get; set; }
+    public int? SpeciesId { get; set; }
+    public Species? CatalogSpecies { get; set; }
+    public int? AnimalVariantId { get; set; }
+    public AnimalVariant? AnimalVariant { get; set; }
+
     /// <summary>Current animal status.</summary>
     public required AnimalStatus Status { get; set; }
 

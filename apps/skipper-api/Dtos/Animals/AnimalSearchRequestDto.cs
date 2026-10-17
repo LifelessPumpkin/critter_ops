@@ -13,6 +13,8 @@ public class AnimalSearchRequestDto
 
     public List<AnimalStatus> Statuses { get; set; } = [];
 
+    public List<int> AnimalGroupIds { get; set; } = [];
+
     public List<AnimalType> AnimalTypes { get; set; } = [];
 
     [Range(1, int.MaxValue)]

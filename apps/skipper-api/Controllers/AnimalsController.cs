@@ -69,6 +69,7 @@ public class AnimalsController : ControllerBase
                 nameof(GetAnimalById),
                 new { id = result.Animal!.Id },
                 result.Animal),
+            CreateAnimalResultStatus.InvalidReference => BadRequest(new { message = result.Error }),
             CreateAnimalResultStatus.EnclosureNotFound => BadRequest(new
             {
                 message = "The provided enclosure does not exist.",
@@ -95,6 +96,7 @@ public class AnimalsController : ControllerBase
         {
             UpdateAnimalResultStatus.Updated => Ok(result.Animal),
             UpdateAnimalResultStatus.AnimalNotFound => NotFound(),
+            UpdateAnimalResultStatus.InvalidReference => BadRequest(new { message = result.Error }),
             UpdateAnimalResultStatus.EnclosureNotFound => BadRequest(new
             {
                 message = "The provided enclosure does not exist.",

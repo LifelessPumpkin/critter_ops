@@ -1,6 +1,7 @@
 import { EnclosureForm } from "@/components/enclosures/EnclosureForm";
 
-export default function NewEnclosurePage() {
+export default async function NewEnclosurePage({ searchParams }: { searchParams: Promise<{ animalWorkflow?: string }> }) {
+  const query = await searchParams;
   return (
     <>
       <section className="page-heading animated-fade-in">
@@ -9,7 +10,7 @@ export default function NewEnclosurePage() {
         <p className="page-subtitle">Create a new habitat or enclosure.</p>
       </section>
 
-      <EnclosureForm />
+      <EnclosureForm animalWorkflow={query.animalWorkflow} />
     </>
   );
 }

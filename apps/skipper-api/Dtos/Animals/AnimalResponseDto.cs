@@ -7,6 +7,15 @@ namespace skipper_api.Dtos.Animals;
 /// </summary>
 public class AnimalResponseDto
 {
+    public int? AnimalGroupId { get; set; }
+    public string? AnimalGroupName { get; set; }
+    public int? SpeciesId { get; set; }
+    public string? SpeciesName => Species;
+    public string? VariantName => SubspeciesOrMorph;
+    public string? SpeciesScientificName { get; set; }
+    public int? AnimalVariantId { get; set; }
+    public VariantType? VariantType { get; set; }
+    public VariantType? PreferredVariantType { get; set; }
     public int Id { get; set; }
 
     public int EnclosureId { get; set; }

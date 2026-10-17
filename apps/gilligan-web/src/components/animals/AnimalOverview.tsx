@@ -14,6 +14,8 @@ import {
 } from "@/lib/api/animals";
 import { type Enclosure, fetchEnclosures } from "@/lib/api/enclosures";
 
+import { fetchAnimalGroups, type AnimalGroup } from "@/lib/api/animalCatalog";
+
 type LoadState = "loading" | "loaded" | "error";
 type AdditionalLoadState = "idle" | "loading" | "error";
 
@@ -42,8 +44,9 @@ export function AnimalOverview({ initialState = {} }: { initialState?: AnimalOve
   const [lifecycle, setLifecycle] = useState<AnimalLifecycle>(() => parseLifecycle(initialState.lifecycle));
   const [search, setSearch] = useState(initialState.search ?? "");
   const [statuses, setStatuses] = useState<string[]>(() => parseList(initialState.status, statusOptions));
-  const [animalTypes, setAnimalTypes] = useState<string[]>(() => parseList(initialState.type, animalTypeOptions));
+  const [animalTypes, setAnimalTypes] = useState<string[]>(() => (initialState.type ?? "").split(",").filter((item) => animalTypeOptions.includes(item) || /^group:[1-9][0-9]*$/.test(item)));
   const [enclosureId, setEnclosureId] = useState<number | undefined>(() => parseNumber(initialState.enclosure));
+  const [groups, setGroups] = useState<AnimalGroup[]>([]);
   const [enclosures, setEnclosures] = useState<Enclosure[]>([]);
   const [enclosuresLoading, setEnclosuresLoading] = useState(true);
   const [animalPage, setAnimalPage] = useState(defaultPage);
@@ -60,7 +63,8 @@ export function AnimalOverview({ initialState = {} }: { initialState?: AnimalOve
     lifecycle,
     search: deferredSearch || undefined,
     statuses,
-    animalTypes,
+    animalTypes: animalTypes.filter((value) => !value.startsWith("group:")),
+    animalGroupIds: animalTypes.filter((value) => value.startsWith("group:")).map((value) => Number(value.slice(6))),
     enclosureId,
     pageSize: animalPageSize,
   }), [animalTypes, deferredSearch, enclosureId, lifecycle, statuses]);
@@ -90,6 +94,12 @@ export function AnimalOverview({ initialState = {} }: { initialState?: AnimalOve
 
     return () => controller.abort();
   }, [query, requestKey]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchAnimalGroups(controller.signal).then(setGroups).catch(() => { /* Legacy filters remain usable offline. */ });
+    return () => controller.abort();
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -174,7 +184,7 @@ export function AnimalOverview({ initialState = {} }: { initialState?: AnimalOve
       <div className="animal-toolbar">
         <Input className="animal-search-input" label="Search animals" labelHidden placeholder="Search animals..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
         <MultiSelect label="Status" labelHidden value={statuses} options={statusOptions.map(toSelectionOption)} onValueChange={setStatuses} />
-        <MultiSelect label="Animal Type" labelHidden value={animalTypes} options={animalTypeOptions.map(toSelectionOption)} onValueChange={setAnimalTypes} />
+        <MultiSelect label="Animal Group" labelHidden value={animalTypes} options={[...groups.map((group) => ({ value: `group:${group.id}`, label: group.name })), ...animalTypeOptions.map((type) => ({ value: type, label: `${type === "Avian" ? "Bird" : formatEnumLabel(type)} (legacy type)` }))]} onValueChange={setAnimalTypes} />
         <Combobox
           className="animal-filter-select"
           label="Enclosure"
@@ -193,7 +203,7 @@ export function AnimalOverview({ initialState = {} }: { initialState?: AnimalOve
         <div className="animal-active-filters" aria-label="Active animal filters">
           {search.trim() ? <FilterChip label={`Search: ${search.trim()}`} onRemove={() => setSearch("")} /> : null}
           {statuses.map((status) => <FilterChip key={status} label={`Status: ${formatEnumLabel(status)}`} onRemove={() => setStatuses(statuses.filter((value) => value !== status))} />)}
-          {animalTypes.map((type) => <FilterChip key={type} label={`Type: ${formatEnumLabel(type)}`} onRemove={() => setAnimalTypes(animalTypes.filter((value) => value !== type))} />)}
+          {animalTypes.map((type) => <FilterChip key={type} label={`Group: ${type.startsWith("group:") ? groups.find((group) => group.id === Number(type.slice(6)))?.name ?? type : formatEnumLabel(type)}`} onRemove={() => setAnimalTypes(animalTypes.filter((value) => value !== type))} />)}
           {enclosureId ? <FilterChip label={`Enclosure: ${selectedEnclosure?.name ?? `#${enclosureId}`}`} onRemove={() => setEnclosureId(undefined)} /> : null}
           <Button variant="ghost" className="animal-clear-filters" type="button" onClick={() => { setSearch(""); setStatuses([]); setAnimalTypes([]); setEnclosureId(undefined); }}>Clear all</Button>
         </div>

@@ -5,7 +5,7 @@ import { ActivityTimeline } from "@/components/activity/ActivityTimeline";
 import { fetchAnimal, type Animal } from "@/lib/api/animals";
 import { fetchEnclosure, type Enclosure } from "@/lib/api/enclosures";
 import type { TimelineInitialState } from "@/components/activity/timelineTypes";
-import { SkeletonPageHeader } from "@/components/ui";
+import { ButtonLink, SkeletonPageHeader } from "@/components/ui";
 
 type EntityActivityPageProps =
   | { kind: "animal"; id: number; initialState?: TimelineInitialState }
@@ -59,7 +59,9 @@ export function EntityActivityPage(props: EntityActivityPageProps) {
         <span className="hero-badge">{props.kind === "animal" ? "Animal" : "Enclosure"}</span>
         <h1 className="page-title">{entity.name}</h1>
         <p className="page-subtitle">{subtitle}</p>
+        {props.kind === "animal" ? <p className="page-subtitle">{[(entity as Animal).animalGroupName, (entity as Animal).speciesScientificName, (entity as Animal).subspeciesOrMorph].filter(Boolean).join(" · ")}</p> : null}
       </section>
+      {props.kind === "animal" ? <ButtonLink href={`/animals/${props.id}/edit`} variant="secondary">Edit Animal</ButtonLink> : null}
       <ActivityTimeline
         context={{ kind: props.kind, id: props.id, name: entity.name }}
         initialState={props.initialState}
