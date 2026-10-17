@@ -11,7 +11,7 @@ function Harness({ initial = empty }: { initial?: AnimalReferences }) {
   const [value, setValue] = useState(initial);
   return <><AnimalReferenceFields value={value} onChange={setValue} /><output data-testid="value">{JSON.stringify(value)}</output></>;
 }
-function choose(label: string, option: RegExp) { fireEvent.click(screen.getByRole("combobox", { name: new RegExp(`^${label}`) })); fireEvent.mouseDown(screen.getByRole("option", { name: option })); }
+function choose(label: RegExp, option: RegExp) { fireEvent.click(screen.getByRole("combobox", { name: label })); fireEvent.mouseDown(screen.getByRole("option", { name: option })); }
 beforeEach(() => {
   vi.mocked(fetchAnimalGroups).mockResolvedValue([{ id: 1, name: "Mammal", sortOrder: 10, legacyAnimalType: "Mammal" }, { id: 3, name: "Reptile", sortOrder: 30, legacyAnimalType: "Reptile" }]);
   vi.mocked(searchSpecies).mockResolvedValue({ items: [dog, python], page: 1, pageSize: 20, hasMore: false });
@@ -23,22 +23,22 @@ describe("adaptive animal references", () => {
     render(<Harness />);
     await waitFor(() => expect(searchSpecies).toHaveBeenCalledWith("", undefined, expect.any(AbortSignal)));
     await waitFor(() => expect(screen.queryByText("Loading options…")).not.toBeInTheDocument());
-    choose("Animal Group", /^Mammal$/);
+    choose(/^Animal Group/, /^Mammal$/);
     await waitFor(() => expect(searchSpecies).toHaveBeenCalledWith("", 1, expect.any(AbortSignal)));
     await act(async () => {});
-    choose("Species", /^Dog · Canis/);
+    choose(/^Species/, /^Dog · Canis/);
     await waitFor(() => expect(searchVariants).toHaveBeenCalledWith("", 1, expect.any(AbortSignal)));
     expect(screen.getByRole("combobox", { name: /^Breed/ })).toBeInTheDocument();
-    choose("Breed", /^Poodle/);
+    choose(/^Breed/, /^Poodle/);
     expect(screen.getByTestId("value")).toHaveTextContent('"selectedVariant":{"id":1');
-    choose("Animal Group", /^Reptile$/);
+    choose(/^Animal Group/, /^Reptile$/);
     expect(screen.getByTestId("value")).toHaveTextContent('"selectedSpecies":null');
     expect(screen.getByTestId("value")).toHaveTextContent('"selectedVariant":null');
   });
   it("clears variants when species changes", async () => {
     render(<Harness initial={{ ...empty, species: "Dog", selectedSpecies: dog, selectedVariant: { id: 1, speciesId: 1, name: "Poodle", variantType: "Breed" } }} />);
     await act(async () => {});
-    choose("Species", /^Ball python/);
+    choose(/^Species/, /^Ball python/);
     expect(screen.getByRole("combobox", { name: /^Morph/ })).toBeInTheDocument();
     expect(screen.getByTestId("value")).toHaveTextContent('"selectedVariant":null');
   });

@@ -61,8 +61,8 @@ it("returns the actual created enclosure ID after successful enclosure creation"
   render(<EnclosureForm animalWorkflow={workflow} />);
   fireEvent.change(screen.getByLabelText(/^Name/), { target: { value: "New habitat" } });
   fireEvent.change(screen.getByLabelText(/^Location/), { target: { value: "Room" } });
-  for (const [label, option] of [["Type", "Terrarium"], ["Status", "Active"], ["Mobility", "Fixed"]]) {
-    fireEvent.click(screen.getByRole("combobox", { name: new RegExp(`^${label}`) }));
+  for (const [label, option] of [[/^Type/, "Terrarium"], [/^Status/, "Active"], [/^Mobility/, "Fixed"]] as const) {
+    fireEvent.click(screen.getByRole("combobox", { name: label }));
     fireEvent.mouseDown(screen.getByRole("option", { name: option }));
   }
   fireEvent.click(screen.getByRole("button", { name: "Create Enclosure" }));
