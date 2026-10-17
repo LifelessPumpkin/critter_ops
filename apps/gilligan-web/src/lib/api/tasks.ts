@@ -41,7 +41,7 @@ export class TaskApiError extends Error {
   }
 }
 
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5198";
+const apiBaseUrl = "/api/skipper";
 
 export async function fetchTasks(): Promise<HusbandryTask[]> {
   const response = await fetch(`${apiBaseUrl}/api/tasks`);

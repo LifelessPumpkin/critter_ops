@@ -60,7 +60,7 @@ export type CreateAnimalRequest = {
   acquiredDate: string;
 };
 
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5198";
+const apiBaseUrl = "/api/skipper";
 
 export async function fetchAnimals(): Promise<Animal[]> {
   const response = await fetch(`${apiBaseUrl}/api/animals`);

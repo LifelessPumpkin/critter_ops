@@ -142,7 +142,7 @@ export type ActivitySearchQuery = {
 
 export const activityPageSize = 50;
 
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5198";
+const apiBaseUrl = "/api/skipper";
 
 export async function fetchActivities(
   query: ActivitySearchQuery,
