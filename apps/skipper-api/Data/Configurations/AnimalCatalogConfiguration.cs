@@ -27,6 +27,8 @@ public class SpeciesConfiguration : IEntityTypeConfiguration<Species>
         b.HasIndex(x => new { x.AnimalGroupId, x.ScientificName, x.Id });
         b.HasIndex(x => x.CommonName).HasMethod("gin").HasOperators("gin_trgm_ops");
         b.HasIndex(x => x.ScientificName).HasMethod("gin").HasOperators("gin_trgm_ops");
+        b.Property(x => x.TaxonomicStatus).HasConversion<string>().HasMaxLength(30).HasDefaultValue(TaxonomicStatus.Unresolved);
+        b.Property(x => x.IsManuallyManaged).HasDefaultValue(true);
         b.HasData(AnimalCatalogSeed.Species);
     }
 }

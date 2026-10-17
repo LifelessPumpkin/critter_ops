@@ -641,6 +641,152 @@ namespace skipper_api.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("skipper_api.Domain.Animals.CatalogSyncIssue", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("CatalogSyncRunId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("DatasetIdentifier")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<string>("ExternalIdentifier")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("IssueType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime?>("ResolvedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Severity")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<int?>("SpeciesExternalReferenceId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("SpeciesId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CatalogSyncRunId");
+
+                    b.HasIndex("SpeciesExternalReferenceId");
+
+                    b.HasIndex("SpeciesId");
+
+                    b.HasIndex("Status", "IssueType");
+
+                    b.ToTable("CatalogSyncIssues", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_CatalogSyncIssues_Dataset", "\"DatasetIdentifier\" IS NULL OR (\"DatasetIdentifier\" = btrim(\"DatasetIdentifier\") AND length(\"DatasetIdentifier\") > 0)");
+
+                            t.HasCheckConstraint("CK_CatalogSyncIssues_Provider", "\"Provider\" ~ '^[a-z0-9][a-z0-9._-]*$'");
+                        });
+                });
+
+            modelBuilder.Entity("skipper_api.Domain.Animals.CatalogSyncRun", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DatasetIdentifier")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<string>("OperationType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("RecordsCreated")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("RecordsFailed")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("RecordsProcessed")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("RecordsSkipped")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("RecordsUpdated")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Provider", "StartedAt");
+
+                    b.HasIndex("Status", "StartedAt");
+
+                    b.ToTable("CatalogSyncRuns", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_CatalogSyncRuns_Counts", "\"RecordsProcessed\" >= 0 AND \"RecordsCreated\" >= 0 AND \"RecordsUpdated\" >= 0 AND \"RecordsSkipped\" >= 0 AND \"RecordsFailed\" >= 0");
+
+                            t.HasCheckConstraint("CK_CatalogSyncRuns_Dataset", "\"DatasetIdentifier\" IS NULL OR (\"DatasetIdentifier\" = btrim(\"DatasetIdentifier\") AND length(\"DatasetIdentifier\") > 0)");
+
+                            t.HasCheckConstraint("CK_CatalogSyncRuns_Provider", "\"Provider\" ~ '^[a-z0-9][a-z0-9._-]*$'");
+
+                            t.HasCheckConstraint("CK_CatalogSyncRuns_Times", "\"CompletedAt\" IS NULL OR (\"StartedAt\" IS NOT NULL AND \"CompletedAt\" >= \"StartedAt\")");
+                        });
+                });
+
             modelBuilder.Entity("skipper_api.Domain.Animals.Species", b =>
                 {
                     b.Property<int>("Id")
@@ -656,8 +802,19 @@ namespace skipper_api.Data.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<DateTime?>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
+
+                    b.Property<bool>("IsManuallyManaged")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<DateTime?>("LastSyncedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("PreferredVariantType")
                         .HasMaxLength(30)
@@ -667,6 +824,16 @@ namespace skipper_api.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
+
+                    b.Property<string>("TaxonomicStatus")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasDefaultValue("Unresolved");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
 
@@ -694,8 +861,10 @@ namespace skipper_api.Data.Migrations
                             AnimalGroupId = 1,
                             CommonName = "Domestic dog",
                             IsActive = true,
+                            IsManuallyManaged = true,
                             PreferredVariantType = "Breed",
-                            ScientificName = "Canis lupus familiaris"
+                            ScientificName = "Canis lupus familiaris",
+                            TaxonomicStatus = "Unresolved"
                         },
                         new
                         {
@@ -703,8 +872,10 @@ namespace skipper_api.Data.Migrations
                             AnimalGroupId = 1,
                             CommonName = "Domestic cat",
                             IsActive = true,
+                            IsManuallyManaged = true,
                             PreferredVariantType = "Breed",
-                            ScientificName = "Felis catus"
+                            ScientificName = "Felis catus",
+                            TaxonomicStatus = "Unresolved"
                         },
                         new
                         {
@@ -712,7 +883,9 @@ namespace skipper_api.Data.Migrations
                             AnimalGroupId = 1,
                             CommonName = "Domestic ferret",
                             IsActive = true,
-                            ScientificName = "Mustela putorius furo"
+                            IsManuallyManaged = true,
+                            ScientificName = "Mustela putorius furo",
+                            TaxonomicStatus = "Unresolved"
                         },
                         new
                         {
@@ -720,8 +893,10 @@ namespace skipper_api.Data.Migrations
                             AnimalGroupId = 3,
                             CommonName = "Ball python",
                             IsActive = true,
+                            IsManuallyManaged = true,
                             PreferredVariantType = "Morph",
-                            ScientificName = "Python regius"
+                            ScientificName = "Python regius",
+                            TaxonomicStatus = "Unresolved"
                         },
                         new
                         {
@@ -729,8 +904,10 @@ namespace skipper_api.Data.Migrations
                             AnimalGroupId = 3,
                             CommonName = "Bearded dragon",
                             IsActive = true,
+                            IsManuallyManaged = true,
                             PreferredVariantType = "Morph",
-                            ScientificName = "Pogona vitticeps"
+                            ScientificName = "Pogona vitticeps",
+                            TaxonomicStatus = "Unresolved"
                         },
                         new
                         {
@@ -738,8 +915,10 @@ namespace skipper_api.Data.Migrations
                             AnimalGroupId = 3,
                             CommonName = "Leopard gecko",
                             IsActive = true,
+                            IsManuallyManaged = true,
                             PreferredVariantType = "Morph",
-                            ScientificName = "Eublepharis macularius"
+                            ScientificName = "Eublepharis macularius",
+                            TaxonomicStatus = "Unresolved"
                         },
                         new
                         {
@@ -747,8 +926,10 @@ namespace skipper_api.Data.Migrations
                             AnimalGroupId = 3,
                             CommonName = "Corn snake",
                             IsActive = true,
+                            IsManuallyManaged = true,
                             PreferredVariantType = "Morph",
-                            ScientificName = "Pantherophis guttatus"
+                            ScientificName = "Pantherophis guttatus",
+                            TaxonomicStatus = "Unresolved"
                         },
                         new
                         {
@@ -756,8 +937,10 @@ namespace skipper_api.Data.Migrations
                             AnimalGroupId = 4,
                             CommonName = "Axolotl",
                             IsActive = true,
+                            IsManuallyManaged = true,
                             PreferredVariantType = "Morph",
-                            ScientificName = "Ambystoma mexicanum"
+                            ScientificName = "Ambystoma mexicanum",
+                            TaxonomicStatus = "Unresolved"
                         },
                         new
                         {
@@ -765,8 +948,10 @@ namespace skipper_api.Data.Migrations
                             AnimalGroupId = 5,
                             CommonName = "Goldfish",
                             IsActive = true,
+                            IsManuallyManaged = true,
                             PreferredVariantType = "Variety",
-                            ScientificName = "Carassius auratus"
+                            ScientificName = "Carassius auratus",
+                            TaxonomicStatus = "Unresolved"
                         },
                         new
                         {
@@ -774,8 +959,10 @@ namespace skipper_api.Data.Migrations
                             AnimalGroupId = 5,
                             CommonName = "Betta",
                             IsActive = true,
+                            IsManuallyManaged = true,
                             PreferredVariantType = "Strain",
-                            ScientificName = "Betta splendens"
+                            ScientificName = "Betta splendens",
+                            TaxonomicStatus = "Unresolved"
                         },
                         new
                         {
@@ -783,8 +970,10 @@ namespace skipper_api.Data.Migrations
                             AnimalGroupId = 2,
                             CommonName = "Budgerigar",
                             IsActive = true,
+                            IsManuallyManaged = true,
                             PreferredVariantType = "Mutation",
-                            ScientificName = "Melopsittacus undulatus"
+                            ScientificName = "Melopsittacus undulatus",
+                            TaxonomicStatus = "Unresolved"
                         },
                         new
                         {
@@ -792,8 +981,10 @@ namespace skipper_api.Data.Migrations
                             AnimalGroupId = 2,
                             CommonName = "Cockatiel",
                             IsActive = true,
+                            IsManuallyManaged = true,
                             PreferredVariantType = "Mutation",
-                            ScientificName = "Nymphicus hollandicus"
+                            ScientificName = "Nymphicus hollandicus",
+                            TaxonomicStatus = "Unresolved"
                         },
                         new
                         {
@@ -801,8 +992,10 @@ namespace skipper_api.Data.Migrations
                             AnimalGroupId = 1,
                             CommonName = "Guinea pig",
                             IsActive = true,
+                            IsManuallyManaged = true,
                             PreferredVariantType = "Breed",
-                            ScientificName = "Cavia porcellus"
+                            ScientificName = "Cavia porcellus",
+                            TaxonomicStatus = "Unresolved"
                         },
                         new
                         {
@@ -810,8 +1003,10 @@ namespace skipper_api.Data.Migrations
                             AnimalGroupId = 1,
                             CommonName = "Rabbit",
                             IsActive = true,
+                            IsManuallyManaged = true,
                             PreferredVariantType = "Breed",
-                            ScientificName = "Oryctolagus cuniculus"
+                            ScientificName = "Oryctolagus cuniculus",
+                            TaxonomicStatus = "Unresolved"
                         },
                         new
                         {
@@ -819,7 +1014,9 @@ namespace skipper_api.Data.Migrations
                             AnimalGroupId = 6,
                             CommonName = "Madagascar hissing cockroach",
                             IsActive = true,
-                            ScientificName = "Gromphadorhina portentosa"
+                            IsManuallyManaged = true,
+                            ScientificName = "Gromphadorhina portentosa",
+                            TaxonomicStatus = "Unresolved"
                         },
                         new
                         {
@@ -827,7 +1024,190 @@ namespace skipper_api.Data.Migrations
                             AnimalGroupId = 6,
                             CommonName = "Mexican red-knee tarantula",
                             IsActive = true,
-                            ScientificName = "Brachypelma hamorii"
+                            IsManuallyManaged = true,
+                            ScientificName = "Brachypelma hamorii",
+                            TaxonomicStatus = "Unresolved"
+                        });
+                });
+
+            modelBuilder.Entity("skipper_api.Domain.Animals.SpeciesAlias", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AliasType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("NameKey")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("text")
+                        .HasComputedColumnSql("lower(btrim(\"Name\"))", true);
+
+                    b.Property<string>("Source")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("SourceKey")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("text")
+                        .HasComputedColumnSql("nullif(lower(btrim(\"Source\")), '')", true);
+
+                    b.Property<int>("SpeciesId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NameKey");
+
+                    b.HasIndex("SpeciesId", "NameKey", "AliasType", "SourceKey")
+                        .IsUnique();
+
+                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("SpeciesId", "NameKey", "AliasType", "SourceKey"), false);
+
+                    b.ToTable("SpeciesAliases", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_SpeciesAliases_Name", "length(btrim(\"Name\")) > 0");
+                        });
+                });
+
+            modelBuilder.Entity("skipper_api.Domain.Animals.SpeciesCommonName", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("LanguageCode")
+                        .HasMaxLength(35)
+                        .HasColumnType("character varying(35)");
+
+                    b.Property<string>("LanguageKey")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("text")
+                        .HasComputedColumnSql("nullif(lower(btrim(\"LanguageCode\")), '')", true);
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("NameKey")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("text")
+                        .HasComputedColumnSql("lower(btrim(\"Name\"))", true);
+
+                    b.Property<string>("Source")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("SourceKey")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("text")
+                        .HasComputedColumnSql("nullif(lower(btrim(\"Source\")), '')", true);
+
+                    b.Property<int>("SpeciesId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NameKey");
+
+                    b.HasIndex("SpeciesId", "NameKey", "LanguageKey", "SourceKey")
+                        .IsUnique();
+
+                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("SpeciesId", "NameKey", "LanguageKey", "SourceKey"), false);
+
+                    b.ToTable("SpeciesCommonNames", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_SpeciesCommonNames_Name", "length(btrim(\"Name\")) > 0");
+                        });
+                });
+
+            modelBuilder.Entity("skipper_api.Domain.Animals.SpeciesExternalReference", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("DatasetIdentifier")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("ExternalAcceptedIdentifier")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("ExternalIdentifier")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("ExternalScientificName")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("ExternalTaxonomicStatus")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime?>("LastCheckedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("SpeciesId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SpeciesId");
+
+                    b.HasIndex("Provider", "DatasetIdentifier", "ExternalIdentifier")
+                        .IsUnique();
+
+                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("Provider", "DatasetIdentifier", "ExternalIdentifier"), false);
+
+                    b.ToTable("SpeciesExternalReferences", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_SpeciesExternalReferences_Dataset", "\"DatasetIdentifier\" IS NULL OR (\"DatasetIdentifier\" = btrim(\"DatasetIdentifier\") AND length(\"DatasetIdentifier\") > 0)");
+
+                            t.HasCheckConstraint("CK_SpeciesExternalReferences_Identifier", "\"ExternalIdentifier\" = btrim(\"ExternalIdentifier\") AND length(\"ExternalIdentifier\") > 0");
+
+                            t.HasCheckConstraint("CK_SpeciesExternalReferences_Provider", "\"Provider\" ~ '^[a-z0-9][a-z0-9._-]*$'");
                         });
                 });
 
@@ -1204,6 +1584,30 @@ namespace skipper_api.Data.Migrations
                     b.Navigation("Species");
                 });
 
+            modelBuilder.Entity("skipper_api.Domain.Animals.CatalogSyncIssue", b =>
+                {
+                    b.HasOne("skipper_api.Domain.Animals.CatalogSyncRun", "CatalogSyncRun")
+                        .WithMany("Issues")
+                        .HasForeignKey("CatalogSyncRunId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("skipper_api.Domain.Animals.SpeciesExternalReference", "SpeciesExternalReference")
+                        .WithMany()
+                        .HasForeignKey("SpeciesExternalReferenceId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("skipper_api.Domain.Animals.Species", "Species")
+                        .WithMany()
+                        .HasForeignKey("SpeciesId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("CatalogSyncRun");
+
+                    b.Navigation("Species");
+
+                    b.Navigation("SpeciesExternalReference");
+                });
+
             modelBuilder.Entity("skipper_api.Domain.Animals.Species", b =>
                 {
                     b.HasOne("skipper_api.Domain.Animals.AnimalGroup", "AnimalGroup")
@@ -1213,6 +1617,39 @@ namespace skipper_api.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("AnimalGroup");
+                });
+
+            modelBuilder.Entity("skipper_api.Domain.Animals.SpeciesAlias", b =>
+                {
+                    b.HasOne("skipper_api.Domain.Animals.Species", "Species")
+                        .WithMany("Aliases")
+                        .HasForeignKey("SpeciesId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Species");
+                });
+
+            modelBuilder.Entity("skipper_api.Domain.Animals.SpeciesCommonName", b =>
+                {
+                    b.HasOne("skipper_api.Domain.Animals.Species", "Species")
+                        .WithMany("CommonNames")
+                        .HasForeignKey("SpeciesId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Species");
+                });
+
+            modelBuilder.Entity("skipper_api.Domain.Animals.SpeciesExternalReference", b =>
+                {
+                    b.HasOne("skipper_api.Domain.Animals.Species", "Species")
+                        .WithMany("ExternalReferences")
+                        .HasForeignKey("SpeciesId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Species");
                 });
 
             modelBuilder.Entity("skipper_api.Domain.Tasks.Task", b =>
@@ -1260,6 +1697,20 @@ namespace skipper_api.Data.Migrations
             modelBuilder.Entity("skipper_api.Domain.Animals.Animal", b =>
                 {
                     b.Navigation("ActivityEvents");
+                });
+
+            modelBuilder.Entity("skipper_api.Domain.Animals.CatalogSyncRun", b =>
+                {
+                    b.Navigation("Issues");
+                });
+
+            modelBuilder.Entity("skipper_api.Domain.Animals.Species", b =>
+                {
+                    b.Navigation("Aliases");
+
+                    b.Navigation("CommonNames");
+
+                    b.Navigation("ExternalReferences");
                 });
 
             modelBuilder.Entity("skipper_api.Domain.Enclosures.Enclosure", b =>
