@@ -2,7 +2,7 @@ import Link from "next/link";
 import { SummaryCard } from "@/components/ui";
 
 export default function Home() {
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5198";
+  const apiBaseUrl = "/api/skipper";
 
   return (
     <>
@@ -17,7 +17,7 @@ export default function Home() {
       <section className="dashboard-grid">
         <SummaryCard
           action={
-            <Link href={`${apiBaseUrl}/swagger`} target="_blank" rel="noopener noreferrer" className="card-link">
+            <Link href={`${apiBaseUrl}/swagger/index.html`} target="_blank" rel="noopener noreferrer" className="card-link">
               Open API Docs <span className="arrow">-&gt;</span>
             </Link>
           }

@@ -52,3 +52,5 @@ jobs:
         run: npm run build
       - name: Gilligan regression tests
         run: ./packages/mary-ann-tests/scripts/test-gilligan.sh
+      - name: Build Gilligan Docker image
+        run: docker build -f apps/gilligan-web/Dockerfile -t critterops/gilligan:ci .

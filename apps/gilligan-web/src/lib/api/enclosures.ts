@@ -47,7 +47,7 @@ export class EnclosureApiError extends Error {
   }
 }
 
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5198";
+const apiBaseUrl = "/api/skipper";
 
 export async function fetchEnclosures(): Promise<Enclosure[]> {
   const response = await fetch(`${apiBaseUrl}/api/enclosures`);
