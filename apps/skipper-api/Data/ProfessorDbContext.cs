@@ -17,6 +17,10 @@ public class ProfessorDbContext : DbContext
     {
     }
 
+    public DbSet<AnimalGroup> AnimalGroups => Set<AnimalGroup>();
+    public DbSet<Species> Species => Set<Species>();
+    public DbSet<AnimalVariant> AnimalVariants => Set<AnimalVariant>();
+
     public DbSet<Animal> Animals => Set<Animal>();
 
     public DbSet<ActivityEvent> ActivityEvents => Set<ActivityEvent>();
@@ -50,6 +54,7 @@ public class ProfessorDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+        modelBuilder.HasPostgresExtension("pg_trgm");
 
         // Automatically applies all IEntityTypeConfiguration<T> implementations in this assembly.
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ProfessorDbContext).Assembly);

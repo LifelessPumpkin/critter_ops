@@ -1,4 +1,16 @@
 export type Animal = {
+  animalGroupId?: number | null;
+  animalGroupName?: string | null;
+  speciesId?: number | null;
+  speciesScientificName?: string | null;
+  animalVariantId?: number | null;
+  variantType?: string | null;
+  preferredVariantType?: string | null;
+  birthDateIsEstimated?: boolean;
+  notes?: string | null;
+  microchipNumber?: string | null;
+  tagIdentifier?: string | null;
+  source?: string | null;
   id: number;
   enclosureId: number;
   enclosureName: string;
@@ -16,7 +28,7 @@ export type Animal = {
 
 export type AnimalListItem = Pick<
   Animal,
-  "id" | "enclosureId" | "enclosureName" | "name" | "species" | "subspeciesOrMorph" | "animalType" | "status" | "sex" | "birthDate"
+  "animalGroupName" | "speciesScientificName" | "id" | "enclosureId" | "enclosureName" | "name" | "species" | "subspeciesOrMorph" | "animalType" | "status" | "sex" | "birthDate"
 > & {
   enclosureLocation: string;
   birthDateIsEstimated: boolean;
@@ -29,6 +41,7 @@ export type AnimalSearchQuery = {
   search?: string;
   statuses?: string[];
   animalTypes?: string[];
+  animalGroupIds?: number[];
   enclosureId?: number;
   page?: number;
   pageSize?: number;
@@ -52,12 +65,21 @@ export type CreateAnimalRequest = {
   name: string;
   species: string;
   subspeciesOrMorph?: string | null;
-  animalType: string;
+  animalType?: string;
+  animalGroupId?: number | null;
+  speciesId?: number | null;
+  animalVariantId?: number | null;
   status: string;
   sex: string;
   birthDate?: string | null;
   birthDateIsEstimated: boolean;
   acquiredDate: string;
+  notes?: string | null;
+  dispositionDate?: string | null;
+  dispositionReason?: string | null;
+  microchipNumber?: string | null;
+  tagIdentifier?: string | null;
+  source?: string | null;
 };
 
 const apiBaseUrl = "/api/skipper";
@@ -85,6 +107,7 @@ export async function searchAnimals(
   if (query.search) parameters.set("search", query.search);
   if (query.enclosureId) parameters.set("enclosureId", String(query.enclosureId));
   query.statuses?.forEach((status) => parameters.append("statuses", status));
+  query.animalGroupIds?.forEach((id) => parameters.append("animalGroupIds", String(id)));
   query.animalTypes?.forEach((animalType) => parameters.append("animalTypes", animalType));
 
   const response = await fetch(`${apiBaseUrl}/api/animals/search?${parameters}`, { signal });
@@ -124,5 +147,14 @@ export async function createAnimal(request: CreateAnimalRequest): Promise<Animal
     throw new Error(message);
   }
 
+  return response.json();
+}
+
+export async function updateAnimal(id: number, request: CreateAnimalRequest): Promise<Animal> {
+  const response = await fetch(`${apiBaseUrl}/api/animals/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(request) });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body.message ?? body.title ?? "Unable to update animal.");
+  }
   return response.json();
 }

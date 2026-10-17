@@ -1,5 +1,6 @@
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using skipper_api.Data;
 using skipper_api.Domain.Animals;
 using skipper_api.Dtos.Animals;
@@ -68,8 +69,15 @@ public class AnimalService : IAnimalService
                 EnclosureName = animal.Enclosure.Name,
                 EnclosureLocation = animal.Enclosure.Location,
                 Name = animal.Name,
-                Species = animal.Species,
-                SubspeciesOrMorph = animal.SubspeciesOrMorph,
+                Species = animal.CatalogSpecies != null ? animal.CatalogSpecies.CommonName ?? animal.CatalogSpecies.ScientificName : animal.Species,
+            AnimalGroupId = animal.AnimalGroupId,
+            AnimalGroupName = animal.AnimalGroup != null ? animal.AnimalGroup.Name : animal.AnimalType.ToString(),
+            SpeciesId = animal.SpeciesId,
+            SpeciesScientificName = animal.CatalogSpecies != null ? animal.CatalogSpecies.ScientificName : null,
+            AnimalVariantId = animal.AnimalVariantId,
+            VariantType = animal.AnimalVariant != null ? animal.AnimalVariant.VariantType : null,
+            PreferredVariantType = animal.CatalogSpecies != null ? animal.CatalogSpecies.PreferredVariantType : null,
+                SubspeciesOrMorph = animal.AnimalVariant != null ? animal.AnimalVariant.Name : animal.SubspeciesOrMorph,
                 AnimalType = animal.AnimalType,
                 Status = animal.Status,
                 Sex = animal.Sex,
@@ -91,7 +99,7 @@ public class AnimalService : IAnimalService
         };
     }
 
-    private static IQueryable<Animal> ApplyNonLifecycleFilters(
+    private IQueryable<Animal> ApplyNonLifecycleFilters(
         IQueryable<Animal> query,
         AnimalSearchRequestDto request)
     {
@@ -106,9 +114,13 @@ public class AnimalService : IAnimalService
             query = query.Where(animal => request.Statuses.Contains(animal.Status));
         }
 
-        if (request.AnimalTypes.Count > 0)
+        if (request.AnimalTypes.Count > 0 || request.AnimalGroupIds.Count > 0)
         {
-            query = query.Where(animal => request.AnimalTypes.Contains(animal.AnimalType));
+            var legacyGroupTypes = _dbContext.AnimalGroups.Where(group => request.AnimalGroupIds.Contains(group.Id))
+                .Select(group => group.LegacyAnimalType);
+            query = query.Where(animal => request.AnimalTypes.Contains(animal.AnimalType)
+                || (animal.AnimalGroupId.HasValue && request.AnimalGroupIds.Contains(animal.AnimalGroupId.Value))
+                || (!animal.AnimalGroupId.HasValue && legacyGroupTypes.Contains(animal.AnimalType)));
         }
 
         if (request.EnclosureId.HasValue)
@@ -147,15 +159,21 @@ public class AnimalService : IAnimalService
             return CreateAnimalResult.EnclosureNotFound();
         }
 
+        var reference = await ResolveReferences(request.AnimalGroupId, request.SpeciesId, request.AnimalVariantId,
+            request.Species, request.SubspeciesOrMorph, request.AnimalType, cancellationToken);
+        if (reference.Error is {} error) return CreateAnimalResult.InvalidReference(error);
         var now = DateTime.UtcNow;
         var animal = new Animal
         {
             EnclosureId = enclosureId,
             Enclosure = null!,
             Name = request.Name!,
-            Species = request.Species!,
-            SubspeciesOrMorph = request.SubspeciesOrMorph,
-            AnimalType = request.AnimalType!.Value,
+            AnimalGroupId = reference.Group?.Id,
+            SpeciesId = reference.Species?.Id,
+            AnimalVariantId = reference.Variant?.Id,
+            Species = reference.Species is {} species ? species.CommonName ?? species.ScientificName : request.Species!.Trim(),
+            SubspeciesOrMorph = reference.Variant?.Name ?? request.SubspeciesOrMorph?.Trim(),
+            AnimalType = reference.Group?.LegacyAnimalType ?? request.AnimalType ?? AnimalType.Other,
             Status = request.Status!.Value,
             Sex = request.Sex!.Value,
             BirthDate = request.BirthDate,
@@ -171,8 +189,15 @@ public class AnimalService : IAnimalService
             UpdatedAt = now,
         };
 
+        animal.AnimalGroup = reference.Group;
+        animal.CatalogSpecies = reference.Species;
+        animal.AnimalVariant = reference.Variant;
         _dbContext.Animals.Add(animal);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        try { await _dbContext.SaveChangesAsync(cancellationToken); }
+        catch (DbUpdateException exception) when (exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.ForeignKeyViolation })
+        {
+            return CreateAnimalResult.InvalidReference("A selected enclosure or catalog reference is no longer available. Refresh the selection and try again.");
+        }
 
         return CreateAnimalResult.Created(ToResponseDto(animal, enclosureName));
     }
@@ -205,11 +230,27 @@ public class AnimalService : IAnimalService
             return UpdateAnimalResult.EnclosureNotFound();
         }
 
+        // Old consumers round-trip resolved text without IDs. Preserve references on unrelated edits.
+        var existingSpeciesName = animal.SpeciesId.HasValue
+            ? await _dbContext.Species.Where(x => x.Id == animal.SpeciesId).Select(x => x.CommonName ?? x.ScientificName).SingleAsync(cancellationToken)
+            : animal.Species;
+        var existingVariantName = animal.AnimalVariantId.HasValue
+            ? await _dbContext.AnimalVariants.Where(x => x.Id == animal.AnimalVariantId).Select(x => x.Name).SingleAsync(cancellationToken)
+            : animal.SubspeciesOrMorph;
+        var speciesId = request.SpeciesIdSpecified ? request.SpeciesId : (request.Species == existingSpeciesName ? animal.SpeciesId : null);
+        var variantId = request.AnimalVariantIdSpecified ? request.AnimalVariantId : (speciesId == animal.SpeciesId && request.SubspeciesOrMorph == existingVariantName ? animal.AnimalVariantId : null);
+        var groupId = request.AnimalGroupIdSpecified ? request.AnimalGroupId : (request.AnimalType == animal.AnimalType ? animal.AnimalGroupId : null);
+        var reference = await ResolveReferences(groupId, speciesId, variantId,
+            request.Species, request.SubspeciesOrMorph, request.AnimalType, cancellationToken, animal);
+        if (reference.Error is {} error) return UpdateAnimalResult.InvalidReference(error);
+        animal.AnimalGroupId = reference.Group?.Id;
+        animal.SpeciesId = reference.Species?.Id;
+        animal.AnimalVariantId = reference.Variant?.Id;
         animal.EnclosureId = enclosureId;
         animal.Name = request.Name!;
-        animal.Species = request.Species!;
-        animal.SubspeciesOrMorph = request.SubspeciesOrMorph;
-        animal.AnimalType = request.AnimalType!.Value;
+        animal.Species = reference.Species is {} species ? species.CommonName ?? species.ScientificName : request.Species!.Trim();
+        animal.SubspeciesOrMorph = reference.Variant?.Name ?? request.SubspeciesOrMorph?.Trim();
+        animal.AnimalType = reference.Group?.LegacyAnimalType ?? request.AnimalType ?? animal.AnimalType;
         animal.Status = request.Status!.Value;
         animal.Sex = request.Sex!.Value;
         animal.BirthDate = request.BirthDate;
@@ -222,8 +263,15 @@ public class AnimalService : IAnimalService
         animal.Source = request.Source;
         animal.Notes = request.Notes;
         animal.UpdatedAt = DateTime.UtcNow;
+        animal.AnimalGroup = reference.Group;
+        animal.CatalogSpecies = reference.Species;
+        animal.AnimalVariant = reference.Variant;
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        try { await _dbContext.SaveChangesAsync(cancellationToken); }
+        catch (DbUpdateException exception) when (exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.ForeignKeyViolation })
+        {
+            return UpdateAnimalResult.InvalidReference("A selected enclosure or catalog reference is no longer available. Refresh the selection and try again.");
+        }
 
         return UpdateAnimalResult.Updated(ToResponseDto(animal, enclosureName));
     }
@@ -244,6 +292,33 @@ public class AnimalService : IAnimalService
         return DeleteAnimalResult.Deleted;
     }
 
+    private record References(AnimalGroup? Group = null, Species? Species = null, AnimalVariant? Variant = null, string? Error = null);
+
+    private async Task<References> ResolveReferences(int? groupId, int? speciesId, int? variantId,
+        string? customSpecies, string? customVariant, AnimalType? legacyType, CancellationToken ct, Animal? existing = null)
+    {
+        var species = speciesId.HasValue ? await _dbContext.Species.Include(x => x.AnimalGroup).SingleOrDefaultAsync(x => x.Id == speciesId, ct) : null;
+        if (speciesId.HasValue && (species == null || ((!species.IsActive || !species.AnimalGroup.IsActive) && existing?.SpeciesId != speciesId)))
+            return new(Error: "The selected species is unavailable.");
+        groupId ??= species?.AnimalGroupId;
+        var group = groupId.HasValue ? await _dbContext.AnimalGroups.SingleOrDefaultAsync(x => x.Id == groupId, ct) : null;
+        if (groupId.HasValue && (group == null || (!group.IsActive && existing?.AnimalGroupId != groupId)))
+            return new(Error: "The selected animal group is unavailable.");
+        if (species != null && species.AnimalGroupId != groupId)
+            return new(Error: "The species does not belong to the selected animal group.");
+        var variant = variantId.HasValue ? await _dbContext.AnimalVariants.SingleOrDefaultAsync(x => x.Id == variantId, ct) : null;
+        if (variantId.HasValue && (variant == null || (!variant.IsActive && existing?.AnimalVariantId != variantId)))
+            return new(Error: "The selected variant is unavailable.");
+        if (variant != null && (species == null || variant.SpeciesId != species.Id))
+            return new(Error: "The variant does not belong to the selected species.");
+        if (species == null && (string.IsNullOrWhiteSpace(customSpecies) || customSpecies.Trim().Length > 100))
+            return new(Error: "Provide a species from the catalog or a custom species name (up to 100 characters).");
+        if (variant == null && customVariant != null && (string.IsNullOrWhiteSpace(customVariant) || customVariant.Trim().Length > 100))
+            return new(Error: "Custom variant must contain 1 to 100 characters, or be omitted.");
+        if (legacyType.HasValue && !Enum.IsDefined(legacyType.Value)) return new(Error: "Invalid animal group.");
+        return new(group, species, variant);
+    }
+
     private static readonly Expression<Func<Animal, AnimalResponseDto>> ToResponseDtoProjection = animal =>
         new AnimalResponseDto
         {
@@ -251,8 +326,15 @@ public class AnimalService : IAnimalService
             EnclosureId = animal.EnclosureId,
             EnclosureName = animal.Enclosure.Name,
             Name = animal.Name,
-            Species = animal.Species,
-            SubspeciesOrMorph = animal.SubspeciesOrMorph,
+            Species = animal.CatalogSpecies != null ? animal.CatalogSpecies.CommonName ?? animal.CatalogSpecies.ScientificName : animal.Species,
+            AnimalGroupId = animal.AnimalGroupId,
+            AnimalGroupName = animal.AnimalGroup != null ? animal.AnimalGroup.Name : animal.AnimalType.ToString(),
+            SpeciesId = animal.SpeciesId,
+            SpeciesScientificName = animal.CatalogSpecies != null ? animal.CatalogSpecies.ScientificName : null,
+            AnimalVariantId = animal.AnimalVariantId,
+            VariantType = animal.AnimalVariant != null ? animal.AnimalVariant.VariantType : null,
+            PreferredVariantType = animal.CatalogSpecies != null ? animal.CatalogSpecies.PreferredVariantType : null,
+            SubspeciesOrMorph = animal.AnimalVariant != null ? animal.AnimalVariant.Name : animal.SubspeciesOrMorph,
             AnimalType = animal.AnimalType,
             Status = animal.Status,
             Sex = animal.Sex,
@@ -277,8 +359,15 @@ public class AnimalService : IAnimalService
             EnclosureId = animal.EnclosureId,
             EnclosureName = enclosureName,
             Name = animal.Name,
-            Species = animal.Species,
-            SubspeciesOrMorph = animal.SubspeciesOrMorph,
+            Species = animal.CatalogSpecies != null ? animal.CatalogSpecies.CommonName ?? animal.CatalogSpecies.ScientificName : animal.Species,
+            AnimalGroupId = animal.AnimalGroupId,
+            AnimalGroupName = animal.AnimalGroup != null ? animal.AnimalGroup.Name : animal.AnimalType.ToString(),
+            SpeciesId = animal.SpeciesId,
+            SpeciesScientificName = animal.CatalogSpecies != null ? animal.CatalogSpecies.ScientificName : null,
+            AnimalVariantId = animal.AnimalVariantId,
+            VariantType = animal.AnimalVariant != null ? animal.AnimalVariant.VariantType : null,
+            PreferredVariantType = animal.CatalogSpecies != null ? animal.CatalogSpecies.PreferredVariantType : null,
+            SubspeciesOrMorph = animal.AnimalVariant != null ? animal.AnimalVariant.Name : animal.SubspeciesOrMorph,
             AnimalType = animal.AnimalType,
             Status = animal.Status,
             Sex = animal.Sex,

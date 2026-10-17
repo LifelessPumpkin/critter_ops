@@ -18,9 +18,10 @@ namespace skipper_api.Data.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "8.0.11")
+                .HasAnnotation("ProductVersion", "10.0.12")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
+            NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "pg_trgm");
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
             modelBuilder.Entity("skipper_api.Domain.Activity.ActivityEvent", b =>
@@ -367,10 +368,16 @@ namespace skipper_api.Data.Migrations
                     b.Property<DateOnly>("AcquiredDate")
                         .HasColumnType("date");
 
+                    b.Property<int?>("AnimalGroupId")
+                        .HasColumnType("integer");
+
                     b.Property<string>("AnimalType")
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
+
+                    b.Property<int?>("AnimalVariantId")
+                        .HasColumnType("integer");
 
                     b.Property<DateOnly?>("BirthDate")
                         .HasColumnType("date");
@@ -419,6 +426,9 @@ namespace skipper_api.Data.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<int?>("SpeciesId")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -437,8 +447,12 @@ namespace skipper_api.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("AnimalGroupId");
+
                     b.HasIndex("AnimalType")
                         .HasDatabaseName("IX_Animals_AnimalType");
+
+                    b.HasIndex("AnimalVariantId");
 
                     b.HasIndex("EnclosureId")
                         .HasDatabaseName("IX_Animals_EnclosureId");
@@ -452,6 +466,8 @@ namespace skipper_api.Data.Migrations
                     b.HasIndex("Species")
                         .HasDatabaseName("IX_Animals_Species");
 
+                    b.HasIndex("SpeciesId");
+
                     b.HasIndex("Status")
                         .HasDatabaseName("IX_Animals_Status");
 
@@ -459,6 +475,360 @@ namespace skipper_api.Data.Migrations
                         .HasDatabaseName("IX_Animals_TagIdentifier");
 
                     b.ToTable("Animals", (string)null);
+                });
+
+            modelBuilder.Entity("skipper_api.Domain.Animals.AnimalGroup", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("LegacyAnimalType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("AnimalGroups", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            IsActive = true,
+                            LegacyAnimalType = "Mammal",
+                            Name = "Mammal",
+                            SortOrder = 10
+                        },
+                        new
+                        {
+                            Id = 2,
+                            IsActive = true,
+                            LegacyAnimalType = "Avian",
+                            Name = "Bird",
+                            SortOrder = 20
+                        },
+                        new
+                        {
+                            Id = 3,
+                            IsActive = true,
+                            LegacyAnimalType = "Reptile",
+                            Name = "Reptile",
+                            SortOrder = 30
+                        },
+                        new
+                        {
+                            Id = 4,
+                            IsActive = true,
+                            LegacyAnimalType = "Amphibian",
+                            Name = "Amphibian",
+                            SortOrder = 40
+                        },
+                        new
+                        {
+                            Id = 5,
+                            IsActive = true,
+                            LegacyAnimalType = "Fish",
+                            Name = "Fish",
+                            SortOrder = 50
+                        },
+                        new
+                        {
+                            Id = 6,
+                            IsActive = true,
+                            LegacyAnimalType = "Invertebrate",
+                            Name = "Invertebrate",
+                            SortOrder = 60
+                        },
+                        new
+                        {
+                            Id = 7,
+                            IsActive = true,
+                            LegacyAnimalType = "Other",
+                            Name = "Other",
+                            SortOrder = 70
+                        });
+                });
+
+            modelBuilder.Entity("skipper_api.Domain.Animals.AnimalVariant", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("SpeciesId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("VariantType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("Name"), "gin");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("Name"), new[] { "gin_trgm_ops" });
+
+                    b.HasIndex("SpeciesId", "VariantType", "Name")
+                        .IsUnique();
+
+                    b.ToTable("AnimalVariants", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            IsActive = true,
+                            Name = "Labrador Retriever",
+                            SpeciesId = 1,
+                            VariantType = "Breed"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            IsActive = true,
+                            Name = "Poodle",
+                            SpeciesId = 1,
+                            VariantType = "Breed"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            IsActive = true,
+                            Name = "Albino",
+                            SpeciesId = 4,
+                            VariantType = "Morph"
+                        },
+                        new
+                        {
+                            Id = 4,
+                            IsActive = true,
+                            Name = "Pastel",
+                            SpeciesId = 4,
+                            VariantType = "Morph"
+                        });
+                });
+
+            modelBuilder.Entity("skipper_api.Domain.Animals.Species", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AnimalGroupId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("CommonName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("PreferredVariantType")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("ScientificName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CommonName");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("CommonName"), "gin");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("CommonName"), new[] { "gin_trgm_ops" });
+
+                    b.HasIndex("ScientificName");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("ScientificName"), "gin");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("ScientificName"), new[] { "gin_trgm_ops" });
+
+                    b.HasIndex("AnimalGroupId", "ScientificName", "Id");
+
+                    b.ToTable("Species", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Species_ScientificName", "length(trim(\"ScientificName\")) > 0");
+                        });
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            AnimalGroupId = 1,
+                            CommonName = "Domestic dog",
+                            IsActive = true,
+                            PreferredVariantType = "Breed",
+                            ScientificName = "Canis lupus familiaris"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            AnimalGroupId = 1,
+                            CommonName = "Domestic cat",
+                            IsActive = true,
+                            PreferredVariantType = "Breed",
+                            ScientificName = "Felis catus"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            AnimalGroupId = 1,
+                            CommonName = "Domestic ferret",
+                            IsActive = true,
+                            ScientificName = "Mustela putorius furo"
+                        },
+                        new
+                        {
+                            Id = 4,
+                            AnimalGroupId = 3,
+                            CommonName = "Ball python",
+                            IsActive = true,
+                            PreferredVariantType = "Morph",
+                            ScientificName = "Python regius"
+                        },
+                        new
+                        {
+                            Id = 5,
+                            AnimalGroupId = 3,
+                            CommonName = "Bearded dragon",
+                            IsActive = true,
+                            PreferredVariantType = "Morph",
+                            ScientificName = "Pogona vitticeps"
+                        },
+                        new
+                        {
+                            Id = 6,
+                            AnimalGroupId = 3,
+                            CommonName = "Leopard gecko",
+                            IsActive = true,
+                            PreferredVariantType = "Morph",
+                            ScientificName = "Eublepharis macularius"
+                        },
+                        new
+                        {
+                            Id = 7,
+                            AnimalGroupId = 3,
+                            CommonName = "Corn snake",
+                            IsActive = true,
+                            PreferredVariantType = "Morph",
+                            ScientificName = "Pantherophis guttatus"
+                        },
+                        new
+                        {
+                            Id = 8,
+                            AnimalGroupId = 4,
+                            CommonName = "Axolotl",
+                            IsActive = true,
+                            PreferredVariantType = "Morph",
+                            ScientificName = "Ambystoma mexicanum"
+                        },
+                        new
+                        {
+                            Id = 9,
+                            AnimalGroupId = 5,
+                            CommonName = "Goldfish",
+                            IsActive = true,
+                            PreferredVariantType = "Variety",
+                            ScientificName = "Carassius auratus"
+                        },
+                        new
+                        {
+                            Id = 10,
+                            AnimalGroupId = 5,
+                            CommonName = "Betta",
+                            IsActive = true,
+                            PreferredVariantType = "Strain",
+                            ScientificName = "Betta splendens"
+                        },
+                        new
+                        {
+                            Id = 11,
+                            AnimalGroupId = 2,
+                            CommonName = "Budgerigar",
+                            IsActive = true,
+                            PreferredVariantType = "Mutation",
+                            ScientificName = "Melopsittacus undulatus"
+                        },
+                        new
+                        {
+                            Id = 12,
+                            AnimalGroupId = 2,
+                            CommonName = "Cockatiel",
+                            IsActive = true,
+                            PreferredVariantType = "Mutation",
+                            ScientificName = "Nymphicus hollandicus"
+                        },
+                        new
+                        {
+                            Id = 13,
+                            AnimalGroupId = 1,
+                            CommonName = "Guinea pig",
+                            IsActive = true,
+                            PreferredVariantType = "Breed",
+                            ScientificName = "Cavia porcellus"
+                        },
+                        new
+                        {
+                            Id = 14,
+                            AnimalGroupId = 1,
+                            CommonName = "Rabbit",
+                            IsActive = true,
+                            PreferredVariantType = "Breed",
+                            ScientificName = "Oryctolagus cuniculus"
+                        },
+                        new
+                        {
+                            Id = 15,
+                            AnimalGroupId = 6,
+                            CommonName = "Madagascar hissing cockroach",
+                            IsActive = true,
+                            ScientificName = "Gromphadorhina portentosa"
+                        },
+                        new
+                        {
+                            Id = 16,
+                            AnimalGroupId = 6,
+                            CommonName = "Mexican red-knee tarantula",
+                            IsActive = true,
+                            ScientificName = "Brachypelma hamorii"
+                        });
                 });
 
             modelBuilder.Entity("skipper_api.Domain.Enclosures.Enclosure", b =>
@@ -793,13 +1163,56 @@ namespace skipper_api.Data.Migrations
 
             modelBuilder.Entity("skipper_api.Domain.Animals.Animal", b =>
                 {
+                    b.HasOne("skipper_api.Domain.Animals.AnimalGroup", "AnimalGroup")
+                        .WithMany()
+                        .HasForeignKey("AnimalGroupId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("skipper_api.Domain.Animals.AnimalVariant", "AnimalVariant")
+                        .WithMany()
+                        .HasForeignKey("AnimalVariantId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("skipper_api.Domain.Enclosures.Enclosure", "Enclosure")
                         .WithMany("Animals")
                         .HasForeignKey("EnclosureId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("skipper_api.Domain.Animals.Species", "CatalogSpecies")
+                        .WithMany()
+                        .HasForeignKey("SpeciesId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("AnimalGroup");
+
+                    b.Navigation("AnimalVariant");
+
+                    b.Navigation("CatalogSpecies");
+
                     b.Navigation("Enclosure");
+                });
+
+            modelBuilder.Entity("skipper_api.Domain.Animals.AnimalVariant", b =>
+                {
+                    b.HasOne("skipper_api.Domain.Animals.Species", "Species")
+                        .WithMany()
+                        .HasForeignKey("SpeciesId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Species");
+                });
+
+            modelBuilder.Entity("skipper_api.Domain.Animals.Species", b =>
+                {
+                    b.HasOne("skipper_api.Domain.Animals.AnimalGroup", "AnimalGroup")
+                        .WithMany()
+                        .HasForeignKey("AnimalGroupId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("AnimalGroup");
                 });
 
             modelBuilder.Entity("skipper_api.Domain.Tasks.Task", b =>

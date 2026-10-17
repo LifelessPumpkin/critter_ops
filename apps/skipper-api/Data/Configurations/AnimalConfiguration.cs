@@ -88,6 +88,10 @@ public class AnimalConfiguration : IEntityTypeConfiguration<Animal>
             .OnDelete(DeleteBehavior.Restrict)
             .IsRequired();
 
+        builder.HasOne(a => a.AnimalGroup).WithMany().HasForeignKey(a => a.AnimalGroupId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(a => a.CatalogSpecies).WithMany().HasForeignKey(a => a.SpeciesId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(a => a.AnimalVariant).WithMany().HasForeignKey(a => a.AnimalVariantId).OnDelete(DeleteBehavior.Restrict);
+
         // Indexes - supports common filtering and lookup queries
         builder.HasIndex(a => a.Name).HasDatabaseName("IX_Animals_Name");
         builder.HasIndex(a => a.Species).HasDatabaseName("IX_Animals_Species");

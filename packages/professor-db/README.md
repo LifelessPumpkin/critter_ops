@@ -98,3 +98,5 @@ Using `psql` from the command line:
 ```bash
 psql "postgresql://postgres:postgres@localhost:5432/critterops_dev"
 ```
+
+See [Animal reference catalog and enclosure return workflow](../../documentation/architecture/animal-reference-catalog.md) for schema, compatibility, API contracts, draft behavior, and verification guidance.

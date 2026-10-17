@@ -8,7 +8,7 @@ namespace skipper_api.Dtos.Animals;
 /// API request shape for creating an animal.
 /// </summary>
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
-public class CreateAnimalRequestDto
+public class CreateAnimalRequestDto : IValidatableObject
 {
     [Required]
     public int? EnclosureId { get; set; }
@@ -17,15 +17,17 @@ public class CreateAnimalRequestDto
     [MaxLength(100)]
     public string? Name { get; set; }
 
-    [Required]
     [MaxLength(100)]
     public string? Species { get; set; }
 
     [MaxLength(100)]
     public string? SubspeciesOrMorph { get; set; }
 
-    [Required]
     public AnimalType? AnimalType { get; set; }
+
+    [Range(1, int.MaxValue)] public int? AnimalGroupId { get; set; }
+    [Range(1, int.MaxValue)] public int? SpeciesId { get; set; }
+    [Range(1, int.MaxValue)] public int? AnimalVariantId { get; set; }
 
     [Required]
     public AnimalStatus? Status { get; set; }
@@ -55,4 +57,11 @@ public class CreateAnimalRequestDto
     public string? Source { get; set; }
 
     public string? Notes { get; set; }
+    public IEnumerable<ValidationResult> Validate(ValidationContext context)
+    {
+        if (!SpeciesId.HasValue && string.IsNullOrWhiteSpace(Species))
+            yield return new ValidationResult("Select a species or provide a custom species.", [nameof(Species)]);
+        if (SubspeciesOrMorph != null && string.IsNullOrWhiteSpace(SubspeciesOrMorph))
+            yield return new ValidationResult("Provide a nonblank custom variant or omit it.", [nameof(SubspeciesOrMorph)]);
+    }
 }

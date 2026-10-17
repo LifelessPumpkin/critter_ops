@@ -39,6 +39,7 @@ type SelectProps = SharedSelectionProps & {
 };
 
 type ComboboxProps = SelectProps & {
+  allowSelectionWhileLoading?: boolean;
   onSearchChange?: (value: string) => void;
   searchPlaceholder?: string;
 };
@@ -187,7 +188,7 @@ export function Combobox(props: ComboboxProps) {
       {open ? createPortal(
         <div ref={contentRef} className="selection-content" style={positionStyle(position)}>
           <label className="selection-search"><span className="visually-hidden">{searchPlaceholder}</span><span aria-hidden="true">⌕</span><input ref={searchRef} value={search} placeholder={searchPlaceholder} role="searchbox" aria-controls={ids.listboxId} aria-activedescendant={filteredOptions[activeIndex] ? `${ids.optionPrefix}-${activeIndex}` : undefined} onChange={(event) => setSearch(event.target.value)} onKeyDown={handleSearchKeyDown} /></label>
-          <SelectionOptions ids={ids} options={filteredOptions} activeIndex={activeIndex} selectedValues={value ? [value] : []} loading={loading} emptyMessage={emptyMessage} onHover={setActiveIndex} onSelect={selectAt} />
+          <SelectionOptions ids={ids} options={filteredOptions} activeIndex={activeIndex} selectedValues={value ? [value] : []} loading={loading} allowSelectionWhileLoading={props.allowSelectionWhileLoading} emptyMessage={emptyMessage} onHover={setActiveIndex} onSelect={selectAt} />
         </div>,
         getPortalRoot(triggerRef.current),
       ) : null}
@@ -238,10 +239,11 @@ function SelectionListbox({ position, contentRef, ...props }: Parameters<typeof 
   return <div ref={contentRef} className="selection-content" style={positionStyle(position)}><SelectionOptions {...props} /></div>;
 }
 
-function SelectionOptions({ activeIndex, emptyMessage, ids, loading, multi = false, onHover, onSelect, options, selectedValues }: { activeIndex: number; emptyMessage: string; ids: ReturnType<typeof useSelectionIds>; loading: boolean; multi?: boolean; onHover: (index: number) => void; onSelect: (index: number) => void; options: SelectionOption[]; selectedValues: string[] }) {
+function SelectionOptions({ allowSelectionWhileLoading = false, activeIndex, emptyMessage, ids, loading, multi = false, onHover, onSelect, options, selectedValues }: { activeIndex: number; emptyMessage: string; ids: ReturnType<typeof useSelectionIds>; loading: boolean; multi?: boolean; onHover: (index: number) => void; onSelect: (index: number) => void; options: SelectionOption[]; selectedValues: string[]; allowSelectionWhileLoading?: boolean }) {
   return (
     <div id={ids.listboxId} className="selection-listbox" role="listbox" aria-multiselectable={multi || undefined} aria-busy={loading}>
-      {loading ? <div className="selection-state"><span className="selection-spinner" aria-hidden="true" /> Loading options…</div> : options.length ? options.map((option, index) => {
+      {loading ? <div className="selection-state"><span className="selection-spinner" aria-hidden="true" /> Loading options…</div> : null}
+      {loading && !allowSelectionWhileLoading ? null : options.length ? options.map((option, index) => {
         const selected = selectedValues.includes(option.value);
         return <div key={option.value} id={`${ids.optionPrefix}-${index}`} className={["selection-option", index === activeIndex ? "selection-option-active" : null, selected ? "selection-option-selected" : null, option.disabled ? "selection-option-disabled" : null].filter(Boolean).join(" ")} role="option" aria-disabled={option.disabled || undefined} aria-selected={selected} onMouseDown={(event) => { event.preventDefault(); onSelect(index); }} onMouseEnter={() => onHover(index)}><span>{option.label}</span><span className="selection-check" aria-hidden="true">{selected ? "✓" : ""}</span></div>;
       }) : <div className="selection-state">{emptyMessage}</div>}

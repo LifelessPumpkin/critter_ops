@@ -7,10 +7,14 @@ public enum UpdateAnimalResultStatus
     Updated,
     AnimalNotFound,
     EnclosureNotFound,
+    InvalidReference,
 }
 
 public class UpdateAnimalResult
 {
+    public string? Error { get; private init; }
+    public static UpdateAnimalResult InvalidReference(string error) => new() { Status = UpdateAnimalResultStatus.InvalidReference, Error = error };
+
     public UpdateAnimalResultStatus Status { get; private init; }
 
     public AnimalResponseDto? Animal { get; private init; }

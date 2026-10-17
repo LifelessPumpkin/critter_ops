@@ -6,10 +6,14 @@ public enum CreateAnimalResultStatus
 {
     Created,
     EnclosureNotFound,
+    InvalidReference,
 }
 
 public class CreateAnimalResult
 {
+    public string? Error { get; private init; }
+    public static CreateAnimalResult InvalidReference(string error) => new() { Status = CreateAnimalResultStatus.InvalidReference, Error = error };
+
     public CreateAnimalResultStatus Status { get; private init; }
 
     public AnimalResponseDto? Animal { get; private init; }

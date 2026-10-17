@@ -9,6 +9,8 @@ import {
   createEnclosure,
 } from "@/lib/api/enclosures";
 
+import { animalReturnUrl, validWorkflow } from "@/components/animals/animalDraft";
+
 type EnclosureFormState = {
   name: string;
   type: string;
@@ -96,7 +98,7 @@ const initialFormState: EnclosureFormState = {
   notes: "",
 };
 
-export function EnclosureForm() {
+export function EnclosureForm({ animalWorkflow }: { animalWorkflow?: string }) {
   const router = useRouter();
   const [formState, setFormState] = useState(initialFormState);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
@@ -120,8 +122,8 @@ export function EnclosureForm() {
     setIsSubmitting(true);
 
     try {
-      await createEnclosure(toCreateRequest(formState));
-      router.push("/enclosures");
+      const enclosure = await createEnclosure(toCreateRequest(formState));
+      router.push(validWorkflow(animalWorkflow) ? animalReturnUrl(animalWorkflow, enclosure.id) : "/enclosures");
       router.refresh();
     } catch (error) {
       if (error instanceof EnclosureApiError) {
@@ -313,7 +315,7 @@ export function EnclosureForm() {
       </FormSection>
 
       <div className="form-actions">
-        <ButtonLink href="/enclosures" variant="secondary">
+        <ButtonLink href={validWorkflow(animalWorkflow) ? animalReturnUrl(animalWorkflow) : "/enclosures"} variant="secondary">
           Cancel
         </ButtonLink>
         <Button type="submit" disabled={isSubmitting}>
