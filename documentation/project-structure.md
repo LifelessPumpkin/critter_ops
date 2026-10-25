@@ -133,7 +133,7 @@ Go here when creating reusable frontend components like buttons, cards, inputs, 
 
 Database-related project assets.
 
-Go here for database documentation, seed data, schema notes, migration documentation, and database helper scripts. EF Core migrations may live inside skipper-api, but database planning and documentation should live here.
+Go here for database documentation, seed data, schema notes, migration documentation, and database helper scripts. EF Core models, mappings, and migrations live in `packages/professor-persistence`, shared by Skipper and the `apps/howell-sync` catalog worker. Database planning and documentation should live here.
 
 ### millionaire
 
