@@ -1,19 +1,5 @@
 {
   "schema_version": 1,
-  "openvex": {
-    "@context": "https://openvex.dev/ns/v0.2.0",
-    "@id": "urn:critterops:security:exceptions:1",
-    "author": "CritterOps maintainers",
-    "role": "Repository risk assessment; approval requires pull request review",
-    "timestamp": "2026-10-10T17:00:00Z",
-    "version": 1,
-    "statements": [
-      {
-      }
-    ]
-  },
-  "exceptions": [
-    {
-    }
-  ]
+  "openvex": null,
+  "exceptions": []
 }
