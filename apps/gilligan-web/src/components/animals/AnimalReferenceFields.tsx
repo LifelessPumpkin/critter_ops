@@ -16,6 +16,7 @@ export type AnimalReferences = {
 
 export function AnimalReferenceFields({ value, onChange }: { value: AnimalReferences; onChange: (value: AnimalReferences) => void }) {
   const [groups, setGroups] = useState<AnimalGroup[]>([]);
+  const [referenceNotice, setReferenceNotice] = useState("");
   const [groupError, setGroupError] = useState("");
   useEffect(() => {
     const controller = new AbortController();
@@ -33,9 +34,19 @@ export function AnimalReferenceFields({ value, onChange }: { value: AnimalRefere
       if (id === "legacy") return;
       const group = groups.find((item) => String(item.id) === id);
       const incompatible = value.selectedSpecies && id && String(value.selectedSpecies.animalGroupId) !== id;
-      onChange({ ...value, animalGroupId: id, animalGroupName: group?.name ?? null, animalType: group?.legacyAnimalType ?? "", ...(incompatible ? { selectedSpecies: null, species: "", selectedVariant: null, subspeciesOrMorph: "" } : {}) });
+      if (incompatible) setReferenceNotice("Species and variant names were kept as custom values after changing the group. Review them before saving.");
+      onChange({ ...value, animalGroupId: id, animalGroupName: group?.name ?? null, animalType: group?.legacyAnimalType ?? "", ...(incompatible ? { selectedSpecies: null, species: value.species || value.selectedSpecies?.commonName || value.selectedSpecies?.scientificName || "", selectedVariant: null, subspeciesOrMorph: value.subspeciesOrMorph || value.selectedVariant?.name || "" } : {}) });
     }} />
-    <SpeciesSelector groupId={value.animalGroupId} selected={value.selectedSpecies} custom={value.species} onChange={(selected, custom) => onChange({ ...value, selectedSpecies: selected, species: custom, ...((selected?.id ?? null) !== (value.selectedSpecies?.id ?? null) || custom !== value.species ? { selectedVariant: null, subspeciesOrMorph: "" } : {}), ...(selected ? { animalGroupId: String(selected.animalGroupId), animalGroupName: selected.animalGroupName, animalType: groups.find((g) => g.id === selected.animalGroupId)?.legacyAnimalType ?? value.animalType } : {}) })} />
+    {referenceNotice ? <p role="status">{referenceNotice}</p> : null}
+    <SpeciesSelector groupId={value.animalGroupId} selected={value.selectedSpecies} custom={value.species} onChange={(selected, custom) => {
+      const changed = (selected?.id ?? null) !== (value.selectedSpecies?.id ?? null) || custom !== value.species;
+      const variantText = value.subspeciesOrMorph || value.selectedVariant?.name || "";
+      if (changed && variantText) setReferenceNotice("The previous variant name was kept as a custom value. Review it for the selected species before saving.");
+      onChange({ ...value, selectedSpecies: selected, species: custom,
+        ...(changed ? { selectedVariant: null, subspeciesOrMorph: variantText } : {}),
+        ...(selected ? { animalGroupId: String(selected.animalGroupId), animalGroupName: selected.animalGroupName,
+          animalType: groups.find((g) => g.id === selected.animalGroupId)?.legacyAnimalType ?? value.animalType } : {}) });
+    }} />
     <VariantSelector key={value.selectedSpecies?.id ?? "custom"} speciesId={value.selectedSpecies?.id} label={variantLabel} selected={value.selectedVariant} custom={value.subspeciesOrMorph} onChange={(selected, custom) => onChange({ ...value, selectedVariant: selected, subspeciesOrMorph: custom })} />
   </>;
 }

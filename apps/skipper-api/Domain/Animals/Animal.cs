@@ -22,13 +22,13 @@ public class Animal
     /// <summary>Animal's given or display name.</summary>
     public required string Name { get; set; }
 
-    /// <summary>Species name, such as Ball Python, Red Kangaroo, Cockatiel, or Axolotl.</summary>
+    /// <summary>Permanent custom species when SpeciesId is absent; exact original description on migrated structured records. Never use as structured identity.</summary>
     public required string Species { get; set; }
 
-    /// <summary>Optional subspecies, morph, locality, or similar descriptor.</summary>
+    /// <summary>Permanent custom variant when AnimalVariantId is absent; exact original description on migrated structured records.</summary>
     public string? SubspeciesOrMorph { get; set; }
 
-    /// <summary>Broad animal category.</summary>
+    /// <summary>Preserved operational category, including ambiguous Herptile/Aquatic classifications. AnimalGroupId is authoritative when present.</summary>
     public required AnimalType AnimalType { get; set; }
 
     public int? AnimalGroupId { get; set; }

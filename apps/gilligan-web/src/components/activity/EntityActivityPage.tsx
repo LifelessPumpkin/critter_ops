@@ -60,6 +60,8 @@ export function EntityActivityPage(props: EntityActivityPageProps) {
         <h1 className="page-title">{entity.name}</h1>
         <p className="page-subtitle">{subtitle}</p>
         {props.kind === "animal" ? <p className="page-subtitle">{[(entity as Animal).animalGroupName, (entity as Animal).speciesScientificName, (entity as Animal).subspeciesOrMorph].filter(Boolean).join(" · ")}</p> : null}
+        {props.kind === "animal" && (entity as Animal).originalSpeciesText && (entity as Animal).originalSpeciesText !== (entity as Animal).species ? <p>Original species description: {(entity as Animal).originalSpeciesText}</p> : null}
+        {props.kind === "animal" && (entity as Animal).originalVariantText && (entity as Animal).originalVariantText !== (entity as Animal).subspeciesOrMorph ? <p>Original variant description: {(entity as Animal).originalVariantText}</p> : null}
       </section>
       {props.kind === "animal" ? <ButtonLink href={`/animals/${props.id}/edit`} variant="secondary">Edit Animal</ButtonLink> : null}
       <ActivityTimeline

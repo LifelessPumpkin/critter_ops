@@ -51,7 +51,7 @@ public class AnimalCatalogIntegrationTests(PostgresFixture database) : IClassFix
     }
 
     [Fact]
-    public async Task AnimalReferences_CreateResolveRejectAndClear_WithoutBreakingLegacyEdits()
+    public async Task AnimalReferences_CreateResolveRejectAndClear_PreservingUnrelatedEdits()
     {
         await using var db = new ProfessorDbContext(await database.CreateDatabaseAsync());
         var enclosure = Enclosure(); db.Enclosures.Add(enclosure); await db.SaveChangesAsync();
@@ -72,22 +72,22 @@ public class AnimalCatalogIntegrationTests(PostgresFixture database) : IClassFix
         Assert.Equal(CreateAnimalResultStatus.InvalidReference, (await service.CreateAsync(wrongVariant)).Status);
         var wrongGroup = Request(); wrongGroup.AnimalGroupId = 1;
         Assert.Equal(CreateAnimalResultStatus.InvalidReference, (await service.CreateAsync(wrongGroup)).Status);
-        var custom = Request(); custom.SpeciesId = null; custom.AnimalVariantId = null; custom.Species = "Unlisted species"; custom.SubspeciesOrMorph = "Local variety";
+        var custom = Request(); custom.SpeciesId = null; custom.AnimalVariantId = null; custom.CustomSpeciesName = "Unlisted species"; custom.CustomVariantName = "Local variety";
         var fallback = await service.CreateAsync(custom);
         Assert.Equal("Unlisted species", fallback.Animal!.Species);
         Assert.Equal("Local variety", fallback.Animal.SubspeciesOrMorph);
-        var customVariant = Request(); customVariant.AnimalVariantId = null; customVariant.SubspeciesOrMorph = "Unlisted morph";
+        var customVariant = Request(); customVariant.AnimalVariantId = null; customVariant.CustomVariantName = "Unlisted morph";
         Assert.Equal("Unlisted morph", (await service.CreateAsync(customVariant)).Animal!.SubspeciesOrMorph);
-        var update = new UpdateAnimalRequestDto { EnclosureId = enclosure.Id, Name = "Renamed", Species = read.Species, SubspeciesOrMorph = read.SubspeciesOrMorph, AnimalType = read.AnimalType, Status = read.Status, Sex = read.Sex, AcquiredDate = read.AcquiredDate };
+        var update = new UpdateAnimalRequestDto { EnclosureId = enclosure.Id, Name = "Renamed", Status = read.Status, Sex = read.Sex, AcquiredDate = read.AcquiredDate };
         var edited = await service.UpdateAsync(read.Id, update);
         Assert.Equal(4, edited.Animal!.SpeciesId);
-        // Catalog renames must not make old clients lose a reference when round-tripping resolved text.
+        // Catalog renames must not make unrelated edits lose a structured reference.
         var renamedVariant = await db.AnimalVariants.SingleAsync(x => x.Id == 3);
         renamedVariant.Name = "Albino (reviewed)";
         await db.SaveChangesAsync();
-        update.SubspeciesOrMorph = (await service.GetByIdAsync(read.Id))!.SubspeciesOrMorph;
         Assert.Equal(3, (await service.UpdateAsync(read.Id, update)).Animal!.AnimalVariantId);
-        update.SubspeciesOrMorph = "Albino";
+        update.CustomSpeciesName = read.Species;
+        update.CustomVariantName = "Albino";
         update.SpeciesId = null; update.AnimalVariantId = null;
         var cleared = await service.UpdateAsync(read.Id, update);
         Assert.Null(cleared.Animal!.SpeciesId);
@@ -124,7 +124,7 @@ public class AnimalCatalogIntegrationTests(PostgresFixture database) : IClassFix
         await migrator.MigrateAsync();
         var animals = await db.Animals.AsNoTracking().ToListAsync();
         Assert.Equal(4, animals.Count);
-        Assert.All(animals, animal => { Assert.Equal("Historical species", animal.Species); Assert.Equal("Historical morph", animal.SubspeciesOrMorph); Assert.Null(animal.SpeciesId); Assert.Null(animal.AnimalGroupId); Assert.Equal(animal.Name, animal.AnimalType.ToString()); });
+        Assert.All(animals, animal => { Assert.Equal("Historical species", animal.Species); Assert.Equal("Historical morph", animal.SubspeciesOrMorph); Assert.Null(animal.SpeciesId); Assert.Equal(animal.AnimalType == AnimalType.Avian ? 2 : animal.AnimalType == AnimalType.Mammal ? 1 : (int?)null, animal.AnimalGroupId); Assert.Equal(animal.Name, animal.AnimalType.ToString()); });
         Assert.Equal(16, await db.Species.CountAsync());
         Assert.Equal(4, await db.AnimalVariants.CountAsync());
     }

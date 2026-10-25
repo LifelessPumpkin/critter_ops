@@ -29,6 +29,7 @@ function AnimalFormContent({ workflow, enclosureId, animalId }: AnimalFormProps)
   const [enclosuresLoading, setEnclosuresLoading] = useState(true);
   const [restored] = useState(() => !animalId ? loadAnimalDraft(workflow, initialForm()) : null);
   const [form, setForm] = useState<FormState>(() => ({ ...(restored ?? initialForm()), ...(restored && enclosureId ? { enclosureId: String(enclosureId) } : {}) }));
+  const [originalReferences, setOriginalReferences] = useState<string | null>(null);
   const [loadingAnimal, setLoadingAnimal] = useState(Boolean(animalId));
   const [activeWorkflow, setActiveWorkflow] = useState<string | undefined>(workflow);
   const [error, setError] = useState(workflow && !restored ? "This animal draft is unavailable or expired. Start a new animal entry." : "");
@@ -58,7 +59,9 @@ function AnimalFormContent({ workflow, enclosureId, animalId }: AnimalFormProps)
     let active = true;
     fetchAnimal(animalId).then((animal) => {
       if (!active) return;
-      setForm({ ...initialForm(), ...animal, enclosureId: String(animal.enclosureId), animalGroupId: animal.animalGroupId ? String(animal.animalGroupId) : "", species: animal.species, subspeciesOrMorph: animal.subspeciesOrMorph ?? "", birthDate: animal.birthDate ?? "", birthDateIsEstimated: animal.birthDateIsEstimated ?? false, notes: animal.notes ?? "", dispositionDate: animal.dispositionDate ?? "", dispositionReason: animal.dispositionReason ?? "", microchipNumber: animal.microchipNumber ?? "", tagIdentifier: animal.tagIdentifier ?? "", source: animal.source ?? "", selectedSpecies: animal.speciesId ? { id: animal.speciesId, commonName: animal.species, scientificName: animal.speciesScientificName ?? "", animalGroupId: animal.animalGroupId!, animalGroupName: animal.animalGroupName ?? "", preferredVariantType: animal.preferredVariantType ?? null } : null, selectedVariant: animal.animalVariantId ? { id: animal.animalVariantId, speciesId: animal.speciesId!, name: animal.subspeciesOrMorph ?? "", variantType: animal.variantType ?? "Other" } : null });
+      const loaded = { ...initialForm(), ...animal, enclosureId: String(animal.enclosureId), animalGroupId: animal.animalGroupId ? String(animal.animalGroupId) : "", species: animal.species, subspeciesOrMorph: animal.subspeciesOrMorph ?? "", birthDate: animal.birthDate ?? "", birthDateIsEstimated: animal.birthDateIsEstimated ?? false, notes: animal.notes ?? "", dispositionDate: animal.dispositionDate ?? "", dispositionReason: animal.dispositionReason ?? "", microchipNumber: animal.microchipNumber ?? "", tagIdentifier: animal.tagIdentifier ?? "", source: animal.source ?? "", selectedSpecies: animal.speciesId ? { id: animal.speciesId, commonName: animal.species, scientificName: animal.speciesScientificName ?? "", animalGroupId: animal.animalGroupId!, animalGroupName: animal.animalGroupName ?? "", preferredVariantType: animal.preferredVariantType ?? null } : null, selectedVariant: animal.animalVariantId ? { id: animal.animalVariantId, speciesId: animal.speciesId!, name: animal.subspeciesOrMorph ?? "", variantType: animal.variantType ?? "Other" } : null };
+      setForm(loaded);
+      setOriginalReferences(referenceKey(loaded));
     }).catch(() => { if (active) { setError("Unable to load animal for editing."); setAnimalLoadFailed(true); } }).finally(() => { if (active) setLoadingAnimal(false); });
     return () => { active = false; };
   }, [animalId]);
@@ -82,7 +85,7 @@ function AnimalFormContent({ workflow, enclosureId, animalId }: AnimalFormProps)
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!form.name.trim() || form.name.trim().length > 100 || !form.species.trim() || form.species.trim().length > 100 || form.subspeciesOrMorph.trim().length > 100 || !form.enclosureId || !form.acquiredDate) {
+    if (!form.name.trim() || form.name.trim().length > 100 || (!animalId && !form.selectedSpecies && !form.species.trim()) || form.species.trim().length > 100 || form.subspeciesOrMorph.trim().length > 100 || !form.enclosureId || !form.acquiredDate) {
       setError("Complete all required fields before creating the animal.");
       return;
     }
@@ -91,12 +94,14 @@ function AnimalFormContent({ workflow, enclosureId, animalId }: AnimalFormProps)
       const request = {
         enclosureId: Number(form.enclosureId),
         name: form.name.trim(),
-        species: form.species.trim(),
-        subspeciesOrMorph: form.subspeciesOrMorph.trim() || null,
-        animalType: form.animalType || undefined,
-        animalGroupId: Number(form.animalGroupId) || null,
-        speciesId: form.selectedSpecies?.id ?? null,
-        animalVariantId: form.selectedVariant?.id ?? null,
+        ...(animalId && referenceKey(form) === originalReferences ? {} : {
+          customSpeciesName: form.selectedSpecies ? null : form.species || null,
+          customVariantName: form.selectedVariant ? null : form.subspeciesOrMorph || null,
+          animalType: form.animalType || undefined,
+          animalGroupId: Number(form.animalGroupId) || null,
+          speciesId: form.selectedSpecies?.id ?? null,
+          animalVariantId: form.selectedVariant?.id ?? null,
+        }),
         notes: form.notes || null,
         dispositionDate: form.dispositionDate || null,
         dispositionReason: form.dispositionReason || null,
@@ -155,4 +160,9 @@ function toLocalDateInputValue(date: Date) {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function referenceKey(form: AnimalReferences) {
+  return JSON.stringify([form.animalGroupId, form.animalType, form.selectedSpecies?.id ?? null,
+    form.species, form.selectedVariant?.id ?? null, form.subspeciesOrMorph]);
 }
