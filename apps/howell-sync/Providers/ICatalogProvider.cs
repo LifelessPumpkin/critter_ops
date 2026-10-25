@@ -13,9 +13,14 @@ public interface ICatalogProvider
     Task ExecuteAsync(CatalogSyncOperation operation, CatalogExecutionContext context, CancellationToken cancellationToken);
 }
 
-public sealed class ProviderRegistry(IEnumerable<ICatalogProvider> providers)
+public sealed class ProviderRegistry
 {
-    private readonly Dictionary<string, ICatalogProvider> providers = providers.ToDictionary(x => x.Name, StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, ICatalogProvider> providers;
+
+    public ProviderRegistry(IEnumerable<ICatalogProvider> providers)
+    {
+        this.providers = providers.ToDictionary(x => x.Name, StringComparer.OrdinalIgnoreCase);
+    }
 
     public ICatalogProvider Resolve(string name, CatalogSyncOperation operation)
     {
