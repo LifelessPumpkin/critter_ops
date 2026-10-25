@@ -7,7 +7,7 @@ using TaskEntity = skipper_api.Domain.Tasks.Task;
 namespace skipper_api.Data;
 
 /// <summary>
-/// The primary EF Core database context for the Skipper API.
+/// The shared EF Core database context for Skipper and Howell Sync.
 /// Named ProfessorDbContext after the professor-db service in the infrastructure stack.
 /// </summary>
 public class ProfessorDbContext : DbContext

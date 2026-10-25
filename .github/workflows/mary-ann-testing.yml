@@ -18,6 +18,8 @@ jobs:
           dotnet-version: 10.0.x
       - name: Build Skipper
         run: dotnet build apps/skipper-api/skipper-api.csproj --configuration Release
+      - name: Build Howell Sync independently
+        run: dotnet build apps/howell-sync/howell-sync.csproj --configuration Release
       - name: Skipper unit tests
         run: ./packages/mary-ann-tests/scripts/test-skipper.sh unit --configuration Release
       - name: Build Skipper Docker image

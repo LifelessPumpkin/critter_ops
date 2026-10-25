@@ -66,6 +66,10 @@ Skipper API uses **Entity Framework Core 10** with the **Npgsql** PostgreSQL pro
 
 ### EF Core Migrations
 
+Run these commands from `apps/skipper-api`. Models, mappings, and migrations now live in
+`packages/professor-persistence`, shared with [Howell Sync](../howell-sync/README.md).
+Skipper retains the design-time factory and configuration; migration IDs and schema are unchanged.
+
 Install the `dotnet-ef` CLI tool if you haven't already:
 
 ```bash
@@ -77,19 +81,19 @@ dotnet tool install --global dotnet-ef --version 10.0.12
 #### Apply migrations to the local database
 
 ```bash
-dotnet ef database update
+dotnet ef database update --project ../../packages/professor-persistence --startup-project .
 ```
 
 #### Create a new migration
 
 ```bash
-dotnet ef migrations add <MigrationName> --output-dir Data/Migrations
+dotnet ef migrations add <MigrationName> --project ../../packages/professor-persistence --startup-project . --output-dir Data/Migrations
 ```
 
 #### Remove the last unapplied migration
 
 ```bash
-dotnet ef migrations remove
+dotnet ef migrations remove --project ../../packages/professor-persistence --startup-project .
 ```
 
 ### Health Endpoints

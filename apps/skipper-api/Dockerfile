@@ -4,9 +4,11 @@ WORKDIR /src
 
 # Restore inputs first so source edits reuse dependency layers.
 COPY apps/skipper-api/skipper-api.csproj apps/skipper-api/packages.lock.json apps/skipper-api/
+COPY packages/professor-persistence/professor-persistence.csproj packages/professor-persistence/packages.lock.json packages/professor-persistence/
 RUN dotnet restore apps/skipper-api/skipper-api.csproj --locked-mode
 
 COPY apps/skipper-api/ apps/skipper-api/
+COPY packages/professor-persistence/ packages/professor-persistence/
 RUN dotnet publish apps/skipper-api/skipper-api.csproj --no-restore \
     --configuration Release --output /out/skipper /p:UseAppHost=false
 

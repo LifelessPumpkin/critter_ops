@@ -24,3 +24,5 @@ executable when running `make test` or `make test-security`. See
 
 See [Testing and CI](../../documentation/testing-and-ci.md) for isolation, regression
 conventions, workflow triggers, and branch protection requirements.
+
+Howell Sync CLI/configuration tests run in the Skipper unit suite. Its lifecycle, advisory-lock, batch rollback, dry-run, cancellation, and process-crash tests run in the PostgreSQL integration suite. The process harness entry point exists only in the test assembly.

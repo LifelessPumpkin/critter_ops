@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../../../apps/skipper-api/skipper-api.csproj" />
+    <ProjectReference Include="../../../apps/howell-sync/howell-sync.csproj" />
   </ItemGroup>
 
 </Project>
