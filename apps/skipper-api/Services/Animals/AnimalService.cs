@@ -70,13 +70,17 @@ public class AnimalService : IAnimalService
                 EnclosureLocation = animal.Enclosure.Location,
                 Name = animal.Name,
                 Species = animal.CatalogSpecies != null ? animal.CatalogSpecies.CommonName ?? animal.CatalogSpecies.ScientificName : animal.Species,
-            AnimalGroupId = animal.AnimalGroupId,
-            AnimalGroupName = animal.AnimalGroup != null ? animal.AnimalGroup.Name : animal.AnimalType.ToString(),
-            SpeciesId = animal.SpeciesId,
-            SpeciesScientificName = animal.CatalogSpecies != null ? animal.CatalogSpecies.ScientificName : null,
-            AnimalVariantId = animal.AnimalVariantId,
-            VariantType = animal.AnimalVariant != null ? animal.AnimalVariant.VariantType : null,
-            PreferredVariantType = animal.CatalogSpecies != null ? animal.CatalogSpecies.PreferredVariantType : null,
+                AnimalGroupId = animal.AnimalGroupId,
+                AnimalGroupName = animal.AnimalGroup != null ? animal.AnimalGroup.Name : animal.AnimalType.ToString(),
+                CustomSpeciesName = animal.SpeciesId == null ? animal.Species : null,
+                CustomVariantName = animal.AnimalVariantId == null ? animal.SubspeciesOrMorph : null,
+                OriginalSpeciesText = animal.Species,
+                OriginalVariantText = animal.SubspeciesOrMorph,
+                SpeciesId = animal.SpeciesId,
+                SpeciesScientificName = animal.CatalogSpecies != null ? animal.CatalogSpecies.ScientificName : null,
+                AnimalVariantId = animal.AnimalVariantId,
+                VariantType = animal.AnimalVariant != null ? animal.AnimalVariant.VariantType : null,
+                PreferredVariantType = animal.CatalogSpecies != null ? animal.CatalogSpecies.PreferredVariantType : null,
                 SubspeciesOrMorph = animal.AnimalVariant != null ? animal.AnimalVariant.Name : animal.SubspeciesOrMorph,
                 AnimalType = animal.AnimalType,
                 Status = animal.Status,
@@ -159,8 +163,10 @@ public class AnimalService : IAnimalService
             return CreateAnimalResult.EnclosureNotFound();
         }
 
+        if (request.SpeciesId.HasValue && request.CustomSpeciesName != null || request.AnimalVariantId.HasValue && request.CustomVariantName != null)
+            return CreateAnimalResult.InvalidReference("Choose either structured or custom references.");
         var reference = await ResolveReferences(request.AnimalGroupId, request.SpeciesId, request.AnimalVariantId,
-            request.Species, request.SubspeciesOrMorph, request.AnimalType, cancellationToken);
+            request.CustomSpeciesName, request.CustomVariantName, request.AnimalType, cancellationToken);
         if (reference.Error is {} error) return CreateAnimalResult.InvalidReference(error);
         var now = DateTime.UtcNow;
         var animal = new Animal
@@ -171,8 +177,8 @@ public class AnimalService : IAnimalService
             AnimalGroupId = reference.Group?.Id,
             SpeciesId = reference.Species?.Id,
             AnimalVariantId = reference.Variant?.Id,
-            Species = reference.Species is {} species ? species.CommonName ?? species.ScientificName : request.Species!.Trim(),
-            SubspeciesOrMorph = reference.Variant?.Name ?? request.SubspeciesOrMorph?.Trim(),
+            Species = reference.Species != null ? "" : request.CustomSpeciesName!,
+            SubspeciesOrMorph = reference.Variant != null ? null : request.CustomVariantName,
             AnimalType = reference.Group?.LegacyAnimalType ?? request.AnimalType ?? AnimalType.Other,
             Status = request.Status!.Value,
             Sex = request.Sex!.Value,
@@ -230,27 +236,34 @@ public class AnimalService : IAnimalService
             return UpdateAnimalResult.EnclosureNotFound();
         }
 
-        // Old consumers round-trip resolved text without IDs. Preserve references on unrelated edits.
-        var existingSpeciesName = animal.SpeciesId.HasValue
-            ? await _dbContext.Species.Where(x => x.Id == animal.SpeciesId).Select(x => x.CommonName ?? x.ScientificName).SingleAsync(cancellationToken)
-            : animal.Species;
-        var existingVariantName = animal.AnimalVariantId.HasValue
-            ? await _dbContext.AnimalVariants.Where(x => x.Id == animal.AnimalVariantId).Select(x => x.Name).SingleAsync(cancellationToken)
-            : animal.SubspeciesOrMorph;
-        var speciesId = request.SpeciesIdSpecified ? request.SpeciesId : (request.Species == existingSpeciesName ? animal.SpeciesId : null);
-        var variantId = request.AnimalVariantIdSpecified ? request.AnimalVariantId : (speciesId == animal.SpeciesId && request.SubspeciesOrMorph == existingVariantName ? animal.AnimalVariantId : null);
-        var groupId = request.AnimalGroupIdSpecified ? request.AnimalGroupId : (request.AnimalType == animal.AnimalType ? animal.AnimalGroupId : null);
-        var reference = await ResolveReferences(groupId, speciesId, variantId,
-            request.Species, request.SubspeciesOrMorph, request.AnimalType, cancellationToken, animal);
-        if (reference.Error is {} error) return UpdateAnimalResult.InvalidReference(error);
-        animal.AnimalGroupId = reference.Group?.Id;
-        animal.SpeciesId = reference.Species?.Id;
-        animal.AnimalVariantId = reference.Variant?.Id;
+        var referencesSpecified = request.AnimalGroupIdSpecified || request.SpeciesIdSpecified || request.AnimalVariantIdSpecified
+            || request.CustomSpeciesNameSpecified || request.CustomVariantNameSpecified || request.AnimalType.HasValue;
+        if (referencesSpecified)
+        {
+            var speciesId = request.SpeciesIdSpecified ? request.SpeciesId : animal.SpeciesId;
+            var variantId = request.AnimalVariantIdSpecified ? request.AnimalVariantId : animal.AnimalVariantId;
+            if (speciesId.HasValue && request.CustomSpeciesName != null || variantId.HasValue && request.CustomVariantName != null)
+                return UpdateAnimalResult.InvalidReference("Clear the structured reference before providing a custom value.");
+            var groupId = request.AnimalGroupIdSpecified ? request.AnimalGroupId : animal.AnimalGroupId;
+            var customSpecies = request.CustomSpeciesNameSpecified ? request.CustomSpeciesName : (speciesId == null ? animal.Species : null);
+            var customVariant = request.CustomVariantNameSpecified ? request.CustomVariantName : (variantId == null ? animal.SubspeciesOrMorph : null);
+            var reference = await ResolveReferences(groupId, speciesId, variantId,
+                customSpecies, customVariant, request.AnimalType, cancellationToken, animal);
+            if (reference.Error is {} error) return UpdateAnimalResult.InvalidReference(error);
+            // An unchanged structured selection must not overwrite preserved historical text.
+            if (speciesId != animal.SpeciesId || speciesId == null) animal.Species = speciesId != null ? "" : customSpecies!;
+            if (variantId != animal.AnimalVariantId || variantId == null) animal.SubspeciesOrMorph = variantId != null ? null : customVariant;
+            // A variant-only edit must not reclassify an ambiguous operational group.
+            var resolvedGroupId = request.AnimalGroupIdSpecified || speciesId != animal.SpeciesId
+                ? reference.Group?.Id : animal.AnimalGroupId;
+            var groupChanged = animal.AnimalGroupId != resolvedGroupId;
+            animal.AnimalGroupId = resolvedGroupId;
+            animal.SpeciesId = reference.Species?.Id;
+            animal.AnimalVariantId = reference.Variant?.Id;
+            animal.AnimalType = request.AnimalType ?? (request.AnimalGroupIdSpecified && groupChanged ? reference.Group?.LegacyAnimalType : null) ?? animal.AnimalType;
+        }
         animal.EnclosureId = enclosureId;
         animal.Name = request.Name!;
-        animal.Species = reference.Species is {} species ? species.CommonName ?? species.ScientificName : request.Species!.Trim();
-        animal.SubspeciesOrMorph = reference.Variant?.Name ?? request.SubspeciesOrMorph?.Trim();
-        animal.AnimalType = reference.Group?.LegacyAnimalType ?? request.AnimalType ?? animal.AnimalType;
         animal.Status = request.Status!.Value;
         animal.Sex = request.Sex!.Value;
         animal.BirthDate = request.BirthDate;
@@ -263,9 +276,6 @@ public class AnimalService : IAnimalService
         animal.Source = request.Source;
         animal.Notes = request.Notes;
         animal.UpdatedAt = DateTime.UtcNow;
-        animal.AnimalGroup = reference.Group;
-        animal.CatalogSpecies = reference.Species;
-        animal.AnimalVariant = reference.Variant;
 
         try { await _dbContext.SaveChangesAsync(cancellationToken); }
         catch (DbUpdateException exception) when (exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.ForeignKeyViolation })
@@ -273,7 +283,7 @@ public class AnimalService : IAnimalService
             return UpdateAnimalResult.InvalidReference("A selected enclosure or catalog reference is no longer available. Refresh the selection and try again.");
         }
 
-        return UpdateAnimalResult.Updated(ToResponseDto(animal, enclosureName));
+        return UpdateAnimalResult.Updated((await GetByIdAsync(animal.Id, cancellationToken))!);
     }
 
     public async Task<DeleteAnimalResult> DeleteAsync(int id, CancellationToken cancellationToken = default)
@@ -304,6 +314,9 @@ public class AnimalService : IAnimalService
         var group = groupId.HasValue ? await _dbContext.AnimalGroups.SingleOrDefaultAsync(x => x.Id == groupId, ct) : null;
         if (groupId.HasValue && (group == null || (!group.IsActive && existing?.AnimalGroupId != groupId)))
             return new(Error: "The selected animal group is unavailable.");
+        if (group != null && legacyType.HasValue && group.LegacyAnimalType != legacyType
+            && !(existing?.AnimalGroupId == group.Id && existing.AnimalType == legacyType))
+            return new(Error: "The animal group conflicts with the supplied operational type.");
         if (species != null && species.AnimalGroupId != groupId)
             return new(Error: "The species does not belong to the selected animal group.");
         var variant = variantId.HasValue ? await _dbContext.AnimalVariants.SingleOrDefaultAsync(x => x.Id == variantId, ct) : null;
@@ -311,9 +324,10 @@ public class AnimalService : IAnimalService
             return new(Error: "The selected variant is unavailable.");
         if (variant != null && (species == null || variant.SpeciesId != species.Id))
             return new(Error: "The variant does not belong to the selected species.");
-        if (species == null && (string.IsNullOrWhiteSpace(customSpecies) || customSpecies.Trim().Length > 100))
+        if (species == null && (string.IsNullOrWhiteSpace(customSpecies) || customSpecies.Length > 100)
+            && !(existing != null && existing.SpeciesId == null && customSpecies == existing.Species))
             return new(Error: "Provide a species from the catalog or a custom species name (up to 100 characters).");
-        if (variant == null && customVariant != null && (string.IsNullOrWhiteSpace(customVariant) || customVariant.Trim().Length > 100))
+        if (variant == null && customVariant != null && (string.IsNullOrWhiteSpace(customVariant) || customVariant.Length > 100))
             return new(Error: "Custom variant must contain 1 to 100 characters, or be omitted.");
         if (legacyType.HasValue && !Enum.IsDefined(legacyType.Value)) return new(Error: "Invalid animal group.");
         return new(group, species, variant);
@@ -329,6 +343,10 @@ public class AnimalService : IAnimalService
             Species = animal.CatalogSpecies != null ? animal.CatalogSpecies.CommonName ?? animal.CatalogSpecies.ScientificName : animal.Species,
             AnimalGroupId = animal.AnimalGroupId,
             AnimalGroupName = animal.AnimalGroup != null ? animal.AnimalGroup.Name : animal.AnimalType.ToString(),
+            CustomSpeciesName = animal.SpeciesId == null ? animal.Species : null,
+            CustomVariantName = animal.AnimalVariantId == null ? animal.SubspeciesOrMorph : null,
+            OriginalSpeciesText = animal.Species,
+            OriginalVariantText = animal.SubspeciesOrMorph,
             SpeciesId = animal.SpeciesId,
             SpeciesScientificName = animal.CatalogSpecies != null ? animal.CatalogSpecies.ScientificName : null,
             AnimalVariantId = animal.AnimalVariantId,
@@ -362,6 +380,10 @@ public class AnimalService : IAnimalService
             Species = animal.CatalogSpecies != null ? animal.CatalogSpecies.CommonName ?? animal.CatalogSpecies.ScientificName : animal.Species,
             AnimalGroupId = animal.AnimalGroupId,
             AnimalGroupName = animal.AnimalGroup != null ? animal.AnimalGroup.Name : animal.AnimalType.ToString(),
+            CustomSpeciesName = animal.SpeciesId == null ? animal.Species : null,
+            CustomVariantName = animal.AnimalVariantId == null ? animal.SubspeciesOrMorph : null,
+            OriginalSpeciesText = animal.Species,
+            OriginalVariantText = animal.SubspeciesOrMorph,
             SpeciesId = animal.SpeciesId,
             SpeciesScientificName = animal.CatalogSpecies != null ? animal.CatalogSpecies.ScientificName : null,
             AnimalVariantId = animal.AnimalVariantId,

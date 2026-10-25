@@ -80,6 +80,8 @@ jobs:
       - name: Validate security policy and prepare OpenVEX
         id: security_policy
         run: |
+          # Empty policies emit no VEX file, so create the scanner output directory explicitly.
+          mkdir -p artifacts/security
           python3 -m venv "$RUNNER_TEMP/security-policy"
           "$RUNNER_TEMP/security-policy/bin/pip" install -r security/requirements.txt
           SECURITY_PYTHON="$RUNNER_TEMP/security-policy/bin/python" ./packages/mary-ann-tests/scripts/test-security.sh

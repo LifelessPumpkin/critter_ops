@@ -5,6 +5,11 @@ namespace skipper_api.Dtos.Animals;
 /// <summary>Compact projection for the operational animals table.</summary>
 public class AnimalListItemDto
 {
+    public string? CustomSpeciesName { get; set; }
+    public string? CustomVariantName { get; set; }
+    // Original text is exposed separately so structured identity never hides historical information.
+    public string? OriginalSpeciesText { get; set; }
+    public string? OriginalVariantText { get; set; }
     public int? AnimalGroupId { get; set; }
     public string? AnimalGroupName { get; set; }
     public int? SpeciesId { get; set; }

@@ -41,8 +41,8 @@ original suppressed findings too, so native suppression cannot bypass policy.
    an official justification and/or impact statement; this policy requires the
    impact evidence text. `fixed` and `under_investigation` never accept an active
    finding in Mary Ann.
-4. Add a matching record under `exceptions`. Copy the existing braces record as a
-   structural example, then replace its identities and assessment. Required:
+4. Add a matching record under `exceptions`. Use `policy_fixture()` in `tests/security/test_policy.py` as a
+   structural example, then replace its synthetic identities and assessment. Required:
    `statement_id`, `decision: "accept_temporarily"`, exact `target`,
    `scope: "development"` or `"production"`, `severity: "HIGH"` or `"CRITICAL"`,
    `reason`, `runtime_exposure`, `remediation` (`available: false`, `details`),
@@ -57,13 +57,9 @@ original suppressed findings too, so native suppression cannot bypass policy.
    policy on the branch being scanned supplies approval; JSON cannot independently
    prove human approval. Repository review/branch protection remains essential.
 
-The initial proposed record is **braces 3.0.3, CVE-2026-93687 /
-GHSA-vfj7-8cjw-p6xm, High**, scoped to Gilligan's development dependencies. On
-October 10, 2026, Trivy detected it, npm confirmed its ESLint dependency chain,
-the production dependency listing and current Next file traces omitted it, and
-the [official advisory](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm) and npm
-registry had no patched release. It remains `affected`. The proposed acceptance
-expires **November 9, 2026 at 00:00 UTC** and still requires PR review.
+The repository currently has no accepted vulnerabilities. Synthetic acceptance
+fixtures remain in the tests to verify policy enforcement independently of live
+exceptions.
 
 ## Matching and lifecycle
 
@@ -88,7 +84,8 @@ stale. Remove both its statement and policy record. If none remain, use:
 {"schema_version": 1, "openvex": null, "exceptions": []}
 ```
 
-No empty/fictitious VEX document is emitted. Dependabot remains free to propose
+Do not leave empty objects (`[{}]`) in either list: they are invalid records,
+not an empty policy. No empty/fictitious VEX document is emitted. Dependabot remains free to propose
 updates; exceptions neither pin packages nor alter update groups/schedules.
 When an update resolves a finding, remove the stale exception in that update PR
 or a follow-up PR. Nothing is deleted or accepted automatically.

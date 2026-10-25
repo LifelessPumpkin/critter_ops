@@ -34,6 +34,9 @@ describe("adaptive animal references", () => {
     choose(/^Animal Group/, /^Reptile$/);
     expect(screen.getByTestId("value")).toHaveTextContent('"selectedSpecies":null');
     expect(screen.getByTestId("value")).toHaveTextContent('"selectedVariant":null');
+    expect(screen.getByTestId("value")).toHaveTextContent('"species":"Dog"');
+    expect(screen.getByTestId("value")).toHaveTextContent('"subspeciesOrMorph":"Poodle"');
+    expect(screen.getByText(/names were kept as custom values/)).toBeInTheDocument();
   });
   it("clears variants when species changes", async () => {
     render(<Harness initial={{ ...empty, species: "Dog", selectedSpecies: dog, selectedVariant: { id: 1, speciesId: 1, name: "Poodle", variantType: "Breed" } }} />);

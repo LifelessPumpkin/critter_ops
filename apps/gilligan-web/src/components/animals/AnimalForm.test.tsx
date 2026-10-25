@@ -31,7 +31,7 @@ it("restores every field, selects a returned enclosure absent from the initial l
   await waitFor(() => expect(screen.getByRole("combobox", { name: /^Enclosure/ })).toHaveTextContent("New habitat"));
   expect(screen.getByLabelText(/^Notes/)).toHaveValue("Keep these notes");
   fireEvent.click(screen.getByRole("button", { name: "Add Animal" }));
-  await waitFor(() => expect(createAnimal).toHaveBeenCalledWith(expect.objectContaining({ name: "Mango", enclosureId: 42, species: "Legacy animal", subspeciesOrMorph: "Local morph", notes: "Keep these notes" })));
+  await waitFor(() => expect(createAnimal).toHaveBeenCalledWith(expect.objectContaining({ name: "Mango", enclosureId: 42, customSpeciesName: "Legacy animal", customVariantName: "Local morph", notes: "Keep these notes" })));
   await waitFor(() => expect(push).toHaveBeenCalledWith("/animals/12/activity"));
   expect(loadAnimalDraft(workflow, draft)).toBeNull();
 });
@@ -77,7 +77,10 @@ it("edits existing references without losing undisplayed legacy metadata", async
   expect(screen.getByRole("combobox", { name: /^Species/ })).toHaveTextContent("Python regius");
   fireEvent.change(screen.getByLabelText(/^Notes/), { target: { value: "Updated notes" } });
   fireEvent.click(screen.getByRole("button", { name: "Save Animal" }));
-  await waitFor(() => expect(updateAnimal).toHaveBeenCalledWith(7, expect.objectContaining({ speciesId: 4, animalGroupId: 3, animalVariantId: 3, source: "Historical source", microchipNumber: "Historical chip", tagIdentifier: "Historical tag", dispositionReason: "Historical reason", notes: "Updated notes" })));
+  await waitFor(() => expect(updateAnimal).toHaveBeenCalledWith(7, expect.objectContaining({ source: "Historical source", microchipNumber: "Historical chip", tagIdentifier: "Historical tag", dispositionReason: "Historical reason", notes: "Updated notes" })));
+  expect(vi.mocked(updateAnimal).mock.calls[0][1]).not.toHaveProperty("speciesId");
+  expect(vi.mocked(updateAnimal).mock.calls[0][1]).not.toHaveProperty("animalVariantId");
+  expect(vi.mocked(updateAnimal).mock.calls[0][1]).not.toHaveProperty("customSpeciesName");
 });
 it("keeps the animal form intact when draft storage fails", async () => {
   saveAnimalDraft(workflow, draft);
@@ -90,4 +93,42 @@ it("keeps the animal form intact when draft storage fails", async () => {
   expect(screen.getByLabelText(/^Name/)).toHaveValue("Mango");
   expect(screen.getByRole("alert")).toHaveTextContent("Unable to preserve this draft");
   storage.mockRestore();
+});
+
+it("creates structured references without duplicating catalog labels into custom fields", async () => {
+  saveAnimalDraft(workflow, { ...draft, species: "Ball python", subspeciesOrMorph: "Albino", animalGroupId: "3", animalType: "Reptile",
+    selectedSpecies: { id: 4, commonName: "Ball python", scientificName: "Python regius", animalGroupId: 3, animalGroupName: "Reptile" },
+    selectedVariant: { id: 3, speciesId: 4, name: "Albino", variantType: "Morph" } });
+  vi.mocked(createAnimal).mockResolvedValue({ id: 12 } as never);
+  render(<AnimalForm workflow={workflow} />);
+  await act(async () => {});
+  fireEvent.click(screen.getByRole("button", { name: "Add Animal" }));
+  await waitFor(() => expect(createAnimal).toHaveBeenCalledWith(expect.objectContaining({ speciesId: 4, animalVariantId: 3, customSpeciesName: null, customVariantName: null })));
+  expect(vi.mocked(createAnimal).mock.calls[0][0]).not.toHaveProperty("species");
+  expect(vi.mocked(createAnimal).mock.calls[0][0]).not.toHaveProperty("subspeciesOrMorph");
+});
+
+it.each(["  Unlisted hybrid  ", ""])("preserves migrated custom or incomplete species on unrelated edits: %s", async (species) => {
+  vi.mocked(fetchAnimal).mockResolvedValue({ id: 7, enclosureId: 1, enclosureName: habitat.name, name: "Migrated", species,
+    customSpeciesName: species, subspeciesOrMorph: "Local strain", animalType: "Herptile", status: "Active", sex: "Unknown", acquiredDate: "2026-01-01" });
+  vi.mocked(updateAnimal).mockResolvedValue({ id: 7 } as never);
+  render(<AnimalForm animalId={7} />);
+  await waitFor(() => expect(screen.getByLabelText(/^Name/)).toHaveValue("Migrated"));
+  fireEvent.change(screen.getByLabelText(/^Name/), { target: { value: "Renamed" } });
+  fireEvent.click(screen.getByRole("button", { name: "Save Animal" }));
+  await waitFor(() => expect(updateAnimal).toHaveBeenCalled());
+  expect(vi.mocked(updateAnimal).mock.calls[0][1]).not.toHaveProperty("customSpeciesName");
+  expect(vi.mocked(updateAnimal).mock.calls[0][1]).not.toHaveProperty("customVariantName");
+});
+
+it("removes a migrated custom variant explicitly while preserving exact custom species text", async () => {
+  vi.mocked(fetchAnimal).mockResolvedValue({ id: 7, enclosureId: 1, enclosureName: habitat.name, name: "Migrated", species: "  Hybrid  ",
+    subspeciesOrMorph: "Local strain", animalType: "Herptile", status: "Active", sex: "Unknown", acquiredDate: "2026-01-01" });
+  vi.mocked(updateAnimal).mockResolvedValue({ id: 7 } as never);
+  render(<AnimalForm animalId={7} />);
+  await waitFor(() => expect(screen.getByLabelText(/^Name/)).toHaveValue("Migrated"));
+  fireEvent.click(screen.getByRole("combobox", { name: /^Variant/ }));
+  fireEvent.mouseDown(screen.getByRole("option", { name: "None" }));
+  fireEvent.click(screen.getByRole("button", { name: "Save Animal" }));
+  await waitFor(() => expect(updateAnimal).toHaveBeenCalledWith(7, expect.objectContaining({ customSpeciesName: "  Hybrid  ", customVariantName: null, animalVariantId: null })));
 });

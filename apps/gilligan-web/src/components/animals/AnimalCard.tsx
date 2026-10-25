@@ -36,9 +36,13 @@ export function AnimalCard({ animal, variant = "active" }: AnimalCardProps) {
             <dd>{animal.species}</dd>
           </div>
 
+          {animal.speciesScientificName ? <div><dt>Scientific name</dt><dd>{animal.speciesScientificName}</dd></div> : null}
+          {animal.speciesId && animal.originalSpeciesText && animal.originalSpeciesText !== animal.species ? <div><dt>Original species description</dt><dd>{animal.originalSpeciesText}</dd></div> : null}
+          {animal.animalVariantId && animal.originalVariantText && animal.originalVariantText !== animal.subspeciesOrMorph ? <div><dt>Original variant description</dt><dd>{animal.originalVariantText}</dd></div> : null}
+
           {animal.subspeciesOrMorph ? (
             <div>
-              <dt>Morph</dt>
+              <dt>{animal.variantType ?? "Variant"}</dt>
               <dd>{animal.subspeciesOrMorph}</dd>
             </div>
           ) : null}

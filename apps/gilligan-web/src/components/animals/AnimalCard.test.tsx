@@ -25,3 +25,12 @@ describe("AnimalCard", () => {
     expect(screen.queryByText("95")).not.toBeInTheDocument();
   });
 });
+
+it("shows scientific identity and preserved original descriptions for migrated animals", () => {
+  render(<AnimalCard animal={{ id: 8, name: "Migrated", enclosureId: 1, enclosureName: "Habitat", species: "Ball python", speciesId: 4,
+    speciesScientificName: "Python regius", originalSpeciesText: "Historical species detail", animalType: "Reptile", animalGroupName: "Reptile",
+    subspeciesOrMorph: "Albino", animalVariantId: 3, variantType: "Morph", originalVariantText: "Historical morph detail", status: "Active", sex: "Unknown", acquiredDate: "2026-01-01" }} />);
+  expect(screen.getByText("Python regius")).toBeInTheDocument();
+  expect(screen.getByText("Historical species detail")).toBeInTheDocument();
+  expect(screen.getByText("Historical morph detail")).toBeInTheDocument();
+});

@@ -177,7 +177,7 @@ public class CatalogMetadataIntegrationTests(PostgresFixture database) : IClassF
                    (1, 'Custom morph', 'Historical name', 'Custom morph', 'Reptile', 'Active', 'Unknown', DATE '2026-01-01', false, NOW(), NOW(), 3, 4, NULL);
             """);
         var before = await Snapshot(db);
-        await migrator.MigrateAsync(); await migrator.MigrateAsync();
+        await migrator.MigrateAsync("20261017184321_ExpandAnimalReferenceCatalog"); await migrator.MigrateAsync("20261017184321_ExpandAnimalReferenceCatalog");
         Assert.Equal(before, await Snapshot(db));
         Assert.False(db.Database.HasPendingModelChanges());
         Assert.Equal(7, await db.AnimalGroups.CountAsync()); Assert.Equal(16, await db.Species.CountAsync()); Assert.Equal(4, await db.AnimalVariants.CountAsync());
@@ -191,7 +191,7 @@ public class CatalogMetadataIntegrationTests(PostgresFixture database) : IClassF
         Assert.Equal(PostgresErrorCodes.ForeignKeyViolation, error.SqlState);
         await migrator.MigrateAsync(PreviousMigration);
         Assert.Equal(before, await Snapshot(db));
-        await migrator.MigrateAsync();
+        await migrator.MigrateAsync("20261017184321_ExpandAnimalReferenceCatalog");
         Assert.Equal(before, await Snapshot(db)); Assert.Empty(await db.SpeciesExternalReferences.ToListAsync());
     }
 

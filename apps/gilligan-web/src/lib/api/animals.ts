@@ -1,4 +1,8 @@
 export type Animal = {
+  customSpeciesName?: string | null;
+  customVariantName?: string | null;
+  originalSpeciesText?: string | null;
+  originalVariantText?: string | null;
   animalGroupId?: number | null;
   animalGroupName?: string | null;
   speciesId?: number | null;
@@ -63,8 +67,8 @@ export const animalPageSize = 40;
 export type CreateAnimalRequest = {
   enclosureId: number;
   name: string;
-  species: string;
-  subspeciesOrMorph?: string | null;
+  customSpeciesName?: string | null;
+  customVariantName?: string | null;
   animalType?: string;
   animalGroupId?: number | null;
   speciesId?: number | null;

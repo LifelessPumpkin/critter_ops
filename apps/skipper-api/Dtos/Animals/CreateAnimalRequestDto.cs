@@ -17,11 +17,13 @@ public class CreateAnimalRequestDto : IValidatableObject
     [MaxLength(100)]
     public string? Name { get; set; }
 
+    /// <summary>Permanent custom species; use instead of SpeciesId.</summary>
     [MaxLength(100)]
-    public string? Species { get; set; }
+    public string? CustomSpeciesName { get; set; }
 
+    /// <summary>Permanent custom variant; use instead of AnimalVariantId.</summary>
     [MaxLength(100)]
-    public string? SubspeciesOrMorph { get; set; }
+    public string? CustomVariantName { get; set; }
 
     public AnimalType? AnimalType { get; set; }
 
@@ -59,9 +61,13 @@ public class CreateAnimalRequestDto : IValidatableObject
     public string? Notes { get; set; }
     public IEnumerable<ValidationResult> Validate(ValidationContext context)
     {
-        if (!SpeciesId.HasValue && string.IsNullOrWhiteSpace(Species))
-            yield return new ValidationResult("Select a species or provide a custom species.", [nameof(Species)]);
-        if (SubspeciesOrMorph != null && string.IsNullOrWhiteSpace(SubspeciesOrMorph))
-            yield return new ValidationResult("Provide a nonblank custom variant or omit it.", [nameof(SubspeciesOrMorph)]);
+        if (!SpeciesId.HasValue && string.IsNullOrWhiteSpace(CustomSpeciesName))
+            yield return new ValidationResult("Select a species or provide a custom species.", [nameof(CustomSpeciesName)]);
+        if (SpeciesId.HasValue && !string.IsNullOrWhiteSpace(CustomSpeciesName))
+            yield return new ValidationResult("Choose structured or custom species, not both.", [nameof(CustomSpeciesName)]);
+        if (AnimalVariantId.HasValue && !string.IsNullOrWhiteSpace(CustomVariantName))
+            yield return new ValidationResult("Choose structured or custom variant, not both.", [nameof(CustomVariantName)]);
+        if (CustomVariantName != null && string.IsNullOrWhiteSpace(CustomVariantName))
+            yield return new ValidationResult("Provide a nonblank custom variant or omit it.", [nameof(CustomVariantName)]);
     }
 }
