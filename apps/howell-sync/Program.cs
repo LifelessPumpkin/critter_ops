@@ -20,7 +20,9 @@ try
     builder.Services.AddScoped<CatalogOperationRunner>();
     builder.Services.AddScoped<CatalogRunRepository>();
     builder.Services.AddSingleton<CatalogSessionFactory>();
-    // Ticket 4 registers ICatalogProvider implementations here via DI; no production provider exists yet.
+    builder.Services.AddHttpClient("gbif", client => { client.Timeout = Timeout.InfiniteTimeSpan; client.MaxResponseContentBufferSize = 4 * 1024 * 1024; })
+        .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+    builder.Services.AddScoped<ICatalogProvider, HowellSync.Providers.Gbif.GbifCatalogProvider>();
     using var host = builder.Build();
     await host.StartAsync();
     var lifetime = host.Services.GetRequiredService<IHostApplicationLifetime>();
