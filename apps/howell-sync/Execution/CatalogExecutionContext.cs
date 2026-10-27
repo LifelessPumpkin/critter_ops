@@ -1,4 +1,5 @@
 using HowellSync.Persistence;
+using HowellSync.Commands;
 using Microsoft.EntityFrameworkCore;
 using skipper_api.Data;
 using skipper_api.Domain.Animals;
@@ -7,8 +8,9 @@ namespace HowellSync.Execution;
 
 public sealed record CatalogCounts(int Processed = 0, int Created = 0, int Updated = 0, int Skipped = 0, int Failed = 0);
 
-public sealed class CatalogExecutionContext(CatalogSession session, int? runId, string provider, bool dryRun)
+public sealed class CatalogExecutionContext(CatalogSession session, int? runId, string provider, bool dryRun, CatalogCommand? command = null)
 {
+    public CatalogCommand Command { get; } = command ?? new("import", provider, dryRun);
     public bool DryRun => dryRun;
     public int? RunId => runId;
     public CatalogCounts Counts { get; private set; } = new();
@@ -38,14 +40,15 @@ public sealed class CatalogExecutionContext(CatalogSession session, int? runId, 
         Counts = total;
     }
 
-    public Task RecordIssueAsync(string issueType, string safeDescription, CatalogIssueSeverity severity, CancellationToken token) =>
+    public Task RecordIssueAsync(string issueType, string safeDescription, CatalogIssueSeverity severity, CancellationToken token, string? datasetIdentifier = null, string? externalIdentifier = null) =>
         BatchAsync((db, _) =>
         {
             // Descriptions are provider-owned diagnostics, never raw external records or exception text.
             if (!dryRun) db.CatalogSyncIssues.Add(new CatalogSyncIssue
             {
                 CatalogSyncRunId = runId, Provider = provider, IssueType = issueType,
-                Description = safeDescription, Severity = severity, CreatedAt = DateTime.UtcNow
+                Description = safeDescription, Severity = severity, CreatedAt = DateTime.UtcNow,
+                DatasetIdentifier = datasetIdentifier, ExternalIdentifier = externalIdentifier
             });
             return Task.FromResult(new CatalogCounts());
         }, token);

@@ -18,8 +18,8 @@ public sealed class CatalogOperationRunner(ProviderRegistry providers, IConfigur
         ICatalogProvider? provider;
         try { provider = command.Provider is null ? null : providers.Resolve(command.Provider, command.Operation); }
         catch (ArgumentException error) { logger.LogError("{ProviderError}", error.Message); return 2; }
-        try { provider?.ValidateConfiguration(configuration.GetSection($"Providers:{provider.Name}")); }
-        catch (Exception) { logger.LogError("Invalid selected provider configuration; check Providers settings"); return 2; }
+        try { provider?.ValidateCommand(command); provider?.ValidateConfiguration(configuration.GetSection($"Providers:{provider.Name}")); }
+        catch (Exception) { logger.LogError("Invalid selected provider configuration; check Providers settings, identifiable UserAgent, and bounded command scope"); return 2; }
         string connectionString;
         try
         {
@@ -55,7 +55,7 @@ public sealed class CatalogOperationRunner(ProviderRegistry providers, IConfigur
             {
                 runId = await history.StartAsync(session, provider!.Name, command.Operation, started, token);
             }
-            var context = new CatalogExecutionContext(session, runId, provider!.Name, command.DryRun);
+            var context = new CatalogExecutionContext(session, runId, provider!.Name, command.DryRun, command);
             using var scope = logger.BeginScope(new Dictionary<string, object?>
             {
                 ["Operation"] = command.Name, ["Provider"] = provider.Name, ["ExecutionId"] = runId?.ToString() ?? Guid.NewGuid().ToString("N"),
