@@ -17,6 +17,7 @@ public sealed class GbifApiClient : IDisposable
     private DateTimeOffset nextRequest;
     private int attempts;
     public int Attempts => attempts;
+    public int Retries { get; private set; }
     public int ThrottledResponses { get; private set; }
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -77,6 +78,7 @@ public sealed class GbifApiClient : IDisposable
                     if (delay > TimeSpan.Zero) await Task.Delay(delay, clock, token);
                     token.ThrowIfCancellationRequested();
                     attempts++;
+                    if (retry > 0) Retries++;
                     nextRequest = clock.GetUtcNow() + options.MinimumRequestInterval;
                 }
                 finally { pacing.Release(); }

@@ -186,13 +186,17 @@ public class CatalogMetadataIntegrationTests(PostgresFixture database) : IClassF
             Assert.True(await db.Database.SqlQuery<int>($"SELECT count(*)::int AS \"Value\" FROM pg_tables WHERE schemaname = 'public' AND tablename = {table}").SingleAsync() == 1);
         var indexes = await db.Database.SqlQueryRaw<string>("SELECT indexdef AS \"Value\" FROM pg_indexes WHERE tablename = 'SpeciesExternalReferences'").ToListAsync();
         Assert.Contains(indexes, x => x.Contains("UNIQUE") && x.Contains("NULLS NOT DISTINCT"));
-        db.Add(Reference()); await db.SaveChangesAsync(); db.ChangeTracker.Clear();
+        // This test deliberately targets the historical schema, so do not insert through the current EF mapping.
+        await db.Database.ExecuteSqlRawAsync("""
+            INSERT INTO "SpeciesExternalReferences" ("SpeciesId", "Provider", "ExternalIdentifier") VALUES (4, 'gbif', 'taxon:abc');
+            """);
+        db.ChangeTracker.Clear();
         var error = await Assert.ThrowsAsync<PostgresException>(() => db.Species.Where(x => x.Id == 4).ExecuteDeleteAsync());
         Assert.Equal(PostgresErrorCodes.ForeignKeyViolation, error.SqlState);
         await migrator.MigrateAsync(PreviousMigration);
         Assert.Equal(before, await Snapshot(db));
         await migrator.MigrateAsync("20261017184321_ExpandAnimalReferenceCatalog");
-        Assert.Equal(before, await Snapshot(db)); Assert.Empty(await db.SpeciesExternalReferences.ToListAsync());
+        Assert.Equal(before, await Snapshot(db)); Assert.Equal(0, await db.SpeciesExternalReferences.CountAsync());
     }
 
     private static async Task<string[]> Snapshot(ProfessorDbContext db) => (await db.Database.SqlQueryRaw<string>("""

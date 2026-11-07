@@ -11,6 +11,8 @@ public interface ICatalogProvider
     IReadOnlySet<CatalogSyncOperation> SupportedOperations { get; }
     // Validate only this provider's section. Never include configuration values in errors.
     void ValidateConfiguration(IConfigurationSection configuration);
+    string? DatasetIdentifier => null;
+    CatalogCommand ResolveDefaults(CatalogCommand command) => command;
     void ValidateCommand(CatalogCommand command) { }
     Task ExecuteAsync(CatalogSyncOperation operation, CatalogExecutionContext context, CancellationToken cancellationToken);
 }

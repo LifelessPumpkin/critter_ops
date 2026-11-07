@@ -1,4 +1,5 @@
 using HowellSync.Commands;
+using System.Text.Json;
 using HowellSync.Persistence;
 using HowellSync.Providers;
 using Microsoft.EntityFrameworkCore;
@@ -50,12 +51,47 @@ public sealed class CatalogOperationRunner(ProviderRegistry providers, IConfigur
                 logger.LogInformation("Professor validation completed: catalog tables are accessible; no data changed");
                 return 0;
             }
+            CatalogSyncRun? retry = null;
+            int[] retryIds = [];
+            if (command.RetryRun is int retryId)
+            {
+                await using var db = session.CreateContext();
+                retry = await db.CatalogSyncRuns.AsNoTracking().SingleOrDefaultAsync(x => x.Id == retryId, token);
+                if (retry is null || retry.Provider != provider!.Name || retry.OperationType != command.Operation ||
+                    retry.DatasetIdentifier != provider.DatasetIdentifier || retry.Scope is null ||
+                    retry.Status is not (CatalogSyncStatus.Failed or CatalogSyncStatus.Partial or CatalogSyncStatus.Cancelled or CatalogSyncStatus.Running))
+                { logger.LogError("Retry requires a compatible incomplete run with stored scope and the same dataset"); return 2; }
+                try
+                {
+                    var original = JsonSerializer.Deserialize<CatalogCommand>(retry.Scope)!;
+                    if (original.Provider != command.Provider || original.Name != command.Name || original.RetryRun is not null || original.Limit is null or < 1 or > 1000)
+                        throw new ArgumentException();
+                    provider.ValidateCommand(original);
+                    if (retry.ReferenceIds is not null)
+                    {
+                        retryIds = JsonSerializer.Deserialize<int[]>(retry.ReferenceIds) ?? throw new ArgumentException();
+                        if (retryIds.Length > original.Limit || retryIds.Any(x => x <= 0) ||
+                            !retryIds.SequenceEqual(retryIds.Distinct().Order()) ||
+                            retry.LastCommittedReferenceId != 0 && !retryIds.Contains(retry.LastCommittedReferenceId))
+                            throw new ArgumentException();
+                    }
+                    command = original with { DryRun = command.DryRun, RetryRun = retryId };
+                }
+                catch (Exception) { logger.LogError("Invalid stored retry scope"); return 2; }
+            }
+            else command = provider!.ResolveDefaults(command);
             int? runId = null;
             if (!command.DryRun)
             {
-                runId = await history.StartAsync(session, provider!.Name, command.Operation, started, token);
+                runId = await history.StartAsync(session, provider!.Name, command.Operation, started, token, command, provider.DatasetIdentifier, retry);
             }
             var context = new CatalogExecutionContext(session, runId, provider!.Name, command.DryRun, command);
+            if (retry?.ReferenceIds is not null)
+            {
+                context.HasReferenceScope = true;
+                context.ReferenceIds = retryIds;
+                context.ResumeAfter = retry.LastCommittedReferenceId;
+            }
             using var scope = logger.BeginScope(new Dictionary<string, object?>
             {
                 ["Operation"] = command.Name, ["Provider"] = provider.Name, ["ExecutionId"] = runId?.ToString() ?? Guid.NewGuid().ToString("N"),
@@ -65,18 +101,26 @@ public sealed class CatalogOperationRunner(ProviderRegistry providers, IConfigur
             var status = CatalogSyncStatus.Completed;
             var exitCode = 0;
             string? error = null;
+            var reason = "BoundedScopeComplete";
             try
             {
                 await provider.ExecuteAsync(command.Operation, context, token);
                 token.ThrowIfCancellationRequested();
             }
+            catch (CatalogPartialException exception)
+            {
+                status = CatalogSyncStatus.Partial; exitCode = 4; reason = exception.Reason;
+                error = "Request budget exhausted; committed work retained. Retry the stored scope.";
+            }
             catch (OperationCanceledException) when (token.IsCancellationRequested)
             {
+                reason = "Cancelled";
                 status = CatalogSyncStatus.Cancelled; exitCode = 130; error = "Operation cancelled; committed batches may remain.";
                 logger.LogWarning("Catalog operation cancelled");
             }
             catch (Exception exception)
             {
+                reason = "ExecutionFailure";
                 status = CatalogSyncStatus.Failed; exitCode = 1; error = "Operation failed; committed batches may remain. Inspect sanitized worker logs.";
                 logger.LogError("Catalog operation failed ({FailureType})", exception.GetType().Name);
             }
@@ -86,7 +130,7 @@ public sealed class CatalogOperationRunner(ProviderRegistry providers, IConfigur
                 {
                     // Finalization must survive the operation's cancellation, but is bounded.
                     using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-                    status = await history.FinishAsync(session, runId.Value, status, error, cleanup.Token);
+                    status = await history.FinishAsync(session, runId.Value, status, error, cleanup.Token, context.HttpRequests, context.HttpRetries, reason);
                 }
                 catch (Exception exception)
                 {
@@ -94,9 +138,12 @@ public sealed class CatalogOperationRunner(ProviderRegistry providers, IConfigur
                     if (exitCode == 0) { exitCode = 1; status = CatalogSyncStatus.Failed; }
                 }
             }
+            logger.LogInformation("Scope {Scope}; run {RunId}; mode {Mode}; unchanged {Unchanged}; issues generated {Issues}; HTTP requests {Requests}; retries {Retries}; reason {Reason}",
+                JsonSerializer.Serialize(command), runId, command.DryRun ? "DryRun: proposed changes" : "Committed", context.Counts.Unchanged,
+                context.Counts.Issues, context.HttpRequests, context.HttpRetries, reason);
             logger.LogInformation("Catalog operation finished: {Status}, {CompletedAt}, {DurationMs}ms, processed {Processed}, created {Created}, updated {Updated}, skipped {Skipped}, failed {Failed}, exit {ExitCode}",
                 status, DateTime.UtcNow, (DateTime.UtcNow - started).TotalMilliseconds, context.Counts.Processed, context.Counts.Created,
-                context.Counts.Updated, context.Counts.Skipped, context.Counts.Failed, exitCode);
+                context.Counts.Updated, context.Counts.Skipped, context.Counts.Failed + (status == CatalogSyncStatus.Failed ? 1 : 0), exitCode);
             return exitCode;
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { logger.LogWarning("Catalog execution cancelled"); return 130; }

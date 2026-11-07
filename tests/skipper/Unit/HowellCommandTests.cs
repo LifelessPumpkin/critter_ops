@@ -38,6 +38,22 @@ public class HowellCommandTests
     }
 
     [Fact]
+    public void SyncDefaultsToExistingReferencesAndRetryRestoresScope()
+    {
+        Assert.Null(CatalogCommand.Parse(["sync", "--provider", "gbif"]).Query);
+        Assert.Equal(123, CatalogCommand.Parse(["sync", "--provider", "gbif", "--retry-run", "123", "--dry-run"]).RetryRun);
+        Assert.Equal(123, CatalogCommand.Parse(["import", "--provider", "gbif", "--retry-run", "123"]).RetryRun);
+    }
+
+    [Theory]
+    [InlineData("sync --provider gbif --query Python")]
+    [InlineData("sync --provider gbif --retry-run 1 --limit 20")]
+    [InlineData("sync --provider gbif --retry-run 0")]
+    [InlineData("import --provider gbif --retry-run 1 --taxon 42")]
+    [InlineData("validate --retry-run 1")]
+    public void UnsafeRetryOrExpansionRejected(string input) => Assert.Throws<ArgumentException>(() => CatalogCommand.Parse(input.Split(' ')));
+
+    [Fact]
     public async Task UnsupportedAndMissingConfigurationReturnTwo()
     {
         var runner = new CatalogOperationRunner(new ProviderRegistry([]), new ConfigurationBuilder().Build(), NullLogger<CatalogOperationRunner>.Instance, new HowellSync.Persistence.CatalogSessionFactory(), new HowellSync.Persistence.CatalogRunRepository());

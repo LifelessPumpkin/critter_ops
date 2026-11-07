@@ -69,6 +69,8 @@ public class SpeciesExternalReferenceConfiguration : IEntityTypeConfiguration<Sp
         CatalogMapping.Provider(b, "SpeciesExternalReferences");
         b.Property(x => x.ExternalIdentifier).HasMaxLength(300).IsRequired();
         b.Property(x => x.ExternalAcceptedIdentifier).HasMaxLength(300);
+        b.Property(x => x.ExternalCanonicalName).HasMaxLength(500);
+        b.Property(x => x.LastAppliedScientificName).HasMaxLength(100);
         b.Property(x => x.ExternalScientificName).HasMaxLength(500);
         b.Property(x => x.ExternalTaxonomicStatus).HasMaxLength(200);
         b.Property(x => x.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
@@ -86,6 +88,10 @@ public class CatalogSyncRunConfiguration : IEntityTypeConfiguration<CatalogSyncR
         CatalogMapping.Provider(b, "CatalogSyncRuns");
         b.Property(x => x.OperationType).HasConversion<string>().HasMaxLength(30);
         b.Property(x => x.Status).HasConversion<string>().HasMaxLength(30);
+        b.Property(x => x.Scope).HasMaxLength(2000);
+        b.Property(x => x.ReferenceIds).HasMaxLength(12000);
+        b.Property(x => x.CompletionReason).HasMaxLength(300);
+        b.HasOne<CatalogSyncRun>().WithMany().HasForeignKey(x => x.RetryOfRunId).OnDelete(DeleteBehavior.Restrict);
         b.Property(x => x.ErrorMessage).HasMaxLength(4000);
         b.HasIndex(x => new { x.Provider, x.StartedAt });
         b.HasIndex(x => new { x.Status, x.StartedAt });
@@ -103,6 +109,8 @@ public class CatalogSyncIssueConfiguration : IEntityTypeConfiguration<CatalogSyn
         CatalogMapping.Identity(b, "CatalogSyncIssues");
         CatalogMapping.Provider(b, "CatalogSyncIssues");
         b.Property(x => x.ExternalIdentifier).HasMaxLength(300);
+        b.Property(x => x.Fingerprint).HasMaxLength(64);
+        b.HasIndex(x => x.Fingerprint).IsUnique().HasFilter("\"Fingerprint\" IS NOT NULL AND \"Status\" IN ('Open', 'Investigating')");
         b.Property(x => x.IssueType).HasMaxLength(100).IsRequired();
         b.Property(x => x.Description).HasMaxLength(4000).IsRequired();
         b.Property(x => x.Status).HasConversion<string>().HasMaxLength(30);

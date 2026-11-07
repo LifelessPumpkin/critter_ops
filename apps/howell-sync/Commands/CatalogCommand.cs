@@ -2,7 +2,7 @@ using skipper_api.Domain.Animals;
 
 namespace HowellSync.Commands;
 
-public sealed record CatalogCommand(string Name, string? Provider = null, bool DryRun = false, string? Query = null, int? Taxon = null, int? Limit = null)
+public sealed record CatalogCommand(string Name, string? Provider = null, bool DryRun = false, string? Query = null, int? Taxon = null, int? Limit = null, int? RetryRun = null)
 {
     public CatalogSyncOperation Operation => Name switch
     {
@@ -17,7 +17,7 @@ public sealed record CatalogCommand(string Name, string? Provider = null, bool D
         if (args[0] is not ("import" or "sync" or "validate"))
             throw new ArgumentException("Unknown command. Use help for usage.");
         string? provider = null, query = null;
-        int? taxon = null, limit = null;
+        int? taxon = null, limit = null, retryRun = null;
         bool dryRun = false, help = false;
         for (int i = 1; i < args.Length; i++)
         {
@@ -33,6 +33,10 @@ public sealed record CatalogCommand(string Name, string? Provider = null, bool D
                     if (++i == args.Length || !int.TryParse(args[i], out var key) || key <= 0)
                         throw new ArgumentException("--taxon requires a positive GBIF usage key.");
                     taxon = key; break;
+                case "--retry-run" when retryRun is null:
+                    if (++i == args.Length || !int.TryParse(args[i], out var run) || run <= 0)
+                        throw new ArgumentException("--retry-run requires a positive run ID.");
+                    retryRun = run; break;
                 case "--limit" when limit is null:
                     if (++i == args.Length || !int.TryParse(args[i], out var count) || count is < 1 or > 1000)
                         throw new ArgumentException("--limit must be between 1 and 1000.");
@@ -52,20 +56,25 @@ public sealed record CatalogCommand(string Name, string? Provider = null, bool D
             throw new ArgumentException("validate checks Professor; it does not accept --provider.");
         if ((query is not null && taxon is not null) || (args[0] == "validate" && (query is not null || taxon is not null || limit is not null)))
             throw new ArgumentException("Specify exactly one scope for imports; validate accepts no scope.");
-        if (provider == "gbif" && (query is null) == (taxon is null))
+        if (retryRun is not null && (args[0] == "validate" || query is not null || taxon is not null || limit is not null))
+            throw new ArgumentException("Retry restores the original scope; do not supply scope or limit overrides.");
+        if (args[0] == "sync" && query is not null)
+            throw new ArgumentException("Text search expansion uses import. Sync refreshes existing references.");
+        if (provider == "gbif" && args[0] == "import" && retryRun is null && (query is null) == (taxon is null))
             throw new ArgumentException("GBIF requires --query or --taxon.");
-        return new(args[0], provider, dryRun, query, taxon, limit);
+        return new(args[0], provider, dryRun, query, taxon, limit, retryRun);
     }
 
     public const string Help = """
         Howell Sync — catalog operations 
         import --provider gbif (--query <text> | --taxon <usage-key>) [--limit 1..1000] [--dry-run]
-        sync --provider gbif (--query <text> | --taxon <usage-key>) [--limit 1..1000] [--dry-run]
+        sync --provider gbif [--taxon <existing-usage-key>] [--limit 1..1000] [--dry-run]
+        (sync | import) --provider gbif --retry-run <run-id> [--dry-run]
         validate [--dry-run]
         help | <command> --help
         Configure ConnectionStrings__ProfessorDb via environment or appsettings.json.
         Configure Providers__gbif__UserAgent with a real project URL/contact. Dry runs and validation write no history or catalog data.
         Exit codes: 0 success; 1 execution failure; 2 invalid arguments/configuration/provider;
-                    3 catalog operation already running; 130 cancelled.
+                    3 catalog operation already running; 4 partial (request budget); 130 cancelled.
         """;
 }
