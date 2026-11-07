@@ -670,6 +670,10 @@ namespace skipper_api.Data.Migrations
                         .HasMaxLength(300)
                         .HasColumnType("character varying(300)");
 
+                    b.Property<string>("Fingerprint")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<string>("IssueType")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -703,6 +707,10 @@ namespace skipper_api.Data.Migrations
 
                     b.HasIndex("CatalogSyncRunId");
 
+                    b.HasIndex("Fingerprint")
+                        .IsUnique()
+                        .HasFilter("\"Fingerprint\" IS NOT NULL AND \"Status\" IN ('Open', 'Investigating')");
+
                     b.HasIndex("SpeciesExternalReferenceId");
 
                     b.HasIndex("SpeciesId");
@@ -725,8 +733,15 @@ namespace skipper_api.Data.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<bool>("CheckpointComplete")
+                        .HasColumnType("boolean");
+
                     b.Property<DateTime?>("CompletedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CompletionReason")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
 
                     b.Property<string>("DatasetIdentifier")
                         .HasMaxLength(300)
@@ -735,6 +750,18 @@ namespace skipper_api.Data.Migrations
                     b.Property<string>("ErrorMessage")
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)");
+
+                    b.Property<int>("HttpRequests")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("HttpRetries")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("IssuesGenerated")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("LastCommittedReferenceId")
+                        .HasColumnType("integer");
 
                     b.Property<string>("OperationType")
                         .IsRequired()
@@ -758,8 +785,22 @@ namespace skipper_api.Data.Migrations
                     b.Property<int>("RecordsSkipped")
                         .HasColumnType("integer");
 
+                    b.Property<int>("RecordsUnchanged")
+                        .HasColumnType("integer");
+
                     b.Property<int>("RecordsUpdated")
                         .HasColumnType("integer");
+
+                    b.Property<string>("ReferenceIds")
+                        .HasMaxLength(12000)
+                        .HasColumnType("character varying(12000)");
+
+                    b.Property<int?>("RetryOfRunId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Scope")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
 
                     b.Property<DateTime?>("StartedAt")
                         .HasColumnType("timestamp with time zone");
@@ -770,6 +811,8 @@ namespace skipper_api.Data.Migrations
                         .HasColumnType("character varying(30)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("RetryOfRunId");
 
                     b.HasIndex("Provider", "StartedAt");
 
@@ -1165,6 +1208,10 @@ namespace skipper_api.Data.Migrations
                         .HasMaxLength(300)
                         .HasColumnType("character varying(300)");
 
+                    b.Property<string>("ExternalCanonicalName")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<string>("ExternalIdentifier")
                         .IsRequired()
                         .HasMaxLength(300)
@@ -1177,6 +1224,10 @@ namespace skipper_api.Data.Migrations
                     b.Property<string>("ExternalTaxonomicStatus")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
+
+                    b.Property<string>("LastAppliedScientificName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
                     b.Property<DateTime?>("LastCheckedAt")
                         .HasColumnType("timestamp with time zone");
@@ -1606,6 +1657,14 @@ namespace skipper_api.Data.Migrations
                     b.Navigation("Species");
 
                     b.Navigation("SpeciesExternalReference");
+                });
+
+            modelBuilder.Entity("skipper_api.Domain.Animals.CatalogSyncRun", b =>
+                {
+                    b.HasOne("skipper_api.Domain.Animals.CatalogSyncRun", null)
+                        .WithMany()
+                        .HasForeignKey("RetryOfRunId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("skipper_api.Domain.Animals.Species", b =>

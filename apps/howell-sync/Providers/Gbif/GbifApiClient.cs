@@ -17,6 +17,7 @@ public sealed class GbifApiClient : IDisposable
     private DateTimeOffset nextRequest;
     private int attempts;
     public int Attempts => attempts;
+    public int Retries { get; private set; }
     public int ThrottledResponses { get; private set; }
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -77,6 +78,7 @@ public sealed class GbifApiClient : IDisposable
                     if (delay > TimeSpan.Zero) await Task.Delay(delay, clock, token);
                     token.ThrowIfCancellationRequested();
                     attempts++;
+                    if (retry > 0) Retries++;
                     nextRequest = clock.GetUtcNow() + options.MinimumRequestInterval;
                 }
                 finally { pacing.Release(); }
@@ -88,7 +90,7 @@ public sealed class GbifApiClient : IDisposable
                     request.Headers.UserAgent.ParseAdd(options.UserAgent);
                     using var timeout = new CancellationTokenSource(options.RequestTimeout, clock);
                     using var linked = CancellationTokenSource.CreateLinkedTokenSource(token, timeout.Token);
-                    logger.LogInformation("GBIF HTTP attempt {Attempt}, retry {Retry}", attempts, retry);
+                    logger.LogDebug("GBIF HTTP attempt {Attempt}, retry {Retry}", attempts, retry);
                     // ResponseContentRead keeps both body download and parsing within the bounded request.
                     using var response = await http.SendAsync(request, HttpCompletionOption.ResponseContentRead, linked.Token);
                     if (response.IsSuccessStatusCode)
@@ -118,6 +120,7 @@ public sealed class GbifApiClient : IDisposable
                 var backoff = TimeSpan.FromMilliseconds(Math.Min(options.MaximumRetryDelay.TotalMilliseconds,
                     options.InitialRetryDelay.TotalMilliseconds * Math.Pow(2, retry) * (1 + jitter())));
                 var wait = retryAfter > backoff ? retryAfter.Value : backoff;
+                logger.LogWarning(new EventId(105, "RETRY"), "GBIF request will retry ({Retry}/{MaximumRetries}) after {DelaySeconds:F1}s", retry + 1, options.MaximumRetries, wait.TotalSeconds);
                 // Shared cooldown prevents other requests bypassing a throttled request's delay.
                 await pacing.WaitAsync(token);
                 try { if (nextRequest < clock.GetUtcNow() + wait) nextRequest = clock.GetUtcNow() + wait; }

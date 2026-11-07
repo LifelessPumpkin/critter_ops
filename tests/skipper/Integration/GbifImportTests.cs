@@ -15,7 +15,7 @@ using Xunit;
 
 namespace MaryAnn.Howell;
 
-public class GbifImportTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public partial class GbifImportTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
 {
     private const string Dataset = "d7dddbf4-2cf0-4f39-9b2a-bb099caae36c";
     private static GbifTaxon Taxon(int key = 42, string name = "Python regius") => new() {
@@ -127,7 +127,7 @@ public class GbifImportTests(PostgresFixture fixture) : IClassFixture<PostgresFi
         await using var db = new ProfessorDbContext(options);
         var reference = await db.SpeciesExternalReferences.SingleAsync();
         Assert.Equal(status, reference.ExternalTaxonomicStatus); Assert.Equal("99", reference.ExternalAcceptedIdentifier); Assert.Equal(4, reference.SpeciesId);
-        Assert.Equal(16, await db.Species.CountAsync()); Assert.Equal(2, await db.CatalogSyncIssues.CountAsync(x => x.IssueType == "TaxonomyChanged"));
+        Assert.Equal(16, await db.Species.CountAsync()); Assert.Equal(1, await db.CatalogSyncIssues.CountAsync(x => x.IssueType == "TaxonomyChanged"));
     }
 
     [Fact]
@@ -219,9 +219,9 @@ public class GbifImportTests(PostgresFixture fixture) : IClassFixture<PostgresFi
             }
             return Task.FromResult(path.EndsWith("vernacularNames") ? Json(new GbifPage<GbifVernacularName>(0, 1, true, [])) : Json(Taxon()));
         });
-        Assert.Equal(1, await Runner(connection, CreateHandler(), failure == "budget" ? 3 : 100).RunAsync(new("import", "gbif", Query: "Python", Limit: 5), default));
+        Assert.Equal(failure == "budget" ? 4 : 1, await Runner(connection, CreateHandler(), failure == "budget" ? 3 : 100).RunAsync(new("import", "gbif", Query: "Python", Limit: 5), default));
         await using var db = new ProfessorDbContext(options);
-        var run = await db.CatalogSyncRuns.SingleAsync(); Assert.Equal(CatalogSyncStatus.Failed, run.Status); Assert.Equal(1, run.RecordsProcessed);
+        var run = await db.CatalogSyncRuns.SingleAsync(); Assert.Equal(failure == "budget" ? CatalogSyncStatus.Partial : CatalogSyncStatus.Failed, run.Status); Assert.Equal(1, run.RecordsProcessed);
         Assert.Single(await db.SpeciesExternalReferences.ToListAsync()); Assert.Single(await db.CatalogSyncIssues.ToListAsync());
         Assert.Equal(0, await Import(connection, Taxon())); Assert.Single(await db.SpeciesExternalReferences.ToListAsync());
         Assert.Equal(16, await db.Species.CountAsync());
@@ -260,10 +260,10 @@ public class GbifImportTests(PostgresFixture fixture) : IClassFixture<PostgresFi
     {
         var (options, connection) = await Database();
         var runner = Runner(connection, Exact(Taxon()), budget: 1, pageSize: 100);
-        Assert.Equal(1, await runner.RunAsync(Command(), default));
+        Assert.Equal(4, await runner.RunAsync(Command(), default));
         await using var db = new ProfessorDbContext(options);
         Assert.Empty(await db.SpeciesExternalReferences.ToListAsync()); Assert.Empty(await db.SpeciesCommonNames.ToListAsync());
-        var run = await db.CatalogSyncRuns.SingleAsync(); Assert.Equal(0, run.RecordsProcessed); Assert.Equal(CatalogSyncStatus.Failed, run.Status);
+        var run = await db.CatalogSyncRuns.SingleAsync(); Assert.Equal(0, run.RecordsProcessed); Assert.Equal(CatalogSyncStatus.Partial, run.Status);
         Assert.Equal("RequestBudgetExhausted", (await db.CatalogSyncIssues.SingleAsync()).IssueType);
     }
 

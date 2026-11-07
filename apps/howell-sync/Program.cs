@@ -1,4 +1,6 @@
 using HowellSync.Commands;
+using HowellSync.Logging;
+using Microsoft.Extensions.Configuration;
 using HowellSync.Execution;
 using HowellSync.Providers;
 using HowellSync.Persistence;
@@ -15,7 +17,10 @@ try
     // Parse operational arguments ourselves; standard host configuration still loads JSON and environment variables.
     var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { Args = [], ContentRootPath = AppContext.BaseDirectory });
     builder.Logging.ClearProviders();
-    builder.Logging.AddJsonConsole(options => options.IncludeScopes = true);
+    var logOptions = new OperationLogOptions();
+    builder.Configuration.GetSection("HowellLog").Bind(logOptions);
+    using var operationLog = new OperationLogProvider(logOptions);
+    builder.Logging.AddProvider(operationLog);
     builder.Services.AddScoped<ProviderRegistry>();
     builder.Services.AddScoped<CatalogOperationRunner>();
     builder.Services.AddScoped<CatalogRunRepository>();
@@ -24,6 +29,8 @@ try
         .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
     builder.Services.AddScoped<ICatalogProvider, HowellSync.Providers.Gbif.GbifCatalogProvider>();
     using var host = builder.Build();
+    var startupLogger = host.Services.GetRequiredService<ILoggerFactory>().CreateLogger("HowellSync.Startup");
+    startupLogger.LogInformation(new EventId(100, "LOGGING"), "Log file: {LogFile}", operationLog.FilePath);
     await host.StartAsync();
     var lifetime = host.Services.GetRequiredService<IHostApplicationLifetime>();
     await using var scope = host.Services.CreateAsyncScope();

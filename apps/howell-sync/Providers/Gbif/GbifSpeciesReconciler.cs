@@ -1,4 +1,5 @@
 using HowellSync.Execution;
+using HowellSync.Synchronization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using skipper_api.Data;
@@ -20,10 +21,8 @@ public sealed class GbifSpeciesReconciler(ILogger logger)
         var dataset = Guid.TryParse(taxon.DatasetKey, out var guid) ? guid.ToString() : null;
         void Issue(string type, string description)
         {
-            logger.LogWarning("GBIF record {ExternalIdentifier}: {IssueType}; {Description}; dry run {DryRun}", id, type, description, context.DryRun);
-            if (!context.DryRun) db.CatalogSyncIssues.Add(new CatalogSyncIssue {
-                CatalogSyncRunId = context.RunId, Provider = "gbif", DatasetIdentifier = dataset, ExternalIdentifier = id,
-                IssueType = type, Description = description, CreatedAt = now });
+            logger.LogDebug("GBIF record {ExternalIdentifier}: {IssueType}; {Description}; dry run {DryRun}", id, type, description, context.DryRun);
+            CatalogIssueRecorder.Add(db, context.RunId, "gbif", dataset, id, type, description);
         }
         CatalogCounts Skip(string type, string description) { Issue(type, description); return new(Processed: 1, Skipped: 1); }
         if (taxon.Key is null or <= 0 || dataset is null)
@@ -33,25 +32,18 @@ public sealed class GbifSpeciesReconciler(ILogger logger)
             .Include(x => x.Species).ThenInclude(x => x.Aliases).Include(x => x.Species).ThenInclude(x => x.ExternalReferences)
             .SingleOrDefaultAsync(x => x.Provider == "gbif" && x.DatasetIdentifier == dataset && x.ExternalIdentifier == id, token);
         reference = proposed.SelectMany(x => x.ExternalReferences).SingleOrDefault(x => x.Provider == "gbif" && x.DatasetIdentifier == dataset && x.ExternalIdentifier == id) ?? reference;
-        var oldStatus = reference?.ExternalTaxonomicStatus;
+        if (reference is not null)
+            return await new CatalogReferenceRefresher().ApplyAsync(db, context, reference, GbifCatalogProvider.Normalize(taxon, names), token);
         void Metadata(SpeciesExternalReference value)
         {
             value.ExternalScientificName = taxon.ScientificName;
+            value.ExternalCanonicalName = taxon.CanonicalName;
             value.ExternalTaxonomicStatus = taxon.TaxonomicStatus;
             value.ExternalAcceptedIdentifier = taxon.AcceptedKey?.ToString();
             value.LastCheckedAt = now; value.UpdatedAt = now;
         }
-        if (taxon.ScientificName?.Length > 500 || taxon.TaxonomicStatus?.Length > 200)
+        if (taxon.ScientificName?.Length > 500 || taxon.CanonicalName?.Length > 500 || taxon.TaxonomicStatus?.Length > 200)
             return Skip("MalformedTaxon", "Provider name or status exceeds catalog storage bounds.");
-        // Preserve the original link even when the provider changes status. Never merge/reassign automatically.
-        if (reference is not null)
-        {
-            Metadata(reference);
-            if (oldStatus != taxon.TaxonomicStatus ||
-                await db.CatalogSyncIssues.AnyAsync(x => x.Provider == "gbif" && x.DatasetIdentifier == dataset && x.ExternalIdentifier == id &&
-                    x.IssueType == "TaxonomyChanged" && x.Status != CatalogIssueStatus.Resolved && x.Status != CatalogIssueStatus.Ignored, token) || taxon.Rank != "SPECIES" || taxon.Deleted is not null)
-                return Skip("TaxonomyChanged", "Provider metadata refreshed; existing Species relationship retained for review.");
-        }
         if (taxon.Rank != "SPECIES" || taxon.Deleted is not null)
             return Skip("UnsupportedRankOrDeleted", "Only non-deleted species-rank records are supported.");
         var scientific = GbifTaxonMapper.Clean(taxon.ScientificName);
@@ -112,13 +104,7 @@ public sealed class GbifSpeciesReconciler(ILogger logger)
                 return Skip("ClassificationConflict", "Existing AnimalGroup preserved; classification changes require review.");
             if (GbifTaxonMapper.Key(species.ScientificName) != canonicalKey)
             {
-                if (species.IsManuallyManaged || candidates.Any(x => !ReferenceEquals(x, species) && (species.Id == 0 || x.Id != species.Id)))
-                    Issue("ScientificNameConflict", "Local scientific name preserved because it is curated or the proposed name conflicts with another Species.");
-                else
-                {
-                    AddAlias(species, species.ScientificName, SpeciesAliasType.Historical, "gbif:" + dataset, now);
-                    species.ScientificName = localName;
-                }
+                Issue("ScientificNameConflict", "Matching Species has no proven ownership for this new reference; local scientific name retained.");
             }
         }
         if (reference is null)
@@ -128,6 +114,7 @@ public sealed class GbifSpeciesReconciler(ILogger logger)
             species!.ExternalReferences.Add(reference);
         }
         Metadata(reference);
+        if (created) reference.LastAppliedScientificName = species!.ScientificName;
         var source = "gbif:" + dataset;
         if (synonym)
         {
