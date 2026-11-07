@@ -85,7 +85,7 @@ public sealed class CatalogOperationRunner(ProviderRegistry providers, IConfigur
             {
                 runId = await history.StartAsync(session, provider!.Name, command.Operation, started, token, command, provider.DatasetIdentifier, retry);
             }
-            var context = new CatalogExecutionContext(session, runId, provider!.Name, command.DryRun, command);
+            var context = new CatalogExecutionContext(session, runId, provider!.Name, command.DryRun, command, logger);
             if (retry?.ReferenceIds is not null)
             {
                 context.HasReferenceScope = true;
@@ -97,7 +97,10 @@ public sealed class CatalogOperationRunner(ProviderRegistry providers, IConfigur
                 ["Operation"] = command.Name, ["Provider"] = provider.Name, ["ExecutionId"] = runId?.ToString() ?? Guid.NewGuid().ToString("N"),
                 ["DryRun"] = command.DryRun, ["StartedAt"] = started
             });
-            logger.LogInformation("Catalog operation started at {StartedAt}", started);
+            logger.LogInformation(new EventId(101, "START"), "{Operation} provider={Provider} mode={Mode} scope={Scope} limit={Limit} retry-of={RetryRun}",
+                command.Name, provider.Name, command.DryRun ? "DRY RUN (no database writes)" : "WRITE",
+                command.Query is not null ? "query: " + command.Query : command.Taxon is not null ? "taxon: " + command.Taxon : "existing references",
+                command.Limit, command.RetryRun?.ToString() ?? "none");
             var status = CatalogSyncStatus.Completed;
             var exitCode = 0;
             string? error = null;
@@ -138,12 +141,11 @@ public sealed class CatalogOperationRunner(ProviderRegistry providers, IConfigur
                     if (exitCode == 0) { exitCode = 1; status = CatalogSyncStatus.Failed; }
                 }
             }
-            logger.LogInformation("Scope {Scope}; run {RunId}; mode {Mode}; unchanged {Unchanged}; issues generated {Issues}; HTTP requests {Requests}; retries {Retries}; reason {Reason}",
-                JsonSerializer.Serialize(command), runId, command.DryRun ? "DryRun: proposed changes" : "Committed", context.Counts.Unchanged,
-                context.Counts.Issues, context.HttpRequests, context.HttpRetries, reason);
-            logger.LogInformation("Catalog operation finished: {Status}, {CompletedAt}, {DurationMs}ms, processed {Processed}, created {Created}, updated {Updated}, skipped {Skipped}, failed {Failed}, exit {ExitCode}",
-                status, DateTime.UtcNow, (DateTime.UtcNow - started).TotalMilliseconds, context.Counts.Processed, context.Counts.Created,
-                context.Counts.Updated, context.Counts.Skipped, context.Counts.Failed + (status == CatalogSyncStatus.Failed ? 1 : 0), exitCode);
+            logger.LogInformation(new EventId(102, "COUNTS"), "{Mode}: examined={Processed} created={Created} updated={Updated} unchanged={Unchanged} skipped={Skipped} failed={Failed} new-issues={Issues}",
+                command.DryRun ? "Proposed" : "Committed", context.Counts.Processed, context.Counts.Created, context.Counts.Updated,
+                context.Counts.Unchanged, context.Counts.Skipped, context.Counts.Failed + (status == CatalogSyncStatus.Failed ? 1 : 0), context.Counts.Issues);
+            logger.Log(exitCode == 0 ? LogLevel.Information : exitCode == 1 ? LogLevel.Error : LogLevel.Warning, new EventId(103, "FINISH"), "{Status} | duration={DurationSeconds:F1}s requests={Requests} retries={Retries} | reason={Reason} exit={ExitCode}",
+                status, (DateTime.UtcNow - started).TotalSeconds, context.HttpRequests, context.HttpRetries, reason, exitCode);
             return exitCode;
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { logger.LogWarning("Catalog execution cancelled"); return 130; }

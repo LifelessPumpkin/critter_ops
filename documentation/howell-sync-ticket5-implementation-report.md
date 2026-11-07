@@ -149,7 +149,7 @@ An external scheduler can eventually run:
 dotnet /app/howell-sync.dll sync --provider gbif --limit 100
 ```
 
-Environment configuration, JSON logs, deterministic exit codes, finite request bounds, and
+Environment configuration, readable retained logs, deterministic exit codes, finite request bounds, and
 generic-host SIGTERM handling support noninteractive execution. No timer or schedule is
 installed. Request/attempt/wait limits bound runtime; there is no separate whole-run timeout.
 
@@ -209,3 +209,44 @@ scheduler configuration, licensing/citations, and future COL XR adapter migratio
 Process note: an initial `git status` was inadvertently executed before the pasted ticket's
 Git-inspection restriction was read. Subsequent inspection used files directly; no further
 prohibited Git inspection, push, or PR-description work was performed.
+
+
+## Logging follow-up — November 7, 2026
+
+Replaced JSON console dumps with timestamped, single-line console/file output. Explicit
+START, PROGRESS, ISSUE, COUNTS, FINISH, RETRY and LOGGING events expose run IDs, bounded
+scope, proposed versus committed counts, timing, and exit status. Routine HTTP messages
+are debug-only. New issue explanations are logged after their batch commits (or after a
+dry-run batch is evaluated), without dumping raw provider responses or exception payloads.
+
+Each non-help invocation opens a unique, auto-flushed file under `logs/howell-sync/`
+(relative to the working directory) and prints its absolute path. Segments rotate at
+10 MiB; matching files older than 30 days are cleaned up at startup. Directory, retention
+and size are configurable through `HowellLog`. Unix files are created with owner-only
+read/write permissions. Containers need a mounted directory for persistence across removal.
+Initialization failure stops startup; a later file-write failure explicitly warns and
+continues console-only. PostgreSQL history is unchanged.
+
+Additional created files:
+
+- `apps/howell-sync/Logging/OperationLogProvider.cs`
+- `tests/skipper/Unit/HowellLoggingTests.cs`
+
+Additional modified files: `apps/howell-sync/Program.cs`, `apps/howell-sync/appsettings.json`.
+Logging changes also update the existing runner, context, GBIF client/provider/reconciler,
+README and this report. No new dependencies or database changes were needed.
+
+Follow-up verification:
+
+- PASS — Howell build (zero warnings/errors).
+- PASS — all 60 Howell-filtered unit tests, including CLI and logging tests.
+- PASS — all 55 Howell-filtered PostgreSQL integration tests.
+- PASS — actual CLI configuration-failure smoke test, expected exit 2, with matching
+  console/file output and owner-only file permissions; explicitly empty connection string,
+  no database contacted.
+- NOT RUN — live GBIF import for this logging follow-up; the displayed README success
+  example is illustrative.
+
+The earlier report's unit-suite NOT RUN entry records the original implementation session.
+The Howell subset has now been executed successfully; the entire backend unit suite was
+not rerun as part of this logging change.

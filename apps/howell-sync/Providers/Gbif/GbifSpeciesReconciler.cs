@@ -21,7 +21,7 @@ public sealed class GbifSpeciesReconciler(ILogger logger)
         var dataset = Guid.TryParse(taxon.DatasetKey, out var guid) ? guid.ToString() : null;
         void Issue(string type, string description)
         {
-            logger.LogWarning("GBIF record {ExternalIdentifier}: {IssueType}; {Description}; dry run {DryRun}", id, type, description, context.DryRun);
+            logger.LogDebug("GBIF record {ExternalIdentifier}: {IssueType}; {Description}; dry run {DryRun}", id, type, description, context.DryRun);
             CatalogIssueRecorder.Add(db, context.RunId, "gbif", dataset, id, type, description);
         }
         CatalogCounts Skip(string type, string description) { Issue(type, description); return new(Processed: 1, Skipped: 1); }

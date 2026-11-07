@@ -97,6 +97,9 @@ public sealed class GbifCatalogProvider(IHttpClientFactory clients, ILogger<Gbif
                 }
                 return await refresher.ApplyAsync(db, context, current, taxon, ct);
             }, token, checkpoint: id);
+            logger.LogInformation(new EventId(104, "PROGRESS"), "Checked GBIF {Identifier}: processed={Processed}/{Selected} updated={Updated} unchanged={Unchanged} skipped={Skipped} new-issues={Issues}",
+                reference?.ExternalIdentifier ?? "missing reference", context.Counts.Processed, ids.Count(x => x > context.ResumeAfter),
+                context.Counts.Updated, context.Counts.Unchanged, context.Counts.Skipped, context.Counts.Issues);
         }
     }
 
@@ -157,12 +160,15 @@ public sealed class GbifCatalogProvider(IHttpClientFactory clients, ILogger<Gbif
                     context.HttpRequests = api.Attempts; context.HttpRetries = api.Retries;
                     await context.BatchAsync((db, ct) => reconciler.ApplyAsync(db, context, taxon, names, ct), token);
                     offset++;
+                    logger.LogInformation(new EventId(104, "PROGRESS"), "Examined GBIF {Identifier} ({Name}): processed={Processed} created={Created} updated={Updated} unchanged={Unchanged} skipped={Skipped} new-issues={Issues}",
+                        currentIdentifier, taxon.CanonicalName ?? taxon.ScientificName, context.Counts.Processed, context.Counts.Created,
+                        context.Counts.Updated, context.Counts.Unchanged, context.Counts.Skipped, context.Counts.Issues);
                 }
                 if (page.EndOfRecords == true) break;
             }
             if (api.ThrottledResponses > 0)
                 await context.RecordIssueAsync("ProviderThrottled", $"GBIF returned {api.ThrottledResponses} throttled responses; bounded retries recovered.", CatalogIssueSeverity.Information, token, settings.DatasetIdentifier);
-            logger.LogInformation("GBIF scope evaluated: {Processed} taxa, {Attempts} HTTP attempts, dry run {DryRun}. Limit is a scope boundary, not a complete taxonomy claim.", context.Counts.Processed, api.Attempts, context.DryRun);
+            logger.LogDebug("GBIF scope evaluated: {Processed} taxa, {Attempts} HTTP attempts, dry run {DryRun}. Limit is a scope boundary, not a complete taxonomy claim.", context.Counts.Processed, api.Attempts, context.DryRun);
         }
         catch (GbifProviderException error)
         {
@@ -174,7 +180,7 @@ public sealed class GbifCatalogProvider(IHttpClientFactory clients, ILogger<Gbif
         finally
         {
             context.HttpRequests = api.Attempts; context.HttpRetries = api.Retries;
-            logger.LogInformation("GBIF used {Attempts} HTTP attempts; {ThrottledResponses} throttled responses", api.Attempts, api.ThrottledResponses);
+            logger.LogDebug("GBIF used {Attempts} HTTP attempts; {ThrottledResponses} throttled responses", api.Attempts, api.ThrottledResponses);
         }
     }
 }

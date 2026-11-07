@@ -1,6 +1,7 @@
 using HowellSync.Persistence;
 using HowellSync.Commands;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using skipper_api.Data;
 using skipper_api.Domain.Animals;
 
@@ -13,7 +14,7 @@ public sealed class CatalogPartialException(string reason) : Exception(reason)
 
 public sealed record CatalogCounts(int Processed = 0, int Created = 0, int Updated = 0, int Skipped = 0, int Failed = 0, int Unchanged = 0, int Issues = 0);
 
-public sealed class CatalogExecutionContext(CatalogSession session, int? runId, string provider, bool dryRun, CatalogCommand? command = null)
+public sealed class CatalogExecutionContext(CatalogSession session, int? runId, string provider, bool dryRun, CatalogCommand? command = null, ILogger? logger = null)
 {
     public CatalogCommand Command { get; } = command ?? new("import", provider, dryRun);
     public bool DryRun => dryRun;
@@ -44,7 +45,8 @@ public sealed class CatalogExecutionContext(CatalogSession session, int? runId, 
         await using var transaction = await db.Database.BeginTransactionAsync(token);
         if (dryRun) await db.Database.ExecuteSqlRawAsync("SET TRANSACTION READ ONLY", token);
         var counts = await apply(db, token);
-        counts = counts with { Issues = counts.Issues + db.ChangeTracker.Entries<CatalogSyncIssue>().Count(x => x.State == EntityState.Added) };
+        var newIssues = db.ChangeTracker.Entries<CatalogSyncIssue>().Where(x => x.State == EntityState.Added).Select(x => x.Entity).ToArray();
+        counts = counts with { Issues = counts.Issues + newIssues.Length };
         if (new[] { counts.Processed, counts.Created, counts.Updated, counts.Skipped, counts.Failed, counts.Unchanged, counts.Issues }.Any(x => x < 0))
             throw new InvalidOperationException("Batch counts must be nonnegative.");
         var total = new CatalogCounts(checked(Counts.Processed + counts.Processed), checked(Counts.Created + counts.Created),
@@ -61,6 +63,9 @@ public sealed class CatalogExecutionContext(CatalogSession session, int? runId, 
             await transaction.CommitAsync(token);
         }
         else await transaction.RollbackAsync(token);
+        foreach (var issue in newIssues)
+            logger?.LogWarning(new EventId(106, "ISSUE"), "{Mode} {IssueType} provider={Provider} external-id={Identifier}: {Description}",
+                dryRun ? "Proposed" : "Recorded", issue.IssueType, issue.Provider, issue.ExternalIdentifier ?? "none", issue.Description);
         Counts = total;
         if (checkpoint.HasValue) LastCommittedReferenceId = checkpoint.Value;
     }

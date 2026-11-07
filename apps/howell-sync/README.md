@@ -215,7 +215,7 @@ dotnet /app/howell-sync.dll sync --provider gbif --limit 100
 ```
 
 Supply a request budget sufficient for that scope and inspect nonzero exit codes and
-persisted history. The generic host handles SIGTERM/Ctrl+C; JSON logs support noninteractive
+persisted history. The generic host handles SIGTERM/Ctrl+C; Readable retained logs support noninteractive
 container execution. Configure the external schedule and its timeout in a future infrastructure
 ticket. This repository change neither configures nor deploys that scheduler.
 
@@ -237,3 +237,52 @@ Ticket 6 must preserve Species identity while adding multiple variant assignment
 can search the local common names/aliases without provider calls. Ticket 8 should document
 scheduler configuration, migrations, issue review, budget sizing, dataset licensing and future
 COL XR migration. None of those tickets is implemented here.
+
+## Human-readable execution logs
+
+Every non-help invocation prints timestamped UTC lines and saves the same output to
+`logs/howell-sync/` relative to the working directory. Startup prints the absolute log
+path. A unique filename identifies each invocation, including dry runs, validation,
+failed configuration checks and lock contention. `run=<id>` correlates catalog work
+with `CatalogSyncRuns`; dry runs use a transient identifier and still write no database
+history. Help/argument-parser errors occur before logging initializes and are console-only.
+
+Events use `START`, `PROGRESS`, `COUNTS`, `FINISH`, `ISSUE`, `RETRY` and `LOGGING` labels;
+other warnings/errors use `WORKER`. Counts are cumulative. Dry-run summaries say
+`Proposed`, and normal summaries say `Committed`. HTTP attempts are Debug-only;
+framework HTTP chatter is suppressed by default. Retries, conflicts and failures remain
+visible. No serialized command/scope JSON or raw exception stack is appended.
+
+```text
+2026-11-07 14:00:00Z INFO  START      run=123 import provider=gbif mode=WRITE scope=taxon: 2436775 limit=1 retry-of=none
+2026-11-07 14:00:02Z INFO  COUNTS     run=123 Committed: examined=1 created=1 updated=0 unchanged=0 skipped=0 failed=0 new-issues=0
+2026-11-07 14:00:02Z INFO  FINISH     run=123 Completed | duration=2.0s requests=2 retries=0 | reason=BoundedScopeComplete exit=0
+```
+
+These lines are illustrative, not a live import result.
+
+| Environment setting | Default | Purpose |
+|---|---|---|
+| `HowellLog__Directory` | `logs/howell-sync` | Use an absolute writable path for scheduled/container runs |
+| `HowellLog__RetentionDays` | `30` | Delete matching expired log files at startup; range 1–3650 days |
+| `HowellLog__MaxFileBytes` | `10485760` | Rotate into a new numbered segment; range 1 KiB–100 MiB |
+| `Logging__LogLevel__HowellSync` | inherited Information | Set to Debug for per-attempt provider diagnostics |
+
+For example, from the repository root:
+
+```sh
+ls -lt logs/howell-sync/
+# Substitute the filename printed at startup:
+tail -n 100 logs/howell-sync/<filename>.log
+```
+
+Files auto-flush after each line and are owner-readable/writable on Unix. They are
+already excluded by the repository's `logs/` ignore rule. Older segments use the same
+invocation filename stem. Retention is performed when a worker starts, not by a timer;
+it does not delete unrelated files. Mount a persistent volume at the configured directory
+if logs must survive container removal. PostgreSQL run/issue history is independent of
+file retention. Startup stops before catalog work if the log file cannot be opened;
+a later write failure emits an explicit console error and continues console-only so a
+logging-storage problem does not interrupt a catalog transaction. Auto-flush does not
+promise disk durability through host power loss. Log messages are single-line sanitized
+and long individual messages are truncated to fit the configured segment size.
