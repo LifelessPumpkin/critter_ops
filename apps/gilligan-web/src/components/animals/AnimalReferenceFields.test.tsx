@@ -6,7 +6,7 @@ import { fetchAnimalGroups, searchSpecies, searchVariants } from "@/lib/api/anim
 vi.mock("@/lib/api/animalCatalog", () => ({ fetchAnimalGroups: vi.fn(), searchSpecies: vi.fn(), searchVariants: vi.fn() }));
 const dog = { id: 1, commonName: "Dog", scientificName: "Canis lupus familiaris", animalGroupId: 1, animalGroupName: "Mammal", preferredVariantType: "Breed" };
 const python = { id: 4, commonName: "Ball python", scientificName: "Python regius", animalGroupId: 3, animalGroupName: "Reptile", preferredVariantType: "Morph" };
-const empty: AnimalReferences = { animalGroupId: "", animalType: "", species: "", subspeciesOrMorph: "", selectedSpecies: null, selectedVariant: null };
+const empty: AnimalReferences = { animalGroupId: "", animalType: "", species: "", selectedSpecies: null };
 function Harness({ initial = empty }: { initial?: AnimalReferences }) {
   const [value, setValue] = useState(initial);
   return <><AnimalReferenceFields value={value} onChange={setValue} /><output data-testid="value">{JSON.stringify(value)}</output></>;
@@ -30,20 +30,20 @@ describe("adaptive animal references", () => {
     await waitFor(() => expect(searchVariants).toHaveBeenCalledWith("", 1, expect.any(AbortSignal)));
     expect(screen.getByRole("combobox", { name: /^Breed/ })).toBeInTheDocument();
     choose(/^Breed/, /^Poodle/);
-    expect(screen.getByTestId("value")).toHaveTextContent('"selectedVariant":{"id":1');
+    expect(screen.getByTestId("value")).toHaveTextContent('"animalVariantId":1');
     choose(/^Animal Group/, /^Reptile$/);
     expect(screen.getByTestId("value")).toHaveTextContent('"selectedSpecies":null');
-    expect(screen.getByTestId("value")).toHaveTextContent('"selectedVariant":null');
     expect(screen.getByTestId("value")).toHaveTextContent('"species":"Dog"');
-    expect(screen.getByTestId("value")).toHaveTextContent('"subspeciesOrMorph":"Poodle"');
-    expect(screen.getByText(/names were kept as custom values/)).toBeInTheDocument();
+    expect(screen.getByTestId("value")).toHaveTextContent('"displayName":"Poodle"');
+    expect(screen.getByText(/Existing variants are preserved/)).toBeInTheDocument();
   });
-  it("clears variants when species changes", async () => {
-    render(<Harness initial={{ ...empty, species: "Dog", selectedSpecies: dog, selectedVariant: { id: 1, speciesId: 1, name: "Poodle", variantType: "Breed" } }} />);
+  it("preserves variants and requires explicit removal when species changes", async () => {
+    render(<Harness initial={{ ...empty, species: "Dog", selectedSpecies: dog, variantAssignments: [{ animalVariantId: 1, speciesId: 1, displayName: "Poodle", variantType: "Breed", isCustom: false }] }} />);
     await act(async () => {});
     choose(/^Species/, /^Ball python/);
     expect(screen.getByRole("combobox", { name: /^Morph/ })).toBeInTheDocument();
-    expect(screen.getByTestId("value")).toHaveTextContent('"selectedVariant":null');
+    expect(screen.getByRole("alert")).toHaveTextContent("Poodle is incompatible");
+    expect(screen.getByTestId("value")).toHaveTextContent('"animalVariantId":1');
   });
   it("debounces scientific search and ignores out-of-order responses", async () => {
     let finishOld!: (value: Awaited<ReturnType<typeof searchSpecies>>) => void;
@@ -73,7 +73,7 @@ describe("adaptive animal references", () => {
     fireEvent.change(screen.getByRole("searchbox"), { target: { value: "Local morph" } });
     await waitFor(() => expect(screen.getByRole("option", { name: /Use "Local morph"/ })).toBeInTheDocument());
     fireEvent.mouseDown(screen.getByRole("option", { name: /Use "Local morph"/ }));
-    expect(screen.getByTestId("value")).toHaveTextContent('"subspeciesOrMorph":"Local morph"');
+    expect(screen.getByTestId("value")).toHaveTextContent('"customValue":"Local morph"');
   });
 });
 it("supports keyboard selection, Escape, outside dismissal and custom values during pending requests", async () => {
@@ -96,4 +96,17 @@ it("supports keyboard selection, Escape, outside dismissal and custom values dur
   await waitFor(() => expect(screen.getByRole("option", { name: /Use "Slow catalog fallback"/ })).toBeInTheDocument());
   fireEvent.mouseDown(screen.getByRole("option", { name: /Use "Slow catalog fallback"/ }));
   expect(screen.getByTestId("value")).toHaveTextContent('"species":"Slow catalog fallback"');
+});
+
+it("adds mixed assignments, prevents duplicates, edits custom text and removes only one", async () => {
+  render(<Harness initial={{ ...empty, selectedSpecies: dog, species: "Dog", variantAssignments: [{ customValue: "Local Line", displayName: "Local Line", variantType: "Breed", isCustom: true }] }} />);
+  await act(async () => {});
+  choose(/^Breed/, /^Poodle/);
+  choose(/^Breed/, /^Poodle/);
+  expect(screen.getByText("That variant is already selected.")).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText("Custom variant 1"), { target: { value: "Edited Line" } });
+  expect(screen.getByTestId("value")).toHaveTextContent('"customValue":"Edited Line"');
+  fireEvent.click(screen.getByRole("button", { name: "Remove Poodle" }));
+  expect(screen.getByTestId("value")).not.toHaveTextContent('"animalVariantId":1');
+  expect(screen.getByLabelText("Custom variant 1")).toHaveValue("Edited Line");
 });

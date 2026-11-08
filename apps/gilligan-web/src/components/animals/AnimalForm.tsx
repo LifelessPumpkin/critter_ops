@@ -6,14 +6,14 @@ import { Button, ButtonLink, Combobox, Input, Select } from "@/components/ui";
 import { createAnimal, updateAnimal, fetchAnimal } from "@/lib/api/animals";
 import { fetchEnclosure, fetchEnclosures, type Enclosure } from "@/lib/api/enclosures";
 
-import { AnimalReferenceFields, type AnimalReferences } from "./AnimalReferenceFields";
+import { AnimalReferenceFields, assignmentError, type AnimalReferences } from "./AnimalReferenceFields";
 import { animalReturnUrl, clearAnimalDraft, loadAnimalDraft, saveAnimalDraft, validWorkflow } from "./animalDraft";
 
 const statuses = ["Active", "Quarantined", "Medical", "Breeding", "OnHold", "Transferred", "Sold", "Deceased", "Released", "Surrendered", "Inactive"];
 const sexes = ["Male", "Female", "Unknown", "Hermaphrodite", "Mixed", "NotApplicable"];
 
 type FormState = AnimalReferences & { name: string; enclosureId: string; status: string; sex: string; birthDate: string; acquiredDate: string; birthDateIsEstimated: boolean; notes: string; dispositionDate: string; dispositionReason: string; microchipNumber: string; tagIdentifier: string; source: string };
-function initialForm(): FormState { return { name: "", species: "", subspeciesOrMorph: "", enclosureId: "", animalType: "", animalGroupId: "", animalGroupName: "", selectedSpecies: null, selectedVariant: null, status: "Active", sex: "Unknown", birthDate: "", acquiredDate: toLocalDateInputValue(new Date()), birthDateIsEstimated: false, notes: "", dispositionDate: "", dispositionReason: "", microchipNumber: "", tagIdentifier: "", source: "" }; }
+function initialForm(): FormState { return { variantAssignments: [], name: "", species: "", enclosureId: "", animalType: "", animalGroupId: "", animalGroupName: "", selectedSpecies: null, status: "Active", sex: "Unknown", birthDate: "", acquiredDate: toLocalDateInputValue(new Date()), birthDateIsEstimated: false, notes: "", dispositionDate: "", dispositionReason: "", microchipNumber: "", tagIdentifier: "", source: "" }; }
 
 type AnimalFormProps = { workflow?: string; enclosureId?: number; animalId?: number };
 const subscribeHydration = () => () => {};
@@ -59,7 +59,7 @@ function AnimalFormContent({ workflow, enclosureId, animalId }: AnimalFormProps)
     let active = true;
     fetchAnimal(animalId).then((animal) => {
       if (!active) return;
-      const loaded = { ...initialForm(), ...animal, enclosureId: String(animal.enclosureId), animalGroupId: animal.animalGroupId ? String(animal.animalGroupId) : "", species: animal.species, subspeciesOrMorph: animal.subspeciesOrMorph ?? "", birthDate: animal.birthDate ?? "", birthDateIsEstimated: animal.birthDateIsEstimated ?? false, notes: animal.notes ?? "", dispositionDate: animal.dispositionDate ?? "", dispositionReason: animal.dispositionReason ?? "", microchipNumber: animal.microchipNumber ?? "", tagIdentifier: animal.tagIdentifier ?? "", source: animal.source ?? "", selectedSpecies: animal.speciesId ? { id: animal.speciesId, commonName: animal.species, scientificName: animal.speciesScientificName ?? "", animalGroupId: animal.animalGroupId!, animalGroupName: animal.animalGroupName ?? "", preferredVariantType: animal.preferredVariantType ?? null } : null, selectedVariant: animal.animalVariantId ? { id: animal.animalVariantId, speciesId: animal.speciesId!, name: animal.subspeciesOrMorph ?? "", variantType: animal.variantType ?? "Other" } : null };
+      const loaded = { ...initialForm(), ...animal, variantAssignments: animal.variantAssignments ?? [], enclosureId: String(animal.enclosureId), animalGroupId: animal.animalGroupId ? String(animal.animalGroupId) : "", species: animal.species, birthDate: animal.birthDate ?? "", birthDateIsEstimated: animal.birthDateIsEstimated ?? false, notes: animal.notes ?? "", dispositionDate: animal.dispositionDate ?? "", dispositionReason: animal.dispositionReason ?? "", microchipNumber: animal.microchipNumber ?? "", tagIdentifier: animal.tagIdentifier ?? "", source: animal.source ?? "", selectedSpecies: animal.speciesId ? { id: animal.speciesId, commonName: animal.species, scientificName: animal.speciesScientificName ?? "", animalGroupId: animal.animalGroupId!, animalGroupName: animal.animalGroupName ?? "", preferredVariantType: animal.preferredVariantType ?? null } : null };
       setForm(loaded);
       setOriginalReferences(referenceKey(loaded));
     }).catch(() => { if (active) { setError("Unable to load animal for editing."); setAnimalLoadFailed(true); } }).finally(() => { if (active) setLoadingAnimal(false); });
@@ -85,10 +85,12 @@ function AnimalFormContent({ workflow, enclosureId, animalId }: AnimalFormProps)
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!form.name.trim() || form.name.trim().length > 100 || (!animalId && !form.selectedSpecies && !form.species.trim()) || form.species.trim().length > 100 || form.subspeciesOrMorph.trim().length > 100 || !form.enclosureId || !form.acquiredDate) {
+    if (!form.name.trim() || form.name.trim().length > 100 || (!animalId && !form.selectedSpecies && !form.species.trim()) || form.species.trim().length > 100 || !form.enclosureId || !form.acquiredDate) {
       setError("Complete all required fields before creating the animal.");
       return;
     }
+    const variantError = assignmentError(form);
+    if (variantError) { setError(variantError); return; }
     setSubmitting(true);
     try {
       const request = {
@@ -96,12 +98,11 @@ function AnimalFormContent({ workflow, enclosureId, animalId }: AnimalFormProps)
         name: form.name.trim(),
         ...(animalId && referenceKey(form) === originalReferences ? {} : {
           customSpeciesName: form.selectedSpecies ? null : form.species || null,
-          customVariantName: form.selectedVariant ? null : form.subspeciesOrMorph || null,
           animalType: form.animalType || undefined,
           animalGroupId: Number(form.animalGroupId) || null,
           speciesId: form.selectedSpecies?.id ?? null,
-          animalVariantId: form.selectedVariant?.id ?? null,
         }),
+        variantAssignments: (form.variantAssignments ?? []).map(item => ({ assignmentId: item.assignmentId, animalVariantId: item.animalVariantId ?? null, customValue: item.isCustom ? item.customValue : null, ...(item.isCustom ? { variantType: item.variantType } : {}) })),
         notes: form.notes || null,
         dispositionDate: form.dispositionDate || null,
         dispositionReason: form.dispositionReason || null,
@@ -164,5 +165,5 @@ function toLocalDateInputValue(date: Date) {
 
 function referenceKey(form: AnimalReferences) {
   return JSON.stringify([form.animalGroupId, form.animalType, form.selectedSpecies?.id ?? null,
-    form.species, form.selectedVariant?.id ?? null, form.subspeciesOrMorph]);
+    form.species]);
 }

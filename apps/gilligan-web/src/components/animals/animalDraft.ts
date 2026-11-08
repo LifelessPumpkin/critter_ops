@@ -18,8 +18,20 @@ export function loadAnimalDraft<T extends object>(workflow: string | undefined, 
     const result = { ...defaults };
     for (const key of Object.keys(defaults) as (keyof T)[]) {
       const value = draft.form[key];
+      if (key === "variantAssignments" && !Array.isArray(value)) continue;
       if (value === null && defaults[key] === null || typeof value === typeof defaults[key]) result[key] = value;
     }
+    // Upgrade still-valid drafts from the previous single-variant form without losing a selection.
+    if ("variantAssignments" in defaults && !Array.isArray(draft.form.variantAssignments)) {
+      const old = draft.form;
+      const variant = old.selectedVariant;
+      const assignments = variant && typeof variant.id === "number" && typeof variant.name === "string"
+        ? [{ animalVariantId: variant.id, speciesId: variant.speciesId, displayName: variant.name, variantType: variant.variantType ?? "Other", isCustom: false }]
+        : typeof old.subspeciesOrMorph === "string" && old.subspeciesOrMorph.trim()
+          ? [{ customValue: old.subspeciesOrMorph, displayName: old.subspeciesOrMorph, variantType: old.selectedSpecies?.preferredVariantType ?? "Other", isCustom: true }] : [];
+      Object.assign(result, { variantAssignments: assignments });
+    }
+    if ("variantAssignments" in result && Array.isArray(result.variantAssignments) && result.variantAssignments.some(item => !item || typeof item !== "object" || typeof item.displayName !== "string" || typeof item.isCustom !== "boolean" || typeof item.variantType !== "string")) return null;
     return result;
   } catch { return null; }
 }

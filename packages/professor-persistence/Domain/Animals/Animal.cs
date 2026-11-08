@@ -25,7 +25,7 @@ public class Animal
     /// <summary>Permanent custom species when SpeciesId is absent; exact original description on migrated structured records. Never use as structured identity.</summary>
     public required string Species { get; set; }
 
-    /// <summary>Permanent custom variant when AnimalVariantId is absent; exact original description on migrated structured records.</summary>
+    /// <summary>Legacy variant text retained for migration audit. VariantAssignments is authoritative.</summary>
     public string? SubspeciesOrMorph { get; set; }
 
     /// <summary>Preserved operational category, including ambiguous Herptile/Aquatic classifications. AnimalGroupId is authoritative when present.</summary>
@@ -35,6 +35,9 @@ public class Animal
     public AnimalGroup? AnimalGroup { get; set; }
     public int? SpeciesId { get; set; }
     public Species? CatalogSpecies { get; set; }
+    public ICollection<AnimalVariantAssignment> VariantAssignments { get; set; } = [];
+
+    // Legacy snapshot retained for migration audit; assignments are authoritative.
     public int? AnimalVariantId { get; set; }
     public AnimalVariant? AnimalVariant { get; set; }
 

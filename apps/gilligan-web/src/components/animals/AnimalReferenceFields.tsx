@@ -1,17 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Combobox, Select } from "@/components/ui";
+import { Button, Combobox, Input, Select } from "@/components/ui";
 import { fetchAnimalGroups, searchSpecies, searchVariants, type AnimalGroup, type AnimalVariant, type CatalogSpecies } from "@/lib/api/animalCatalog";
 
+import type { VariantAssignment } from "@/lib/api/animals";
+
 export type AnimalReferences = {
+  variantAssignments?: VariantAssignment[];
   animalGroupId: string;
   animalGroupName?: string | null;
   animalType: string;
   species: string;
   selectedSpecies: CatalogSpecies | null;
-  subspeciesOrMorph: string;
-  selectedVariant: AnimalVariant | null;
 };
 
 export function AnimalReferenceFields({ value, onChange }: { value: AnimalReferences; onChange: (value: AnimalReferences) => void }) {
@@ -23,6 +24,8 @@ export function AnimalReferenceFields({ value, onChange }: { value: AnimalRefere
     fetchAnimalGroups(controller.signal).then(setGroups).catch(() => { if (!controller.signal.aborted) setGroupError("Groups unavailable. Continue with a custom species."); });
     return () => controller.abort();
   }, []);
+  const [customType, setCustomType] = useState("");
+  const assignments = value.variantAssignments ?? [];
   const variantLabel = value.selectedSpecies?.preferredVariantType ?? "Variant";
   return <>
     <Select label="Animal Group" value={value.animalGroupId || (value.animalType ? "legacy" : "")} error={groupError} placeholder="Any group" options={[
@@ -34,20 +37,37 @@ export function AnimalReferenceFields({ value, onChange }: { value: AnimalRefere
       if (id === "legacy") return;
       const group = groups.find((item) => String(item.id) === id);
       const incompatible = value.selectedSpecies && id && String(value.selectedSpecies.animalGroupId) !== id;
-      if (incompatible) setReferenceNotice("Species and variant names were kept as custom values after changing the group. Review them before saving.");
-      onChange({ ...value, animalGroupId: id, animalGroupName: group?.name ?? null, animalType: group?.legacyAnimalType ?? "", ...(incompatible ? { selectedSpecies: null, species: value.species || value.selectedSpecies?.commonName || value.selectedSpecies?.scientificName || "", selectedVariant: null, subspeciesOrMorph: value.subspeciesOrMorph || value.selectedVariant?.name || "" } : {}) });
+      if (incompatible) { setReferenceNotice("Choose a compatible species for this group. Existing variants are preserved; remove incompatible variants explicitly."); }
+      onChange({ ...value, animalGroupId: id, animalGroupName: group?.name ?? null, animalType: group?.legacyAnimalType ?? "", ...(incompatible ? { selectedSpecies: null, species: value.species || value.selectedSpecies?.commonName || value.selectedSpecies?.scientificName || "" } : {}) });
     }} />
     {referenceNotice ? <p role="status">{referenceNotice}</p> : null}
     <SpeciesSelector groupId={value.animalGroupId} selected={value.selectedSpecies} custom={value.species} onChange={(selected, custom) => {
-      const changed = (selected?.id ?? null) !== (value.selectedSpecies?.id ?? null) || custom !== value.species;
-      const variantText = value.subspeciesOrMorph || value.selectedVariant?.name || "";
-      if (changed && variantText) setReferenceNotice("The previous variant name was kept as a custom value. Review it for the selected species before saving.");
       onChange({ ...value, selectedSpecies: selected, species: custom,
-        ...(changed ? { selectedVariant: null, subspeciesOrMorph: variantText } : {}),
         ...(selected ? { animalGroupId: String(selected.animalGroupId), animalGroupName: selected.animalGroupName,
           animalType: groups.find((g) => g.id === selected.animalGroupId)?.legacyAnimalType ?? value.animalType } : {}) });
     }} />
-    <VariantSelector key={value.selectedSpecies?.id ?? "custom"} speciesId={value.selectedSpecies?.id} label={variantLabel} selected={value.selectedVariant} custom={value.subspeciesOrMorph} onChange={(selected, custom) => onChange({ ...value, selectedVariant: selected, subspeciesOrMorph: custom })} />
+    <section style={{ gridColumn: "1 / -1", minWidth: 0 }}>
+      <h3>{new Set(assignments.map(x => x.variantType)).size > 1 ? "Variants & Traits" : variantLabel + " assignments"}</h3>
+      <ul style={{ maxHeight: "18rem", overflowY: "auto", overflowWrap: "anywhere" }}>
+        {assignments.map((item, index) => <li key={item.assignmentId ?? index}>
+          {item.isCustom ? <Input label={`Custom variant ${index + 1}`} maxLength={100} value={item.customValue ?? ""} onChange={event => onChange({ ...value, variantAssignments: assignments.map((x, i) => i === index ? { ...x, customValue: event.target.value, displayName: event.target.value } : x) })} /> : item.displayName}
+          {" — "}{item.isCustom ? "Custom " : ""}{item.variantType}
+          {!item.isCustom && item.speciesId !== value.selectedSpecies?.id ? <p role="alert">{item.displayName} is incompatible with the selected species. Remove it or choose its species before saving.</p> : null}
+          <Button type="button" variant="secondary" onClick={() => onChange({ ...value, variantAssignments: assignments.filter((_, i) => i !== index) })}>Remove {item.displayName}</Button>
+        </li>)}
+      </ul>
+      <Select label="Custom variant type" value={customType || variantLabelToType(variantLabel)} options={["Breed", "Morph", "Variety", "Strain", "Mutation", "Subspecies", "Other"].map(type => ({ value: type, label: type }))} onValueChange={setCustomType} />
+      <VariantSelector key={value.selectedSpecies?.id ?? "custom"} speciesId={value.selectedSpecies?.id} label={variantLabel} selected={null} custom="" onChange={(selected, custom) => {
+        if (!selected && !custom) return;
+        const item: VariantAssignment = selected ? { animalVariantId: selected.id, speciesId: selected.speciesId, displayName: selected.name, variantType: selected.variantType, isCustom: false }
+          : { customValue: custom, displayName: custom, variantType: customType || variantLabelToType(variantLabel), isCustom: true };
+        if (assignments.some(x => item.isCustom ? x.isCustom && x.variantType === item.variantType && normalizeVariant(x.customValue ?? "") === normalizeVariant(custom) : x.animalVariantId === item.animalVariantId)) {
+          setReferenceNotice("That variant is already selected."); return;
+        }
+        setReferenceNotice("");
+        onChange({ ...value, variantAssignments: [...assignments, item] });
+      }} />
+    </section>
   </>;
 }
 
@@ -100,4 +120,18 @@ function VariantSelector({ speciesId, label, selected, custom, onChange }: { spe
     else if (id === "use-custom") onChange(null, search.trim());
     else if (id !== "custom") { const item = items.find((x) => String(x.id) === id); if (item) onChange(item, item.name); }
   }} />;
+}
+
+export function normalizeVariant(value: string) { return value.trim().replace(/\s+/g, " ").toLowerCase(); }
+function variantLabelToType(label: string) { return label === "Variant" ? "Other" : label; }
+export function assignmentError(value: AnimalReferences): string | null {
+  const keys = new Set<string>();
+  for (const item of value.variantAssignments ?? []) {
+    if (!item.isCustom && item.speciesId !== value.selectedSpecies?.id) return `Remove incompatible variant ${item.displayName} before saving.`;
+    if (item.isCustom && (!item.customValue?.trim() || item.customValue.length > 100)) return "Custom variants require 1–100 characters.";
+    const key = item.isCustom ? `${item.variantType}:${normalizeVariant(item.customValue ?? "")}` : `id:${item.animalVariantId}`;
+    if (keys.has(key)) return "Duplicate variant assignments are not allowed.";
+    keys.add(key);
+  }
+  return null;
 }

@@ -1,4 +1,16 @@
+export type VariantAssignment = {
+  assignmentId?: number;
+  animalVariantId?: number | null;
+  speciesId?: number | null;
+  displayName: string;
+  customValue?: string | null;
+  variantType: string;
+  isCustom: boolean;
+  displayOrder?: number;
+};
+export type VariantAssignmentRequest = Pick<VariantAssignment, "assignmentId" | "animalVariantId" | "customValue"> & { variantType?: string };
 export type Animal = {
+  variantAssignments?: VariantAssignment[];
   customSpeciesName?: string | null;
   customVariantName?: string | null;
   originalSpeciesText?: string | null;
@@ -32,7 +44,7 @@ export type Animal = {
 
 export type AnimalListItem = Pick<
   Animal,
-  "animalGroupName" | "speciesScientificName" | "id" | "enclosureId" | "enclosureName" | "name" | "species" | "subspeciesOrMorph" | "animalType" | "status" | "sex" | "birthDate"
+  "variantAssignments" | "animalGroupName" | "speciesScientificName" | "id" | "enclosureId" | "enclosureName" | "name" | "species" | "subspeciesOrMorph" | "animalType" | "status" | "sex" | "birthDate"
 > & {
   enclosureLocation: string;
   birthDateIsEstimated: boolean;
@@ -65,6 +77,7 @@ export type AnimalSearchResponse = {
 export const animalPageSize = 40;
 
 export type CreateAnimalRequest = {
+  variantAssignments?: VariantAssignmentRequest[];
   enclosureId: number;
   name: string;
   customSpeciesName?: string | null;

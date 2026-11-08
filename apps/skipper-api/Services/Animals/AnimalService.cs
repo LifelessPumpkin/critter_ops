@@ -64,6 +64,14 @@ public class AnimalService : IAnimalService
             .Take(pageSize)
             .Select(animal => new AnimalListItemDto
             {
+                VariantAssignments = animal.VariantAssignments.OrderBy(x => x.DisplayOrder).ThenBy(x => x.Id).Select(x => new VariantAssignmentDto {
+                    AssignmentId = x.Id, AnimalVariantId = x.AnimalVariantId,
+                    SpeciesId = x.AnimalVariant != null ? x.AnimalVariant.SpeciesId : null,
+                    DisplayName = x.AnimalVariant != null ? x.AnimalVariant.Name : x.CustomValue!,
+                    CustomValue = x.CustomValue, IsCustom = x.AnimalVariantId == null,
+                    VariantType = x.AnimalVariant != null ? x.AnimalVariant.VariantType : x.VariantType!.Value,
+                    DisplayOrder = x.DisplayOrder
+                }).ToList(),
                 Id = animal.Id,
                 EnclosureId = animal.EnclosureId,
                 EnclosureName = animal.Enclosure.Name,
@@ -73,15 +81,15 @@ public class AnimalService : IAnimalService
                 AnimalGroupId = animal.AnimalGroupId,
                 AnimalGroupName = animal.AnimalGroup != null ? animal.AnimalGroup.Name : animal.AnimalType.ToString(),
                 CustomSpeciesName = animal.SpeciesId == null ? animal.Species : null,
-                CustomVariantName = animal.AnimalVariantId == null ? animal.SubspeciesOrMorph : null,
+                CustomVariantName = animal.VariantAssignments.OrderBy(x => x.DisplayOrder).Select(x => x.CustomValue).FirstOrDefault(),
                 OriginalSpeciesText = animal.Species,
                 OriginalVariantText = animal.SubspeciesOrMorph,
                 SpeciesId = animal.SpeciesId,
                 SpeciesScientificName = animal.CatalogSpecies != null ? animal.CatalogSpecies.ScientificName : null,
-                AnimalVariantId = animal.AnimalVariantId,
-                VariantType = animal.AnimalVariant != null ? animal.AnimalVariant.VariantType : null,
+                AnimalVariantId = animal.VariantAssignments.OrderBy(x => x.DisplayOrder).Select(x => x.AnimalVariantId).FirstOrDefault(),
+                VariantType = animal.VariantAssignments.OrderBy(x => x.DisplayOrder).Select(x => x.AnimalVariant != null ? (VariantType?)x.AnimalVariant.VariantType : x.VariantType).FirstOrDefault(),
                 PreferredVariantType = animal.CatalogSpecies != null ? animal.CatalogSpecies.PreferredVariantType : null,
-                SubspeciesOrMorph = animal.AnimalVariant != null ? animal.AnimalVariant.Name : animal.SubspeciesOrMorph,
+                SubspeciesOrMorph = animal.VariantAssignments.OrderBy(x => x.DisplayOrder).Select(x => x.AnimalVariant != null ? x.AnimalVariant.Name : x.CustomValue).FirstOrDefault(),
                 AnimalType = animal.AnimalType,
                 Status = animal.Status,
                 Sex = animal.Sex,
@@ -163,11 +171,15 @@ public class AnimalService : IAnimalService
             return CreateAnimalResult.EnclosureNotFound();
         }
 
+        if (request.VariantAssignments != null && (request.AnimalVariantId != null || request.CustomVariantName != null))
+            return CreateAnimalResult.InvalidReference("Use variantAssignments without legacy variant fields.");
         if (request.SpeciesId.HasValue && request.CustomSpeciesName != null || request.AnimalVariantId.HasValue && request.CustomVariantName != null)
             return CreateAnimalResult.InvalidReference("Choose either structured or custom references.");
         var reference = await ResolveReferences(request.AnimalGroupId, request.SpeciesId, request.AnimalVariantId,
             request.CustomSpeciesName, request.CustomVariantName, request.AnimalType, cancellationToken);
         if (reference.Error is {} error) return CreateAnimalResult.InvalidReference(error);
+        var assignments = await ResolveAssignments(request.VariantAssignments ?? LegacyAssignments(request.AnimalVariantId, request.CustomVariantName), reference.Species, null, cancellationToken);
+        if (assignments.Error != null) return CreateAnimalResult.InvalidReference(assignments.Error);
         var now = DateTime.UtcNow;
         var animal = new Animal
         {
@@ -176,9 +188,9 @@ public class AnimalService : IAnimalService
             Name = request.Name!,
             AnimalGroupId = reference.Group?.Id,
             SpeciesId = reference.Species?.Id,
-            AnimalVariantId = reference.Variant?.Id,
+            AnimalVariantId = null,
             Species = reference.Species != null ? "" : request.CustomSpeciesName!,
-            SubspeciesOrMorph = reference.Variant != null ? null : request.CustomVariantName,
+            SubspeciesOrMorph = null,
             AnimalType = reference.Group?.LegacyAnimalType ?? request.AnimalType ?? AnimalType.Other,
             Status = request.Status!.Value,
             Sex = request.Sex!.Value,
@@ -197,12 +209,13 @@ public class AnimalService : IAnimalService
 
         animal.AnimalGroup = reference.Group;
         animal.CatalogSpecies = reference.Species;
-        animal.AnimalVariant = reference.Variant;
+
+        ApplyAssignments(animal, assignments.Items!);
         _dbContext.Animals.Add(animal);
         try { await _dbContext.SaveChangesAsync(cancellationToken); }
-        catch (DbUpdateException exception) when (exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.ForeignKeyViolation })
+        catch (DbUpdateException exception) when (exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.ForeignKeyViolation or PostgresErrorCodes.UniqueViolation or PostgresErrorCodes.CheckViolation })
         {
-            return CreateAnimalResult.InvalidReference("A selected enclosure or catalog reference is no longer available. Refresh the selection and try again.");
+            return CreateAnimalResult.InvalidReference("The selection conflicts with current database values (duplicate assignment or unavailable reference). Refresh and try again.");
         }
 
         return CreateAnimalResult.Created(ToResponseDto(animal, enclosureName));
@@ -213,7 +226,7 @@ public class AnimalService : IAnimalService
         UpdateAnimalRequestDto request,
         CancellationToken cancellationToken = default)
     {
-        var animal = await _dbContext.Animals
+        var animal = await _dbContext.Animals.Include(x => x.VariantAssignments).ThenInclude(x => x.AnimalVariant)
             .SingleOrDefaultAsync(animal => animal.Id == id, cancellationToken);
 
         if (animal is null)
@@ -236,32 +249,28 @@ public class AnimalService : IAnimalService
             return UpdateAnimalResult.EnclosureNotFound();
         }
 
-        var referencesSpecified = request.AnimalGroupIdSpecified || request.SpeciesIdSpecified || request.AnimalVariantIdSpecified
-            || request.CustomSpeciesNameSpecified || request.CustomVariantNameSpecified || request.AnimalType.HasValue;
-        if (referencesSpecified)
-        {
-            var speciesId = request.SpeciesIdSpecified ? request.SpeciesId : animal.SpeciesId;
-            var variantId = request.AnimalVariantIdSpecified ? request.AnimalVariantId : animal.AnimalVariantId;
-            if (speciesId.HasValue && request.CustomSpeciesName != null || variantId.HasValue && request.CustomVariantName != null)
-                return UpdateAnimalResult.InvalidReference("Clear the structured reference before providing a custom value.");
-            var groupId = request.AnimalGroupIdSpecified ? request.AnimalGroupId : animal.AnimalGroupId;
-            var customSpecies = request.CustomSpeciesNameSpecified ? request.CustomSpeciesName : (speciesId == null ? animal.Species : null);
-            var customVariant = request.CustomVariantNameSpecified ? request.CustomVariantName : (variantId == null ? animal.SubspeciesOrMorph : null);
-            var reference = await ResolveReferences(groupId, speciesId, variantId,
-                customSpecies, customVariant, request.AnimalType, cancellationToken, animal);
-            if (reference.Error is {} error) return UpdateAnimalResult.InvalidReference(error);
-            // An unchanged structured selection must not overwrite preserved historical text.
-            if (speciesId != animal.SpeciesId || speciesId == null) animal.Species = speciesId != null ? "" : customSpecies!;
-            if (variantId != animal.AnimalVariantId || variantId == null) animal.SubspeciesOrMorph = variantId != null ? null : customVariant;
-            // A variant-only edit must not reclassify an ambiguous operational group.
-            var resolvedGroupId = request.AnimalGroupIdSpecified || speciesId != animal.SpeciesId
-                ? reference.Group?.Id : animal.AnimalGroupId;
-            var groupChanged = animal.AnimalGroupId != resolvedGroupId;
-            animal.AnimalGroupId = resolvedGroupId;
-            animal.SpeciesId = reference.Species?.Id;
-            animal.AnimalVariantId = reference.Variant?.Id;
-            animal.AnimalType = request.AnimalType ?? (request.AnimalGroupIdSpecified && groupChanged ? reference.Group?.LegacyAnimalType : null) ?? animal.AnimalType;
-        }
+        var speciesId = request.SpeciesIdSpecified ? request.SpeciesId : animal.SpeciesId;
+        var groupId = request.AnimalGroupIdSpecified ? request.AnimalGroupId : animal.AnimalGroupId;
+        var customSpecies = request.CustomSpeciesNameSpecified ? request.CustomSpeciesName : (speciesId == null ? animal.Species : null);
+        if (speciesId.HasValue && request.CustomSpeciesName != null)
+            return UpdateAnimalResult.InvalidReference("Clear the structured species before providing a custom value.");
+        var reference = await ResolveReferences(groupId, speciesId, null, customSpecies, null, request.AnimalType, cancellationToken, animal);
+        if (reference.Error != null) return UpdateAnimalResult.InvalidReference(reference.Error);
+        if (request.VariantAssignments != null && (request.AnimalVariantIdSpecified || request.CustomVariantNameSpecified))
+            return UpdateAnimalResult.InvalidReference("Use variantAssignments without legacy variant fields.");
+        var supplied = request.VariantAssignments ?? (request.AnimalVariantIdSpecified || request.CustomVariantNameSpecified
+            ? LegacyAssignments(request.AnimalVariantId, request.CustomVariantName)
+            : animal.VariantAssignments.Select(x => new VariantAssignmentRequestDto { AssignmentId = x.Id, AnimalVariantId = x.AnimalVariantId, CustomValue = x.CustomValue, VariantType = x.VariantType }).ToList());
+        var assignments = await ResolveAssignments(supplied, reference.Species, animal, cancellationToken);
+        if (assignments.Error != null) return UpdateAnimalResult.InvalidReference(assignments.Error);
+        // All validation precedes mutations; SaveChanges commits the aggregate atomically.
+        if (speciesId != animal.SpeciesId || speciesId == null) animal.Species = speciesId != null ? "" : customSpecies!;
+        var resolvedGroupId = request.AnimalGroupIdSpecified || speciesId != animal.SpeciesId ? reference.Group?.Id : animal.AnimalGroupId;
+        var groupChanged = animal.AnimalGroupId != resolvedGroupId;
+        animal.AnimalGroupId = resolvedGroupId;
+        animal.SpeciesId = speciesId;
+        animal.AnimalType = request.AnimalType ?? (request.AnimalGroupIdSpecified && groupChanged ? reference.Group?.LegacyAnimalType : null) ?? animal.AnimalType;
+        ApplyAssignments(animal, assignments.Items!);
         animal.EnclosureId = enclosureId;
         animal.Name = request.Name!;
         animal.Status = request.Status!.Value;
@@ -278,9 +287,9 @@ public class AnimalService : IAnimalService
         animal.UpdatedAt = DateTime.UtcNow;
 
         try { await _dbContext.SaveChangesAsync(cancellationToken); }
-        catch (DbUpdateException exception) when (exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.ForeignKeyViolation })
+        catch (DbUpdateException exception) when (exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.ForeignKeyViolation or PostgresErrorCodes.UniqueViolation or PostgresErrorCodes.CheckViolation })
         {
-            return UpdateAnimalResult.InvalidReference("A selected enclosure or catalog reference is no longer available. Refresh the selection and try again.");
+            return UpdateAnimalResult.InvalidReference("The selection conflicts with current database values (duplicate assignment or unavailable reference). Refresh and try again.");
         }
 
         return UpdateAnimalResult.Updated((await GetByIdAsync(animal.Id, cancellationToken))!);
@@ -288,7 +297,7 @@ public class AnimalService : IAnimalService
 
     public async Task<DeleteAnimalResult> DeleteAsync(int id, CancellationToken cancellationToken = default)
     {
-        var animal = await _dbContext.Animals
+        var animal = await _dbContext.Animals.Include(x => x.VariantAssignments).ThenInclude(x => x.AnimalVariant)
             .SingleOrDefaultAsync(animal => animal.Id == id, cancellationToken);
 
         if (animal is null)
@@ -300,6 +309,71 @@ public class AnimalService : IAnimalService
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return DeleteAnimalResult.Deleted;
+    }
+
+    private static List<VariantAssignmentRequestDto> LegacyAssignments(int? id, string? custom) =>
+        id != null || custom != null ? [new() { AnimalVariantId = id, CustomValue = custom }] : [];
+
+    private static string Normalize(string value) => System.Text.RegularExpressions.Regex.Replace(value.Trim(), @"\s+", " ").ToLowerInvariant();
+
+    private async Task<(List<AnimalVariantAssignment>? Items, string? Error)> ResolveAssignments(
+        List<VariantAssignmentRequestDto> requests, Species? species, Animal? existing, CancellationToken ct)
+    {
+        var ids = requests.Where(x => x != null && x.AnimalVariantId.HasValue).Select(x => x.AnimalVariantId!.Value).Distinct().ToList();
+        var catalog = await _dbContext.AnimalVariants.Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id, ct);
+        var result = new List<AnimalVariantAssignment>();
+        var keys = new HashSet<string>();
+        var assignmentIds = new HashSet<int>();
+        foreach (var request in requests)
+        {
+            if (request == null) return (null, "Assignments cannot contain null entries.");
+            if (request.AssignmentId is {} id && (id <= 0 || !assignmentIds.Add(id) || existing == null || !existing.VariantAssignments.Any(x => x.Id == id)))
+                return (null, "Assignment ID is duplicated or does not belong to this animal.");
+            if (request.AnimalVariantId.HasValue == (request.CustomValue != null))
+                return (null, "Each assignment requires exactly one catalog variant or custom value.");
+            AnimalVariant? variant = null;
+            var type = request.VariantType ?? species?.PreferredVariantType ?? VariantType.Other;
+            if (request.AnimalVariantId is {} variantId)
+            {
+                if (!catalog.TryGetValue(variantId, out variant) || (!variant.IsActive && !(existing?.VariantAssignments.Any(x => x.AnimalVariantId == variantId) ?? false)))
+                    return (null, $"Variant {variantId} is unavailable for new selection.");
+                if (species == null || variant.SpeciesId != species.Id)
+                    return (null, $"Variant '{variant.Name}' ({variantId}) is incompatible with the selected species. Explicitly remove or replace it.");
+                if (request.VariantType != null && request.VariantType != variant.VariantType)
+                    return (null, "Structured variant type must match the catalog.");
+            }
+            else if (string.IsNullOrWhiteSpace(request.CustomValue) || request.CustomValue.Length > 100 || !Enum.IsDefined(type))
+                return (null, "Custom variants require 1–100 characters and a valid variant type.");
+            var key = variant != null ? $"id:{variant.Id}" : $"custom:{type}:{Normalize(request.CustomValue!)}";
+            if (!keys.Add(key)) return (null, "Duplicate variant assignments are not allowed (custom values ignore case and repeated whitespace within a type).");
+            var retained = request.AssignmentId.HasValue ? existing?.VariantAssignments.Single(x => x.Id == request.AssignmentId)
+                : existing?.VariantAssignments.FirstOrDefault(x => variant != null ? x.AnimalVariantId == variant.Id : x.AnimalVariantId == null && x.VariantType == type && Normalize(x.CustomValue!) == Normalize(request.CustomValue!));
+            if (retained != null && result.Any(x => x.Id == retained.Id))
+                return (null, "An existing assignment cannot be used twice in a replacement collection.");
+            result.Add(new() { Id = retained?.Id ?? 0, AnimalVariantId = variant?.Id, AnimalVariant = variant,
+                CustomValue = request.CustomValue, VariantType = variant != null ? null : type, DisplayOrder = result.Count,
+                CreatedAt = retained?.CreatedAt ?? DateTime.UtcNow, UpdatedAt = DateTime.UtcNow });
+        }
+        return (result, null);
+    }
+
+    private void ApplyAssignments(Animal animal, List<AnimalVariantAssignment> desired)
+    {
+        foreach (var removed in animal.VariantAssignments.Where(x => !desired.Any(y => y.Id != 0 && y.Id == x.Id)).ToList())
+        {
+            animal.VariantAssignments.Remove(removed);
+            _dbContext.AnimalVariantAssignments.Remove(removed);
+        }
+        foreach (var value in desired)
+        {
+            var current = value.Id == 0 ? null : animal.VariantAssignments.Single(x => x.Id == value.Id);
+            if (current == null) animal.VariantAssignments.Add(value);
+            else {
+                current.AnimalVariantId = value.AnimalVariantId; current.AnimalVariant = value.AnimalVariant;
+                current.CustomValue = value.CustomValue; current.VariantType = value.VariantType;
+                current.DisplayOrder = value.DisplayOrder; current.UpdatedAt = value.UpdatedAt;
+            }
+        }
     }
 
     private record References(AnimalGroup? Group = null, Species? Species = null, AnimalVariant? Variant = null, string? Error = null);
@@ -336,7 +410,15 @@ public class AnimalService : IAnimalService
     private static readonly Expression<Func<Animal, AnimalResponseDto>> ToResponseDtoProjection = animal =>
         new AnimalResponseDto
         {
-            Id = animal.Id,
+            VariantAssignments = animal.VariantAssignments.OrderBy(x => x.DisplayOrder).ThenBy(x => x.Id).Select(x => new VariantAssignmentDto {
+                    AssignmentId = x.Id, AnimalVariantId = x.AnimalVariantId,
+                    SpeciesId = x.AnimalVariant != null ? x.AnimalVariant.SpeciesId : null,
+                    DisplayName = x.AnimalVariant != null ? x.AnimalVariant.Name : x.CustomValue!,
+                    CustomValue = x.CustomValue, IsCustom = x.AnimalVariantId == null,
+                    VariantType = x.AnimalVariant != null ? x.AnimalVariant.VariantType : x.VariantType!.Value,
+                    DisplayOrder = x.DisplayOrder
+                }).ToList(),
+                Id = animal.Id,
             EnclosureId = animal.EnclosureId,
             EnclosureName = animal.Enclosure.Name,
             Name = animal.Name,
@@ -344,15 +426,15 @@ public class AnimalService : IAnimalService
             AnimalGroupId = animal.AnimalGroupId,
             AnimalGroupName = animal.AnimalGroup != null ? animal.AnimalGroup.Name : animal.AnimalType.ToString(),
             CustomSpeciesName = animal.SpeciesId == null ? animal.Species : null,
-            CustomVariantName = animal.AnimalVariantId == null ? animal.SubspeciesOrMorph : null,
+            CustomVariantName = animal.VariantAssignments.OrderBy(x => x.DisplayOrder).Select(x => x.CustomValue).FirstOrDefault(),
             OriginalSpeciesText = animal.Species,
             OriginalVariantText = animal.SubspeciesOrMorph,
             SpeciesId = animal.SpeciesId,
             SpeciesScientificName = animal.CatalogSpecies != null ? animal.CatalogSpecies.ScientificName : null,
-            AnimalVariantId = animal.AnimalVariantId,
-            VariantType = animal.AnimalVariant != null ? animal.AnimalVariant.VariantType : null,
+            AnimalVariantId = animal.VariantAssignments.OrderBy(x => x.DisplayOrder).Select(x => x.AnimalVariantId).FirstOrDefault(),
+            VariantType = animal.VariantAssignments.OrderBy(x => x.DisplayOrder).Select(x => x.AnimalVariant != null ? (VariantType?)x.AnimalVariant.VariantType : x.VariantType).FirstOrDefault(),
             PreferredVariantType = animal.CatalogSpecies != null ? animal.CatalogSpecies.PreferredVariantType : null,
-            SubspeciesOrMorph = animal.AnimalVariant != null ? animal.AnimalVariant.Name : animal.SubspeciesOrMorph,
+            SubspeciesOrMorph = animal.VariantAssignments.OrderBy(x => x.DisplayOrder).Select(x => x.AnimalVariant != null ? x.AnimalVariant.Name : x.CustomValue).FirstOrDefault(),
             AnimalType = animal.AnimalType,
             Status = animal.Status,
             Sex = animal.Sex,
@@ -373,7 +455,15 @@ public class AnimalService : IAnimalService
     {
         return new AnimalResponseDto
         {
-            Id = animal.Id,
+            VariantAssignments = animal.VariantAssignments.OrderBy(x => x.DisplayOrder).ThenBy(x => x.Id).Select(x => new VariantAssignmentDto {
+                    AssignmentId = x.Id, AnimalVariantId = x.AnimalVariantId,
+                    SpeciesId = x.AnimalVariant != null ? x.AnimalVariant.SpeciesId : null,
+                    DisplayName = x.AnimalVariant != null ? x.AnimalVariant.Name : x.CustomValue!,
+                    CustomValue = x.CustomValue, IsCustom = x.AnimalVariantId == null,
+                    VariantType = x.AnimalVariant != null ? x.AnimalVariant.VariantType : x.VariantType!.Value,
+                    DisplayOrder = x.DisplayOrder
+                }).ToList(),
+                Id = animal.Id,
             EnclosureId = animal.EnclosureId,
             EnclosureName = enclosureName,
             Name = animal.Name,
@@ -381,15 +471,15 @@ public class AnimalService : IAnimalService
             AnimalGroupId = animal.AnimalGroupId,
             AnimalGroupName = animal.AnimalGroup != null ? animal.AnimalGroup.Name : animal.AnimalType.ToString(),
             CustomSpeciesName = animal.SpeciesId == null ? animal.Species : null,
-            CustomVariantName = animal.AnimalVariantId == null ? animal.SubspeciesOrMorph : null,
+            CustomVariantName = animal.VariantAssignments.OrderBy(x => x.DisplayOrder).Select(x => x.CustomValue).FirstOrDefault(),
             OriginalSpeciesText = animal.Species,
             OriginalVariantText = animal.SubspeciesOrMorph,
             SpeciesId = animal.SpeciesId,
             SpeciesScientificName = animal.CatalogSpecies != null ? animal.CatalogSpecies.ScientificName : null,
-            AnimalVariantId = animal.AnimalVariantId,
-            VariantType = animal.AnimalVariant != null ? animal.AnimalVariant.VariantType : null,
+            AnimalVariantId = animal.VariantAssignments.OrderBy(x => x.DisplayOrder).Select(x => x.AnimalVariantId).FirstOrDefault(),
+            VariantType = animal.VariantAssignments.OrderBy(x => x.DisplayOrder).Select(x => x.AnimalVariant != null ? (VariantType?)x.AnimalVariant.VariantType : x.VariantType).FirstOrDefault(),
             PreferredVariantType = animal.CatalogSpecies != null ? animal.CatalogSpecies.PreferredVariantType : null,
-            SubspeciesOrMorph = animal.AnimalVariant != null ? animal.AnimalVariant.Name : animal.SubspeciesOrMorph,
+            SubspeciesOrMorph = animal.VariantAssignments.OrderBy(x => x.DisplayOrder).Select(x => x.AnimalVariant != null ? x.AnimalVariant.Name : x.CustomValue).FirstOrDefault(),
             AnimalType = animal.AnimalType,
             Status = animal.Status,
             Sex = animal.Sex,
