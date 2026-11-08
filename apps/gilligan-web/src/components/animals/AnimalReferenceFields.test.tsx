@@ -23,7 +23,7 @@ describe("adaptive animal references", () => {
     render(<Harness />);
     await waitFor(() => expect(searchSpecies).toHaveBeenCalledWith("", undefined, expect.any(AbortSignal)));
     await waitFor(() => expect(screen.queryByText("Loading options…")).not.toBeInTheDocument());
-    choose(/^Animal Group/, /^Mammal$/);
+    choose(/^Animal Category/, /^Mammal$/);
     await waitFor(() => expect(searchSpecies).toHaveBeenCalledWith("", 1, expect.any(AbortSignal)));
     await act(async () => {});
     choose(/^Species/, /^Dog · Canis/);
@@ -31,18 +31,16 @@ describe("adaptive animal references", () => {
     expect(screen.getByRole("combobox", { name: /^Breed/ })).toBeInTheDocument();
     choose(/^Breed/, /^Poodle/);
     expect(screen.getByTestId("value")).toHaveTextContent('"animalVariantId":1');
-    choose(/^Animal Group/, /^Reptile$/);
-    expect(screen.getByTestId("value")).toHaveTextContent('"selectedSpecies":null');
-    expect(screen.getByTestId("value")).toHaveTextContent('"species":"Dog"');
-    expect(screen.getByTestId("value")).toHaveTextContent('"displayName":"Poodle"');
-    expect(screen.getByText(/Existing variants are preserved/)).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: /^Animal Category/ })).toBeDisabled();
+    expect(screen.getByRole("combobox", { name: /^Animal Category/ })).toHaveTextContent("Mammal");
+    expect(screen.queryByText("Custom variant type")).not.toBeInTheDocument();
   });
   it("preserves variants and requires explicit removal when species changes", async () => {
     render(<Harness initial={{ ...empty, species: "Dog", selectedSpecies: dog, variantAssignments: [{ animalVariantId: 1, speciesId: 1, displayName: "Poodle", variantType: "Breed", isCustom: false }] }} />);
     await act(async () => {});
     choose(/^Species/, /^Ball python/);
     expect(screen.getByRole("combobox", { name: /^Morph/ })).toBeInTheDocument();
-    expect(screen.getByRole("alert")).toHaveTextContent("Poodle is incompatible");
+    expect(screen.getByText("Incompatible with selected species")).toBeInTheDocument();
     expect(screen.getByTestId("value")).toHaveTextContent('"animalVariantId":1');
   });
   it("debounces scientific search and ignores out-of-order responses", async () => {
@@ -71,8 +69,8 @@ describe("adaptive animal references", () => {
     expect(screen.getByTestId("value")).toHaveTextContent('"selectedSpecies":null');
     fireEvent.click(screen.getByRole("combobox", { name: /^Variant/ }));
     fireEvent.change(screen.getByRole("searchbox"), { target: { value: "Local morph" } });
-    await waitFor(() => expect(screen.getByRole("option", { name: /Use "Local morph"/ })).toBeInTheDocument());
-    fireEvent.mouseDown(screen.getByRole("option", { name: /Use "Local morph"/ }));
+    await waitFor(() => expect(screen.getByRole("option", { name: /Add "Local morph"/ })).toBeInTheDocument());
+    fireEvent.mouseDown(screen.getByRole("option", { name: /Add "Local morph"/ }));
     expect(screen.getByTestId("value")).toHaveTextContent('"customValue":"Local morph"');
   });
 });
@@ -103,10 +101,62 @@ it("adds mixed assignments, prevents duplicates, edits custom text and removes o
   await act(async () => {});
   choose(/^Breed/, /^Poodle/);
   choose(/^Breed/, /^Poodle/);
-  expect(screen.getByText("That variant is already selected.")).toBeInTheDocument();
-  fireEvent.change(screen.getByLabelText("Custom variant 1"), { target: { value: "Edited Line" } });
+  expect(screen.getByRole("option", { name: "Poodle — Selected" })).toHaveAttribute("aria-disabled", "true");
+  fireEvent.keyDown(screen.getByRole("searchbox"), { key: "Escape" });
+  fireEvent.click(screen.getByRole("button", { name: "Edit Local Line" }));
+  fireEvent.change(screen.getByLabelText("Edit selected value"), { target: { value: "Edited Line" } });
+  fireEvent.click(screen.getByRole("button", { name: "Save value" }));
   expect(screen.getByTestId("value")).toHaveTextContent('"customValue":"Edited Line"');
   fireEvent.click(screen.getByRole("button", { name: "Remove Poodle" }));
   expect(screen.getByTestId("value")).not.toHaveTextContent('"animalVariantId":1');
-  expect(screen.getByLabelText("Custom variant 1")).toHaveValue("Edited Line");
+  expect(screen.getByRole("button", { name: "Edit Edited Line" })).toBeInTheDocument();
+});
+
+it.each([null, "UnknownType", "Other"])("falls back to Variant for preference %s", async preference => {
+  render(<Harness initial={{ ...empty, selectedSpecies: { ...dog, preferredVariantType: preference } }} />);
+  await act(async () => {});
+  expect(screen.getByRole("combobox", { name: /^Variant/ })).toBeInTheDocument();
+});
+it("uses species preference for new custom values and preserves historical types", async () => {
+  render(<Harness initial={{ ...empty, selectedSpecies: dog, variantAssignments: [{ assignmentId: 9, customValue: "Historical", displayName: "Historical", variantType: "Strain", isCustom: true }] }} />);
+  await act(async () => {});
+  fireEvent.click(screen.getByRole("combobox", { name: /^Breed/ }));
+  fireEvent.change(screen.getByRole("searchbox"), { target: { value: "Local breed" } });
+  await waitFor(() => expect(screen.getByRole("option", { name: 'Add "Local breed" as a custom breed' })).toBeInTheDocument());
+  fireEvent.keyDown(screen.getByRole("searchbox"), { key: "End" });
+  fireEvent.mouseDown(screen.getByRole("option", { name: 'Add "Local breed" as a custom breed' }));
+  expect(screen.getByTestId("value")).toHaveTextContent('"variantType":"Breed"');
+  fireEvent.click(screen.getByRole("button", { name: "Edit Historical" }));
+  fireEvent.change(screen.getByLabelText("Edit selected value"), { target: { value: "Historical edited" } });
+  fireEvent.keyDown(screen.getByLabelText("Edit selected value"), { key: "Enter" });
+  expect(screen.getByTestId("value")).toHaveTextContent('"assignmentId":9,"customValue":"Historical edited","displayName":"Historical edited","variantType":"Strain"');
+});
+it("shows normalized custom duplicate feedback beside the selector and allows manual custom-species category", async () => {
+  render(<Harness initial={{ ...empty, species: "Hybrid", variantAssignments: [{ customValue: "Local  Line", displayName: "Local Line", variantType: "Other", isCustom: true }] }} />);
+  await act(async () => {});
+  choose(/^Animal Category/, /^Reptile$/);
+  expect(screen.getByTestId("value")).toHaveTextContent('"animalGroupId":"3"');
+  fireEvent.click(screen.getByRole("combobox", { name: /^Variant/ }));
+  fireEvent.change(screen.getByRole("searchbox"), { target: { value: " local line " } });
+  await waitFor(() => expect(screen.getByRole("option", { name: /Add "local line"/ })).toBeInTheDocument());
+  fireEvent.mouseDown(screen.getByRole("option", { name: /Add "local line"/ }));
+  expect(screen.getByText("That value is already selected.").closest(".animal-variant-picker")).not.toBeNull();
+  expect(screen.getAllByRole("button", { name: /^Remove / })).toHaveLength(1);
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+});
+it("selects multiple catalog values by keyboard and keeps custom values on species change", async () => {
+  vi.mocked(searchVariants).mockResolvedValue({ items: [{ id: 1, speciesId: 1, name: "Poodle", variantType: "Breed" }, { id: 2, speciesId: 1, name: "Labrador", variantType: "Breed" }], page: 1, pageSize: 20, hasMore: false });
+  render(<Harness initial={{ ...empty, selectedSpecies: dog, variantAssignments: [{ customValue: "Line", displayName: "Line", variantType: "Strain", isCustom: true }] }} />);
+  await act(async () => {});
+  for (const name of ["Poodle", "Labrador"]) {
+    fireEvent.keyDown(screen.getByRole("combobox", { name: /^Breed/ }), { key: "Enter" });
+    fireEvent.keyDown(screen.getByRole("searchbox"), { key: "Enter" });
+    expect(screen.getByRole("button", { name: `Remove ${name}` })).toBeInTheDocument();
+  }
+  choose(/^Species/, /^Ball python/);
+  expect(screen.getByRole("button", { name: "Edit Line" })).toBeInTheDocument();
+  expect(screen.getAllByText("Incompatible with selected species")).toHaveLength(2);
+  screen.getByRole("button", { name: "Remove Poodle" }).focus();
+  fireEvent.click(screen.getByRole("button", { name: "Remove Poodle" }));
+  await waitFor(() => expect(screen.getByRole("combobox", { name: /^Morph/ })).toHaveFocus());
 });

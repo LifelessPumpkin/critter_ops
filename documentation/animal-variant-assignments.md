@@ -61,7 +61,13 @@ FROM "AnimalVariantAssignmentMigrationAudit";
 
 ## Gilligan
 
-Add and Edit share the existing form and Ginger controls. Selecting a search result or custom value appends an assignment. A scrollable selected list supports individual removal and inline custom text editing. Custom entry has an explicit type selector; labels follow species preferences and mixed types use “Variants & Traits.” Species/group changes retain assignments and display incompatibility errors until the user explicitly resolves them. Submission checks duplicates and compatibility; API errors remain visible without clearing the form.
+Add and Edit share one full-width searchable selector using the existing Ginger combobox. Selecting a catalog result or “Add … as a custom …” appends a compact removable chip. Already-selected catalog results are disabled; equivalent custom values receive contextual feedback. Click a custom chip to edit its text, then save or cancel; its assignment ID and stored type are retained.
+
+“Animal Category” is the user-facing term for AnimalGroup. Structured species determine and lock the category; select a different species to change it. Species search is unrestricted once a structured species is selected, while a manually selected category filters custom/new-species searches. Custom species allow manual category selection. The selector label and new custom type come from Species.PreferredVariantType. Missing, unknown or Other preferences use “Variant” with type Other. Historical types never change merely because the preferred type changes. No type dropdown or advanced characteristics section is exposed.
+
+Species changes preserve every selection. Incompatible chips are marked and a blocking red banner above Animal Details names the affected values. Required-field errors appear beside their fields and summarize in that banner. API errors use the same banner and can be dismissed. Duplicate, empty-search and catalog-failure feedback stays beside the selector. Chips wrap on small screens and use keyboard-accessible edit/remove buttons; removal returns focus to search. Below 600px, animal forms use a horizontal navigation row above the editor to preserve usable form width.
+
+Howell Sync follow-up: populate Species.PreferredVariantType through future classification rules. This frontend consumes that metadata without hardcoded species rules or GBIF calls. No importer or scheduling changes are included.
 
 Detail displays all assignments and custom/type metadata, including inactive catalog values. The list displays two names plus an overflow count, with a full tooltip and detail link. Draft storage preserves the array, type, IDs and order across enclosure creation and restores the actual enclosure ID. Still-valid old drafts are upgraded from their single selection; malformed collection entries are rejected.
 

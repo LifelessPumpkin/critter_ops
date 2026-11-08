@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore, type FormEvent } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Button, ButtonLink, Combobox, Input, Select } from "@/components/ui";
 import { createAnimal, updateAnimal, fetchAnimal } from "@/lib/api/animals";
@@ -35,6 +35,20 @@ function AnimalFormContent({ workflow, enclosureId, animalId }: AnimalFormProps)
   const [error, setError] = useState(workflow && !restored ? "This animal draft is unavailable or expired. Start a new animal entry." : "");
   const [animalLoadFailed, setAnimalLoadFailed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [attempted, setAttempted] = useState(false);
+  const banner = useRef<HTMLDivElement>(null);
+  const fields: Record<string, string> = {};
+  if (!form.name.trim()) fields.name = "Enter an animal name.";
+  else if (form.name.trim().length > 100) fields.name = "Use 100 characters or fewer.";
+  if ((!animalId || referenceKey(form) !== originalReferences) && !form.selectedSpecies && !form.species.trim()) fields.species = "Select or enter a species.";
+  if (!form.selectedSpecies && form.species.length > 100) fields.species = "Use 100 characters or fewer.";
+  if (!form.enclosureId) fields.enclosureId = "Choose an enclosure.";
+  if (!validDate(form.acquiredDate)) fields.acquiredDate = "Enter a valid acquired date.";
+  if (form.birthDate && !validDate(form.birthDate)) fields.birthDate = "Enter a valid birth date.";
+  const incompatible = (form.variantAssignments ?? []).filter(item => !item.isCustom && item.speciesId !== form.selectedSpecies?.id);
+  const blockingError = incompatible.length ? `These selections do not match the species: ${incompatible.map(item => item.displayName).join(", ")}. Remove them or choose their species.` : "";
+  const bannerMessage = blockingError || (attempted && Object.keys(fields).length ? "Check the highlighted fields before saving." : error);
+  const fieldError = (name: string) => attempted ? fields[name] : undefined;
 
   useEffect(() => {
     let active = true;
@@ -85,12 +99,13 @@ function AnimalFormContent({ workflow, enclosureId, animalId }: AnimalFormProps)
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!form.name.trim() || form.name.trim().length > 100 || (!animalId && !form.selectedSpecies && !form.species.trim()) || form.species.trim().length > 100 || !form.enclosureId || !form.acquiredDate) {
-      setError("Complete all required fields before creating the animal.");
+    setAttempted(true);
+    const variantError = assignmentError(form);
+    if (Object.keys(fields).length || variantError) {
+      setError(variantError ?? "");
+      requestAnimationFrame(() => banner.current?.focus());
       return;
     }
-    const variantError = assignmentError(form);
-    if (variantError) { setError(variantError); return; }
     setSubmitting(true);
     try {
       const request = {
@@ -131,19 +146,22 @@ function AnimalFormContent({ workflow, enclosureId, animalId }: AnimalFormProps)
   if (loadingAnimal) return <p role="status">Loading animal…</p>;
 
   return (
-    <form className="entity-form animated-fade-in" onSubmit={submit} noValidate>
-      {error ? <div className="form-error-panel" role="alert">{error}</div> : null}
+    <form className="entity-form animal-entry-form animated-fade-in" onSubmit={submit} noValidate>
+      {bannerMessage ? <div ref={banner} className="form-error-panel animal-form-error" role="alert" tabIndex={-1}>
+        <span>{bannerMessage}</span>
+        {!blockingError && !(attempted && Object.keys(fields).length) ? <button type="button" aria-label="Dismiss error" onClick={() => setError("")}>×</button> : null}
+      </div> : null}
       <section className="form-section">
         <h2>Animal details</h2>
         <div className="form-grid">
-          <Input label="Name" required maxLength={100} value={form.name} onChange={(event) => update("name", event.target.value)} />
-          <AnimalReferenceFields value={form} onChange={(references) => setForm((current) => ({ ...current, ...references }))} />
+          <Input label="Name" error={fieldError("name")} required maxLength={100} value={form.name} onChange={(event) => update("name", event.target.value)} />
+          <AnimalReferenceFields value={form} speciesError={fieldError("species")} onChange={(references) => { setForm((current) => ({ ...current, ...references })); setError(""); }} />
           <Select label="Status" required value={form.status} options={toOptions(statuses)} onValueChange={(value) => update("status", value)} />
           <Select label="Sex" required value={form.sex} options={toOptions(sexes)} onValueChange={(value) => update("sex", value)} />
-          <Combobox allowSelectionWhileLoading label="Enclosure" required value={form.enclosureId} placeholder="Search or select enclosure" searchPlaceholder="Search enclosures..." loading={enclosuresLoading} emptyMessage="No enclosures available." options={[...enclosures.map((enclosure) => ({ label: `${enclosure.name} · ${enclosure.location}`, value: String(enclosure.id) })), ...(!animalId ? [{ value: "create", label: "+ Create new enclosure" }] : [])]} onValueChange={(value) => value === "create" ? createNewEnclosure() : update("enclosureId", value)} />
+          <Combobox allowSelectionWhileLoading label="Enclosure" error={fieldError("enclosureId")} required value={form.enclosureId} placeholder="Search or select enclosure" searchPlaceholder="Search enclosures..." loading={enclosuresLoading} emptyMessage="No enclosures available." options={[...enclosures.map((enclosure) => ({ label: `${enclosure.name} · ${enclosure.location}`, value: String(enclosure.id) })), ...(!animalId ? [{ value: "create", label: "+ Create new enclosure" }] : [])]} onValueChange={(value) => value === "create" ? createNewEnclosure() : update("enclosureId", value)} />
           <Input label="Notes" value={form.notes} onChange={(event) => update("notes", event.target.value)} />
-          <Input label="Acquired Date" required type="date" value={form.acquiredDate} onChange={(event) => update("acquiredDate", event.target.value)} />
-          <Input label="Date of Birth" type="date" value={form.birthDate} onChange={(event) => update("birthDate", event.target.value)} />
+          <Input label="Acquired Date" error={fieldError("acquiredDate")} required type="date" value={form.acquiredDate} onChange={(event) => update("acquiredDate", event.target.value)} />
+          <Input label="Date of Birth" error={fieldError("birthDate")} type="date" value={form.birthDate} onChange={(event) => update("birthDate", event.target.value)} />
           <label className="animal-checkbox-field"><input type="checkbox" checked={form.birthDateIsEstimated} onChange={(event) => update("birthDateIsEstimated", event.target.checked)} /> Birth date is estimated</label>
         </div>
       </section>
@@ -166,4 +184,10 @@ function toLocalDateInputValue(date: Date) {
 function referenceKey(form: AnimalReferences) {
   return JSON.stringify([form.animalGroupId, form.animalType, form.selectedSpecies?.id ?? null,
     form.species]);
+}
+
+function validDate(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }

@@ -149,10 +149,37 @@ it("keeps edited custom assignments and displays API validation errors", async (
     variantAssignments: [{ assignmentId: 12, displayName: "Original", customValue: "Original", variantType: "Other", isCustom: true }] });
   vi.mocked(updateAnimal).mockRejectedValue(new Error("Duplicate variant assignments are not allowed."));
   render(<AnimalForm animalId={7} />);
-  await waitFor(() => expect(screen.getByLabelText("Custom variant 1")).toHaveValue("Original"));
-  fireEvent.change(screen.getByLabelText("Custom variant 1"), { target: { value: "Edited" } });
+  await waitFor(() => expect(screen.getByRole("button", { name: "Edit Original" })).toBeInTheDocument());
+  fireEvent.click(screen.getByRole("button", { name: "Edit Original" }));
+  fireEvent.change(screen.getByLabelText("Edit selected value"), { target: { value: "Edited" } });
+  fireEvent.click(screen.getByRole("button", { name: "Save value" }));
   fireEvent.click(screen.getByRole("button", { name: "Save Animal" }));
   await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Duplicate variant"));
   expect(vi.mocked(updateAnimal).mock.calls[0][1].variantAssignments).toEqual([expect.objectContaining({ assignmentId: 12, customValue: "Edited" })]);
-  expect(screen.getByLabelText("Custom variant 1")).toHaveValue("Edited");
+  expect(screen.getByRole("button", { name: "Edit Edited" })).toBeInTheDocument();
+});
+
+it("places required-field errors above the card and clears them as fields are corrected", async () => {
+  render(<AnimalForm />);
+  await act(async () => {});
+  fireEvent.click(screen.getByRole("button", { name: "Add Animal" }));
+  const alert = screen.getByRole("alert");
+  expect(alert).toHaveTextContent("Check the highlighted fields");
+  expect(alert.nextElementSibling).toHaveClass("form-section");
+  expect(screen.getByLabelText(/^Name/)).toHaveAttribute("aria-invalid", "true");
+  fireEvent.change(screen.getByLabelText(/^Name/), { target: { value: "New animal" } });
+  expect(screen.getByLabelText(/^Name/)).toHaveAttribute("aria-invalid", "false");
+  expect(createAnimal).not.toHaveBeenCalled();
+});
+it("shows incompatible selections in the banner and clears it only after explicit removal", async () => {
+  saveAnimalDraft(workflow, { ...draft, variantAssignments: [{ animalVariantId: 1, speciesId: 1, displayName: "Poodle", variantType: "Breed", isCustom: false }, ...draft.variantAssignments] });
+  render(<AnimalForm workflow={workflow} />);
+  await act(async () => {});
+  expect(screen.getByRole("alert")).toHaveTextContent("Poodle");
+  expect(screen.getByRole("alert").nextElementSibling).toHaveClass("form-section");
+  fireEvent.click(screen.getByRole("button", { name: "Add Animal" }));
+  expect(createAnimal).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "Remove Poodle" }));
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Edit Local morph" })).toBeInTheDocument();
 });
