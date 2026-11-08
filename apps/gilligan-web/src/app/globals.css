@@ -3154,3 +3154,32 @@ button.timeline-cluster-event:focus-visible {
     grid-template-columns: 3.8rem 1.45rem minmax(0, 1fr);
   }
 }
+
+/* Animal selection reuses Ginger's fields, filters and error panel. */
+.animal-variant-picker { min-width: 0; }
+.animal-selection-help { color: var(--text-muted); font-size: 0.8rem; margin-top: 0.3rem; }
+.animal-selection-feedback { color: #7d2f2f; font-size: 0.8rem; min-height: 1.2em; margin-top: 0.2rem; }
+.animal-variant-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; list-style: none; padding: 0; margin: 0.3rem 0 0; }
+.animal-variant-chip { max-width: 100%; gap: 0.4rem; }
+.animal-variant-chip > span { min-width: 0; overflow-wrap: anywhere; }
+.animal-variant-chip button { flex-shrink: 0; }
+.animal-variant-chip .animal-chip-edit { border-radius: 0.25rem; font: inherit; height: auto; width: auto; min-width: 0; text-align: left; overflow-wrap: anywhere; flex-shrink: 1; line-height: 1.4; }
+.animal-chip-edit:hover { text-decoration: underline; }
+.animal-variant-chip-invalid { background: #fff3f3; border-color: #efc0c0; color: #7d2f2f; }
+.animal-variant-chip button:focus-visible, .animal-form-error button:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+.animal-variant-edit { margin-top: 0.75rem; display: grid; gap: 0.5rem; }
+.animal-variant-edit > div { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.animal-form-error { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem; padding: 0.75rem 1rem; }
+.animal-form-error button { background: transparent; border: 0; color: inherit; cursor: pointer; font-size: 1.2rem; flex-shrink: 0; }
+
+@media (max-width: 600px) {
+  /* Keep the animal editor usable without changing other page layouts. */
+  .app-shell:has(.animal-entry-form) .app-body { grid-template-columns: minmax(0, 1fr); }
+  .app-shell:has(.animal-entry-form) .app-sidebar { padding: 0.5rem; border-right: 0; border-bottom: 1px solid var(--border-color); min-width: 0; }
+  .app-shell:has(.animal-entry-form) .sidebar-nav { display: flex; overflow-x: auto; position: static; }
+  .app-shell:has(.animal-entry-form) .sidebar-link { flex-shrink: 0; padding: 0.5rem; }
+  .app-shell:has(.animal-entry-form) .sidebar-link-icon { display: none; }
+  .app-shell:has(.animal-entry-form) .global-search-placeholder { display: none; }
+  .app-shell:has(.animal-entry-form) .app-main { padding: 1rem 0.75rem 2rem; }
+  .animal-entry-form .form-section { padding: 1rem; }
+}

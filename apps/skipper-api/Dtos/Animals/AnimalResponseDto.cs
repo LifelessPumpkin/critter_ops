@@ -7,6 +7,7 @@ namespace skipper_api.Dtos.Animals;
 /// </summary>
 public class AnimalResponseDto
 {
+    public List<VariantAssignmentDto> VariantAssignments { get; set; } = [];
     public string? CustomSpeciesName { get; set; }
     public string? CustomVariantName { get; set; }
     // Original text is exposed separately so structured identity never hides historical information.

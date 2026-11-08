@@ -184,7 +184,7 @@ export function AnimalOverview({ initialState = {} }: { initialState?: AnimalOve
       <div className="animal-toolbar">
         <Input className="animal-search-input" label="Search animals" labelHidden placeholder="Search animals..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
         <MultiSelect label="Status" labelHidden value={statuses} options={statusOptions.map(toSelectionOption)} onValueChange={setStatuses} />
-        <MultiSelect label="Animal Group" labelHidden value={animalTypes} options={[...groups.map((group) => ({ value: `group:${group.id}`, label: group.name })), ...animalTypeOptions.map((type) => ({ value: type, label: `${type === "Avian" ? "Bird" : formatEnumLabel(type)} (legacy type)` }))]} onValueChange={setAnimalTypes} />
+        <MultiSelect label="Animal Category" labelHidden value={animalTypes} options={[...groups.map((group) => ({ value: `group:${group.id}`, label: group.name })), ...animalTypeOptions.map((type) => ({ value: type, label: `${type === "Avian" ? "Bird" : formatEnumLabel(type)} (legacy type)` }))]} onValueChange={setAnimalTypes} />
         <Combobox
           className="animal-filter-select"
           label="Enclosure"

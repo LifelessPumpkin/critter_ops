@@ -1,19 +1,19 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore, type FormEvent } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Button, ButtonLink, Combobox, Input, Select } from "@/components/ui";
 import { createAnimal, updateAnimal, fetchAnimal } from "@/lib/api/animals";
 import { fetchEnclosure, fetchEnclosures, type Enclosure } from "@/lib/api/enclosures";
 
-import { AnimalReferenceFields, type AnimalReferences } from "./AnimalReferenceFields";
+import { AnimalReferenceFields, assignmentError, type AnimalReferences } from "./AnimalReferenceFields";
 import { animalReturnUrl, clearAnimalDraft, loadAnimalDraft, saveAnimalDraft, validWorkflow } from "./animalDraft";
 
 const statuses = ["Active", "Quarantined", "Medical", "Breeding", "OnHold", "Transferred", "Sold", "Deceased", "Released", "Surrendered", "Inactive"];
 const sexes = ["Male", "Female", "Unknown", "Hermaphrodite", "Mixed", "NotApplicable"];
 
 type FormState = AnimalReferences & { name: string; enclosureId: string; status: string; sex: string; birthDate: string; acquiredDate: string; birthDateIsEstimated: boolean; notes: string; dispositionDate: string; dispositionReason: string; microchipNumber: string; tagIdentifier: string; source: string };
-function initialForm(): FormState { return { name: "", species: "", subspeciesOrMorph: "", enclosureId: "", animalType: "", animalGroupId: "", animalGroupName: "", selectedSpecies: null, selectedVariant: null, status: "Active", sex: "Unknown", birthDate: "", acquiredDate: toLocalDateInputValue(new Date()), birthDateIsEstimated: false, notes: "", dispositionDate: "", dispositionReason: "", microchipNumber: "", tagIdentifier: "", source: "" }; }
+function initialForm(): FormState { return { variantAssignments: [], name: "", species: "", enclosureId: "", animalType: "", animalGroupId: "", animalGroupName: "", selectedSpecies: null, status: "Active", sex: "Unknown", birthDate: "", acquiredDate: toLocalDateInputValue(new Date()), birthDateIsEstimated: false, notes: "", dispositionDate: "", dispositionReason: "", microchipNumber: "", tagIdentifier: "", source: "" }; }
 
 type AnimalFormProps = { workflow?: string; enclosureId?: number; animalId?: number };
 const subscribeHydration = () => () => {};
@@ -35,6 +35,20 @@ function AnimalFormContent({ workflow, enclosureId, animalId }: AnimalFormProps)
   const [error, setError] = useState(workflow && !restored ? "This animal draft is unavailable or expired. Start a new animal entry." : "");
   const [animalLoadFailed, setAnimalLoadFailed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [attempted, setAttempted] = useState(false);
+  const banner = useRef<HTMLDivElement>(null);
+  const fields: Record<string, string> = {};
+  if (!form.name.trim()) fields.name = "Enter an animal name.";
+  else if (form.name.trim().length > 100) fields.name = "Use 100 characters or fewer.";
+  if ((!animalId || referenceKey(form) !== originalReferences) && !form.selectedSpecies && !form.species.trim()) fields.species = "Select or enter a species.";
+  if (!form.selectedSpecies && form.species.length > 100) fields.species = "Use 100 characters or fewer.";
+  if (!form.enclosureId) fields.enclosureId = "Choose an enclosure.";
+  if (!validDate(form.acquiredDate)) fields.acquiredDate = "Enter a valid acquired date.";
+  if (form.birthDate && !validDate(form.birthDate)) fields.birthDate = "Enter a valid birth date.";
+  const incompatible = (form.variantAssignments ?? []).filter(item => !item.isCustom && item.speciesId !== form.selectedSpecies?.id);
+  const blockingError = incompatible.length ? `These selections do not match the species: ${incompatible.map(item => item.displayName).join(", ")}. Remove them or choose their species.` : "";
+  const bannerMessage = blockingError || (attempted && Object.keys(fields).length ? "Check the highlighted fields before saving." : error);
+  const fieldError = (name: string) => attempted ? fields[name] : undefined;
 
   useEffect(() => {
     let active = true;
@@ -59,7 +73,7 @@ function AnimalFormContent({ workflow, enclosureId, animalId }: AnimalFormProps)
     let active = true;
     fetchAnimal(animalId).then((animal) => {
       if (!active) return;
-      const loaded = { ...initialForm(), ...animal, enclosureId: String(animal.enclosureId), animalGroupId: animal.animalGroupId ? String(animal.animalGroupId) : "", species: animal.species, subspeciesOrMorph: animal.subspeciesOrMorph ?? "", birthDate: animal.birthDate ?? "", birthDateIsEstimated: animal.birthDateIsEstimated ?? false, notes: animal.notes ?? "", dispositionDate: animal.dispositionDate ?? "", dispositionReason: animal.dispositionReason ?? "", microchipNumber: animal.microchipNumber ?? "", tagIdentifier: animal.tagIdentifier ?? "", source: animal.source ?? "", selectedSpecies: animal.speciesId ? { id: animal.speciesId, commonName: animal.species, scientificName: animal.speciesScientificName ?? "", animalGroupId: animal.animalGroupId!, animalGroupName: animal.animalGroupName ?? "", preferredVariantType: animal.preferredVariantType ?? null } : null, selectedVariant: animal.animalVariantId ? { id: animal.animalVariantId, speciesId: animal.speciesId!, name: animal.subspeciesOrMorph ?? "", variantType: animal.variantType ?? "Other" } : null };
+      const loaded = { ...initialForm(), ...animal, variantAssignments: animal.variantAssignments ?? [], enclosureId: String(animal.enclosureId), animalGroupId: animal.animalGroupId ? String(animal.animalGroupId) : "", species: animal.species, birthDate: animal.birthDate ?? "", birthDateIsEstimated: animal.birthDateIsEstimated ?? false, notes: animal.notes ?? "", dispositionDate: animal.dispositionDate ?? "", dispositionReason: animal.dispositionReason ?? "", microchipNumber: animal.microchipNumber ?? "", tagIdentifier: animal.tagIdentifier ?? "", source: animal.source ?? "", selectedSpecies: animal.speciesId ? { id: animal.speciesId, commonName: animal.species, scientificName: animal.speciesScientificName ?? "", animalGroupId: animal.animalGroupId!, animalGroupName: animal.animalGroupName ?? "", preferredVariantType: animal.preferredVariantType ?? null } : null };
       setForm(loaded);
       setOriginalReferences(referenceKey(loaded));
     }).catch(() => { if (active) { setError("Unable to load animal for editing."); setAnimalLoadFailed(true); } }).finally(() => { if (active) setLoadingAnimal(false); });
@@ -85,8 +99,11 @@ function AnimalFormContent({ workflow, enclosureId, animalId }: AnimalFormProps)
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!form.name.trim() || form.name.trim().length > 100 || (!animalId && !form.selectedSpecies && !form.species.trim()) || form.species.trim().length > 100 || form.subspeciesOrMorph.trim().length > 100 || !form.enclosureId || !form.acquiredDate) {
-      setError("Complete all required fields before creating the animal.");
+    setAttempted(true);
+    const variantError = assignmentError(form);
+    if (Object.keys(fields).length || variantError) {
+      setError(variantError ?? "");
+      requestAnimationFrame(() => banner.current?.focus());
       return;
     }
     setSubmitting(true);
@@ -96,12 +113,11 @@ function AnimalFormContent({ workflow, enclosureId, animalId }: AnimalFormProps)
         name: form.name.trim(),
         ...(animalId && referenceKey(form) === originalReferences ? {} : {
           customSpeciesName: form.selectedSpecies ? null : form.species || null,
-          customVariantName: form.selectedVariant ? null : form.subspeciesOrMorph || null,
           animalType: form.animalType || undefined,
           animalGroupId: Number(form.animalGroupId) || null,
           speciesId: form.selectedSpecies?.id ?? null,
-          animalVariantId: form.selectedVariant?.id ?? null,
         }),
+        variantAssignments: (form.variantAssignments ?? []).map(item => ({ assignmentId: item.assignmentId, animalVariantId: item.animalVariantId ?? null, customValue: item.isCustom ? item.customValue : null, ...(item.isCustom ? { variantType: item.variantType } : {}) })),
         notes: form.notes || null,
         dispositionDate: form.dispositionDate || null,
         dispositionReason: form.dispositionReason || null,
@@ -130,19 +146,22 @@ function AnimalFormContent({ workflow, enclosureId, animalId }: AnimalFormProps)
   if (loadingAnimal) return <p role="status">Loading animal…</p>;
 
   return (
-    <form className="entity-form animated-fade-in" onSubmit={submit} noValidate>
-      {error ? <div className="form-error-panel" role="alert">{error}</div> : null}
+    <form className="entity-form animal-entry-form animated-fade-in" onSubmit={submit} noValidate>
+      {bannerMessage ? <div ref={banner} className="form-error-panel animal-form-error" role="alert" tabIndex={-1}>
+        <span>{bannerMessage}</span>
+        {!blockingError && !(attempted && Object.keys(fields).length) ? <button type="button" aria-label="Dismiss error" onClick={() => setError("")}>×</button> : null}
+      </div> : null}
       <section className="form-section">
         <h2>Animal details</h2>
         <div className="form-grid">
-          <Input label="Name" required maxLength={100} value={form.name} onChange={(event) => update("name", event.target.value)} />
-          <AnimalReferenceFields value={form} onChange={(references) => setForm((current) => ({ ...current, ...references }))} />
+          <Input label="Name" error={fieldError("name")} required maxLength={100} value={form.name} onChange={(event) => update("name", event.target.value)} />
+          <AnimalReferenceFields value={form} speciesError={fieldError("species")} onChange={(references) => { setForm((current) => ({ ...current, ...references })); setError(""); }} />
           <Select label="Status" required value={form.status} options={toOptions(statuses)} onValueChange={(value) => update("status", value)} />
           <Select label="Sex" required value={form.sex} options={toOptions(sexes)} onValueChange={(value) => update("sex", value)} />
-          <Combobox allowSelectionWhileLoading label="Enclosure" required value={form.enclosureId} placeholder="Search or select enclosure" searchPlaceholder="Search enclosures..." loading={enclosuresLoading} emptyMessage="No enclosures available." options={[...enclosures.map((enclosure) => ({ label: `${enclosure.name} · ${enclosure.location}`, value: String(enclosure.id) })), ...(!animalId ? [{ value: "create", label: "+ Create new enclosure" }] : [])]} onValueChange={(value) => value === "create" ? createNewEnclosure() : update("enclosureId", value)} />
+          <Combobox allowSelectionWhileLoading label="Enclosure" error={fieldError("enclosureId")} required value={form.enclosureId} placeholder="Search or select enclosure" searchPlaceholder="Search enclosures..." loading={enclosuresLoading} emptyMessage="No enclosures available." options={[...enclosures.map((enclosure) => ({ label: `${enclosure.name} · ${enclosure.location}`, value: String(enclosure.id) })), ...(!animalId ? [{ value: "create", label: "+ Create new enclosure" }] : [])]} onValueChange={(value) => value === "create" ? createNewEnclosure() : update("enclosureId", value)} />
           <Input label="Notes" value={form.notes} onChange={(event) => update("notes", event.target.value)} />
-          <Input label="Acquired Date" required type="date" value={form.acquiredDate} onChange={(event) => update("acquiredDate", event.target.value)} />
-          <Input label="Date of Birth" type="date" value={form.birthDate} onChange={(event) => update("birthDate", event.target.value)} />
+          <Input label="Acquired Date" error={fieldError("acquiredDate")} required type="date" value={form.acquiredDate} onChange={(event) => update("acquiredDate", event.target.value)} />
+          <Input label="Date of Birth" error={fieldError("birthDate")} type="date" value={form.birthDate} onChange={(event) => update("birthDate", event.target.value)} />
           <label className="animal-checkbox-field"><input type="checkbox" checked={form.birthDateIsEstimated} onChange={(event) => update("birthDateIsEstimated", event.target.checked)} /> Birth date is estimated</label>
         </div>
       </section>
@@ -164,5 +183,11 @@ function toLocalDateInputValue(date: Date) {
 
 function referenceKey(form: AnimalReferences) {
   return JSON.stringify([form.animalGroupId, form.animalType, form.selectedSpecies?.id ?? null,
-    form.species, form.selectedVariant?.id ?? null, form.subspeciesOrMorph]);
+    form.species]);
+}
+
+function validDate(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }

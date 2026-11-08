@@ -10,6 +10,9 @@ namespace skipper_api.Dtos.Animals;
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public class UpdateAnimalRequestDto : IValidatableObject
 {
+    /// <summary>Omitted/null preserves assignments on update; [] clears; otherwise full replacement.</summary>
+    public List<VariantAssignmentRequestDto>? VariantAssignments { get; set; }
+
     [Required]
     public int? EnclosureId { get; set; }
 

@@ -27,6 +27,8 @@ public class ProfessorDbContext : DbContext
     public DbSet<CatalogSyncRun> CatalogSyncRuns => Set<CatalogSyncRun>();
     public DbSet<CatalogSyncIssue> CatalogSyncIssues => Set<CatalogSyncIssue>();
 
+    public DbSet<AnimalVariantAssignment> AnimalVariantAssignments => Set<AnimalVariantAssignment>();
+
     public DbSet<Animal> Animals => Set<Animal>();
 
     public DbSet<ActivityEvent> ActivityEvents => Set<ActivityEvent>();

@@ -641,6 +641,62 @@ namespace skipper_api.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("skipper_api.Domain.Animals.AnimalVariantAssignment", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AnimalId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("AnimalVariantId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CustomValue")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("NormalizedCustomValue")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("text")
+                        .HasComputedColumnSql("lower(trim(regexp_replace(\"CustomValue\", '[[:space:]]+', ' ', 'g')))", true);
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("VariantType")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AnimalVariantId");
+
+                    b.HasIndex("AnimalId", "AnimalVariantId")
+                        .IsUnique()
+                        .HasFilter("\"AnimalVariantId\" IS NOT NULL");
+
+                    b.HasIndex("AnimalId", "VariantType", "NormalizedCustomValue")
+                        .IsUnique()
+                        .HasFilter("\"AnimalVariantId\" IS NULL");
+
+                    b.ToTable("AnimalVariantAssignments", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Assignment_Type", "\"VariantType\" IS NULL OR \"VariantType\" IN ('Breed','Morph','Variety','Strain','Mutation','Subspecies','Other')");
+
+                            t.HasCheckConstraint("CK_Assignment_Value", "(\"AnimalVariantId\" IS NOT NULL AND \"CustomValue\" IS NULL AND \"VariantType\" IS NULL) OR (\"AnimalVariantId\" IS NULL AND \"NormalizedCustomValue\" <> '' AND \"CustomValue\" IS NOT NULL AND \"VariantType\" IS NOT NULL)");
+                        });
+                });
+
             modelBuilder.Entity("skipper_api.Domain.Animals.CatalogSyncIssue", b =>
                 {
                     b.Property<int>("Id")
@@ -1635,6 +1691,24 @@ namespace skipper_api.Data.Migrations
                     b.Navigation("Species");
                 });
 
+            modelBuilder.Entity("skipper_api.Domain.Animals.AnimalVariantAssignment", b =>
+                {
+                    b.HasOne("skipper_api.Domain.Animals.Animal", "Animal")
+                        .WithMany("VariantAssignments")
+                        .HasForeignKey("AnimalId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("skipper_api.Domain.Animals.AnimalVariant", "AnimalVariant")
+                        .WithMany()
+                        .HasForeignKey("AnimalVariantId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Animal");
+
+                    b.Navigation("AnimalVariant");
+                });
+
             modelBuilder.Entity("skipper_api.Domain.Animals.CatalogSyncIssue", b =>
                 {
                     b.HasOne("skipper_api.Domain.Animals.CatalogSyncRun", "CatalogSyncRun")
@@ -1756,6 +1830,8 @@ namespace skipper_api.Data.Migrations
             modelBuilder.Entity("skipper_api.Domain.Animals.Animal", b =>
                 {
                     b.Navigation("ActivityEvents");
+
+                    b.Navigation("VariantAssignments");
                 });
 
             modelBuilder.Entity("skipper_api.Domain.Animals.CatalogSyncRun", b =>

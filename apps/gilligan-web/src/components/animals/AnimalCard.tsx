@@ -40,12 +40,9 @@ export function AnimalCard({ animal, variant = "active" }: AnimalCardProps) {
           {animal.speciesId && animal.originalSpeciesText && animal.originalSpeciesText !== animal.species ? <div><dt>Original species description</dt><dd>{animal.originalSpeciesText}</dd></div> : null}
           {animal.animalVariantId && animal.originalVariantText && animal.originalVariantText !== animal.subspeciesOrMorph ? <div><dt>Original variant description</dt><dd>{animal.originalVariantText}</dd></div> : null}
 
-          {animal.subspeciesOrMorph ? (
-            <div>
-              <dt>{animal.variantType ?? "Variant"}</dt>
-              <dd>{animal.subspeciesOrMorph}</dd>
-            </div>
-          ) : null}
+          <div><dt>Variants &amp; Traits</dt><dd style={{ overflowWrap: "anywhere" }}>
+            {animal.variantAssignments?.length ? <ul>{animal.variantAssignments.map((item, index) => <li key={item.assignmentId ?? index}>{item.displayName} — {item.isCustom ? "Custom " : ""}{item.variantType}</li>)}</ul> : "None"}
+          </dd></div>
 
           <div>
             <dt>Sex</dt>

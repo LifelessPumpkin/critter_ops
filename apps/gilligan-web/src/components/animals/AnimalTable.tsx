@@ -54,8 +54,8 @@ const columns: TableColumn<AnimalListItem>[] = [
     ) : <span className="animal-empty-value">—</span>,
   },
   {
-    header: "Morph / Breed",
-    render: (animal) => animal.subspeciesOrMorph?.trim() || <span className="animal-empty-value">—</span>,
+    header: "Variants & Traits",
+    render: (animal) => (animal.variantAssignments?.length ? <span title={animal.variantAssignments.map(x => x.displayName).join(", ")} style={{ display: "block", maxWidth: "18rem", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{animal.variantAssignments.slice(0, 2).map(x => x.displayName).join(", ")}{animal.variantAssignments.length > 2 ? ` +${animal.variantAssignments.length - 2}` : ""}</span> : <span className="animal-empty-value">—</span>),
   },
   {
     header: "Status",
