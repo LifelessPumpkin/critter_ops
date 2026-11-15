@@ -25,6 +25,13 @@ public sealed class GbifCatalogProvider(IHttpClientFactory clients, ILogger<Gbif
                 throw new ArgumentException("Retry cannot override its stored scope.");
             return;
         }
+        if (command.Name == "dev-import")
+        {
+            if (command.DevelopmentProfile is null || command.Profile is null || command.Query is not null || command.Taxon is not null) throw new ArgumentException("Resolved profile required.");
+            command.DevelopmentProfile.Validate(command.Profile);
+            if (command.Limit != command.DevelopmentProfile.MaximumExaminedRecords) throw new ArgumentException("Profile bounds must match.");
+            return;
+        }
         if (command.Taxon <= 0 || command.Limit is < 1 or > 1000 ||
             command.Query is not null && (string.IsNullOrWhiteSpace(command.Query) || command.Query.Length > 300) ||
             command.Name == "import" && (command.Query is null) == (command.Taxon is null) ||
@@ -115,6 +122,10 @@ public sealed class GbifCatalogProvider(IHttpClientFactory clients, ILogger<Gbif
             if (!context.DryRun) (await db.CatalogSyncRuns.SingleAsync(x => x.Id == context.RunId, ct)).DatasetIdentifier = settings.DatasetIdentifier;
             return new CatalogCounts();
         }, token);
+        var profile = context.Command.DevelopmentProfile;
+        var existing = profile is null ? 0 : await context.ReadAsync(db => profile.SpeciesIds(db, settings.DatasetIdentifier).CountAsync(token));
+        var qualifying = existing;
+        var proposedNames = new HashSet<string>(StringComparer.Ordinal);
         string? currentIdentifier = context.Command.Taxon?.ToString();
         try
         {
@@ -123,48 +134,95 @@ public sealed class GbifCatalogProvider(IHttpClientFactory clients, ILogger<Gbif
                 await RefreshAsync(api, context, token);
                 return;
             }
-            var offset = 0;
             HashSet<int> seen = [];
-            while (offset < limit)
+            string?[] scopes = profile?.Genera.Select(g => (string?)g).ToArray() ?? [context.Command.Query];
+            var offsets = new int[scopes.Length];
+            var completed = new bool[scopes.Length];
+            var examined = 0;
+            // Round-robin pages give small profiles category coverage and large profiles bounded expansion.
+            while (examined < limit && completed.Any(done => !done) && (profile is null || qualifying < profile.TargetSpecies))
             {
-                token.ThrowIfCancellationRequested();
-                GbifPage<GbifTaxon> page;
-                if (context.Command.Taxon is int key)
+                for (var scopeIndex = 0; scopeIndex < scopes.Length && examined < limit; scopeIndex++)
                 {
-                    var taxon = await api.TaxonAsync(key, token);
-                    if (taxon.Key != key) throw new GbifProviderException("MismatchedUsageKey");
-                    page = new(0, 1, true, [taxon]);
-                }
-                else
-                {
-                    currentIdentifier = null;
-                    var size = Math.Min(settings.PageSize, limit - offset);
-                    page = await api.SearchAsync(context.Command.Query!, offset, size, token);
-                    GbifApiClient.ValidatePage(page, offset, size);
-                }
-                foreach (var result in page.Results!)
-                {
+                    if (completed[scopeIndex] || profile is not null && qualifying >= profile.TargetSpecies) continue;
                     token.ThrowIfCancellationRequested();
-                    if (result is null) throw new GbifProviderException("MalformedTaxon");
-                    currentIdentifier = result.Key?.ToString();
-                    // Search projections do not guarantee canonicalName/deleted. Fetch the authoritative usage.
-                    var taxon = context.Command.Taxon is null && result.Key is > 0 && result.Rank == "SPECIES"
-                        ? await api.TaxonAsync(result.Key.Value, token) : result;
-                    if (taxon.Key != result.Key) throw new GbifProviderException("MismatchedUsageKey");
-                    if (taxon.Key is int usage && !seen.Add(usage)) throw new GbifProviderException("RepeatedUsageKey");
-                    if (Guid.TryParse(taxon.DatasetKey, out var dataset) && dataset.ToString() != settings.DatasetIdentifier)
-                        throw new GbifProviderException("UnexpectedDataset");
-                    IReadOnlyList<GbifVernacularName> names = [];
-                    if (taxon.Key is > 0 && taxon.Rank == "SPECIES" && taxon.TaxonomicStatus == "ACCEPTED" && taxon.Deleted is null)
-                        names = await api.NamesAsync(taxon.Key.Value, token);
-                    context.HttpRequests = api.Attempts; context.HttpRetries = api.Retries;
-                    await context.BatchAsync((db, ct) => reconciler.ApplyAsync(db, context, taxon, names, ct), token);
-                    offset++;
-                    logger.LogInformation(new EventId(104, "PROGRESS"), "Examined GBIF {Identifier} ({Name}): processed={Processed} created={Created} updated={Updated} unchanged={Unchanged} skipped={Skipped} new-issues={Issues}",
-                        currentIdentifier, taxon.CanonicalName ?? taxon.ScientificName, context.Counts.Processed, context.Counts.Created,
-                        context.Counts.Updated, context.Counts.Unchanged, context.Counts.Skipped, context.Counts.Issues);
+                    GbifPage<GbifTaxon> page;
+                    if (context.Command.Taxon is int key)
+                    {
+                        var taxon = await api.TaxonAsync(key, token);
+                        if (taxon.Key != key) throw new GbifProviderException("MismatchedUsageKey");
+                        page = new(0, 1, true, [taxon]);
+                    }
+                    else
+                    {
+                        currentIdentifier = null;
+                        // Spread the first target across scopes rather than filling it from one genus.
+                        var size = Math.Min(settings.PageSize, limit - examined);
+                        if (profile is not null) size = Math.Min(size, Math.Max(1, profile.TargetSpecies / scopes.Length));
+                        page = await api.SearchAsync(scopes[scopeIndex]!, offsets[scopeIndex], size, token, profile is not null);
+                        GbifApiClient.ValidatePage(page, offsets[scopeIndex], size);
+                    }
+                    foreach (var result in page.Results!)
+                    {
+                        token.ThrowIfCancellationRequested();
+                        if (profile is not null && qualifying >= Math.Min(profile.TargetSpecies, profile.MaximumSpecies)) break;
+                        if (result is null) throw new GbifProviderException("MalformedTaxon");
+                        offsets[scopeIndex]++; examined++;
+                        currentIdentifier = result.Key?.ToString();
+                        context.HttpRequests = api.Attempts; context.HttpRetries = api.Retries;
+                        if (result.Key is int usage && !seen.Add(usage))
+                        {
+                            if (profile is null) throw new GbifProviderException("RepeatedUsageKey");
+                            await context.BatchAsync((db, ct) => {
+                                CatalogIssueRecorder.Add(db, context.RunId, Name, settings.DatasetIdentifier, usage.ToString(),
+                                    "RepeatedUsageKey", "Duplicate provider taxon skipped within the bounded scope.", usage.ToString());
+                                return Task.FromResult(new CatalogCounts(Processed: 1, Skipped: 1));
+                            }, token);
+                            continue;
+                        }
+                        // Replay/resume skips already persisted eligible references. Refreshing is the separate sync command.
+                        if (profile is not null && await context.ReadAsync(db => {
+                            var eligibleIds = profile.SpeciesIds(db, settings.DatasetIdentifier);
+                            return db.SpeciesExternalReferences.AnyAsync(x =>
+                            x.Provider == Name && x.DatasetIdentifier == settings.DatasetIdentifier && x.ExternalIdentifier == currentIdentifier &&
+                            x.ExternalTaxonomicStatus == "ACCEPTED" && eligibleIds.Contains(x.SpeciesId), token); }))
+                        {
+                            await context.BatchAsync((db, ct) => Task.FromResult(new CatalogCounts(Processed: 1, Unchanged: 1)), token);
+                            continue;
+                        }
+                        var taxon = context.Command.Taxon is null && result.Key is > 0 && result.Rank == "SPECIES"
+                            ? await api.TaxonAsync(result.Key.Value, token) : result;
+                        if (taxon.Key != result.Key) throw new GbifProviderException("MismatchedUsageKey");
+                        if (Guid.TryParse(taxon.DatasetKey, out var dataset) && dataset.ToString() != settings.DatasetIdentifier)
+                            throw new GbifProviderException("UnexpectedDataset");
+                        if (profile is not null && (!profile.ContainsCanonicalName(taxon.CanonicalName) || taxon.Rank != "SPECIES" || taxon.TaxonomicStatus != "ACCEPTED" || taxon.Deleted is not null))
+                        {
+                            await context.BatchAsync((db, ct) => Task.FromResult(new CatalogCounts(Processed: 1, Skipped: 1)), token);
+                            continue;
+                        }
+                        IReadOnlyList<GbifVernacularName> names = [];
+                        if (taxon.Key is > 0 && taxon.Rank == "SPECIES" && taxon.TaxonomicStatus == "ACCEPTED" && taxon.Deleted is null)
+                            names = await api.NamesAsync(taxon.Key.Value, token);
+                        context.HttpRequests = api.Attempts; context.HttpRetries = api.Retries;
+                        var previousCreated = context.Counts.Created;
+                        var previousUpdated = context.Counts.Updated;
+                        await context.BatchAsync((db, ct) => reconciler.ApplyAsync(db, context, taxon, names, ct), token);
+                        if (profile is not null)
+                        {
+                            if (!context.DryRun) qualifying = await context.ReadAsync(db => profile.SpeciesIds(db, settings.DatasetIdentifier).CountAsync(token));
+                            else if ((context.Counts.Created > previousCreated || context.Counts.Updated > previousUpdated) && proposedNames.Add(taxon.CanonicalName!)) qualifying++;
+                        }
+                        logger.LogInformation(new EventId(104, "PROGRESS"), "Examined GBIF {Identifier} ({Name}): processed={Processed} created={Created} updated={Updated} unchanged={Unchanged} skipped={Skipped} eligible={Eligible}",
+                            currentIdentifier, taxon.CanonicalName ?? taxon.ScientificName, context.Counts.Processed, context.Counts.Created,
+                            context.Counts.Updated, context.Counts.Unchanged, context.Counts.Skipped, qualifying);
+                    }
+                    completed[scopeIndex] = page.EndOfRecords == true;
                 }
-                if (page.EndOfRecords == true) break;
+            }
+            if (profile is not null && qualifying < profile.MinimumSpecies)
+            {
+                await context.RecordIssueAsync("ProfileBelowMinimum", "Configured profile scopes did not supply the minimum distinct eligible Species within the examined-record bound.", CatalogIssueSeverity.Error, token, settings.DatasetIdentifier);
+                throw new CatalogMinimumException();
             }
             if (api.ThrottledResponses > 0)
                 await context.RecordIssueAsync("ProviderThrottled", $"GBIF returned {api.ThrottledResponses} throttled responses; bounded retries recovered.", CatalogIssueSeverity.Information, token, settings.DatasetIdentifier);
@@ -180,6 +238,19 @@ public sealed class GbifCatalogProvider(IHttpClientFactory clients, ILogger<Gbif
         finally
         {
             context.HttpRequests = api.Attempts; context.HttpRetries = api.Retries;
+            if (profile is not null)
+            {
+                using var summaryTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                try
+                {
+                    var persisted = await context.ReadAsync(db => profile.SpeciesIds(db, settings.DatasetIdentifier).CountAsync(summaryTimeout.Token));
+                    var total = await context.ReadAsync(db => db.Species.CountAsync(summaryTimeout.Token));
+                    logger.LogInformation("Profile={Profile}; existing matching Species={Existing}; {Mode} new Species={Created}; updated={Updated}; unchanged examined={Unchanged}; total distinct eligible={Eligible}; total Professor Species={Total}; HTTP requests={Requests}; retries={Retries}; issues={Issues}; proposed eligible={Proposed}. Final status follows in FINISH.",
+                        profile.Name, existing, context.DryRun ? "proposed" : "committed", context.Counts.Created, context.Counts.Updated, context.Counts.Unchanged,
+                        persisted, total, api.Attempts, api.Retries, context.Counts.Issues, context.DryRun ? qualifying : persisted);
+                }
+                catch (Exception error) { logger.LogWarning("Profile summary unavailable ({Type}); inspect persisted history after connectivity is restored.", error.GetType().Name); }
+            }
             logger.LogDebug("GBIF used {Attempts} HTTP attempts; {ThrottledResponses} throttled responses", api.Attempts, api.ThrottledResponses);
         }
     }

@@ -77,7 +77,7 @@ public class AnimalService : IAnimalService
                 EnclosureName = animal.Enclosure.Name,
                 EnclosureLocation = animal.Enclosure.Location,
                 Name = animal.Name,
-                Species = animal.CatalogSpecies != null ? animal.CatalogSpecies.CommonName ?? animal.CatalogSpecies.ScientificName : animal.Species,
+                Species = animal.CatalogSpecies != null ? animal.CatalogSpecies.CommonName ?? animal.CatalogSpecies.CommonNames.OrderByDescending(n => n.LanguageCode == "eng" || n.LanguageCode == "en").ThenBy(n => n.Id).Select(n => n.Name).FirstOrDefault() ?? animal.CatalogSpecies.ScientificName : animal.Species,
                 AnimalGroupId = animal.AnimalGroupId,
                 AnimalGroupName = animal.AnimalGroup != null ? animal.AnimalGroup.Name : animal.AnimalType.ToString(),
                 CustomSpeciesName = animal.SpeciesId == null ? animal.Species : null,
@@ -381,7 +381,7 @@ public class AnimalService : IAnimalService
     private async Task<References> ResolveReferences(int? groupId, int? speciesId, int? variantId,
         string? customSpecies, string? customVariant, AnimalType? legacyType, CancellationToken ct, Animal? existing = null)
     {
-        var species = speciesId.HasValue ? await _dbContext.Species.Include(x => x.AnimalGroup).SingleOrDefaultAsync(x => x.Id == speciesId, ct) : null;
+        var species = speciesId.HasValue ? await _dbContext.Species.Include(x => x.AnimalGroup).Include(x => x.CommonNames).SingleOrDefaultAsync(x => x.Id == speciesId, ct) : null;
         if (speciesId.HasValue && (species == null || ((!species.IsActive || !species.AnimalGroup.IsActive) && existing?.SpeciesId != speciesId)))
             return new(Error: "The selected species is unavailable.");
         groupId ??= species?.AnimalGroupId;
@@ -422,7 +422,7 @@ public class AnimalService : IAnimalService
             EnclosureId = animal.EnclosureId,
             EnclosureName = animal.Enclosure.Name,
             Name = animal.Name,
-            Species = animal.CatalogSpecies != null ? animal.CatalogSpecies.CommonName ?? animal.CatalogSpecies.ScientificName : animal.Species,
+            Species = animal.CatalogSpecies != null ? animal.CatalogSpecies.CommonName ?? animal.CatalogSpecies.CommonNames.OrderByDescending(n => n.LanguageCode == "eng" || n.LanguageCode == "en").ThenBy(n => n.Id).Select(n => n.Name).FirstOrDefault() ?? animal.CatalogSpecies.ScientificName : animal.Species,
             AnimalGroupId = animal.AnimalGroupId,
             AnimalGroupName = animal.AnimalGroup != null ? animal.AnimalGroup.Name : animal.AnimalType.ToString(),
             CustomSpeciesName = animal.SpeciesId == null ? animal.Species : null,
@@ -467,7 +467,7 @@ public class AnimalService : IAnimalService
             EnclosureId = animal.EnclosureId,
             EnclosureName = enclosureName,
             Name = animal.Name,
-            Species = animal.CatalogSpecies != null ? animal.CatalogSpecies.CommonName ?? animal.CatalogSpecies.ScientificName : animal.Species,
+            Species = animal.CatalogSpecies != null ? animal.CatalogSpecies.CommonName ?? animal.CatalogSpecies.CommonNames.OrderByDescending(n => n.LanguageCode == "eng" || n.LanguageCode == "en").ThenBy(n => n.Id).Select(n => n.Name).FirstOrDefault() ?? animal.CatalogSpecies.ScientificName : animal.Species,
             AnimalGroupId = animal.AnimalGroupId,
             AnimalGroupName = animal.AnimalGroup != null ? animal.AnimalGroup.Name : animal.AnimalType.ToString(),
             CustomSpeciesName = animal.SpeciesId == null ? animal.Species : null,

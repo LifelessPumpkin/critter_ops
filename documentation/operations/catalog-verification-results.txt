@@ -1,0 +1,52 @@
+ total_species | original_seed_ids | importer_managed_species | with_primary_common_name | with_preferred_variant_type | uses_variant_fallback 
+---------------+-------------------+--------------------------+--------------------------+-----------------------------+-----------------------
+          1553 |                16 |                     1537 |                       16 |                          13 |                  1540
+(1 row)
+
+ distinct_gbif_backed_species | gbif_external_references | accepted_gbif_backed_species | nonaccepted_references 
+------------------------------+--------------------------+------------------------------+------------------------
+                         1538 |                     1538 |                         1538 |                      0
+(1 row)
+
+ animal_category | species | with_alternate_common_names | with_aliases | with_external_references 
+-----------------+---------+-----------------------------+--------------+--------------------------
+ Amphibian       |     122 |                          89 |            0 |                      121
+ Bird            |     145 |                          67 |            0 |                      143
+ Fish            |       2 |                           0 |            0 |                        0
+ Invertebrate    |     886 |                         156 |            0 |                      884
+ Mammal          |     218 |                          95 |            0 |                      213
+ Reptile         |     180 |                         165 |            0 |                      177
+(6 rows)
+
+ Id | profile  |       Status        |           StartedAt           |          CompletedAt          | RecordsCreated | RecordsUpdated | RecordsUnchanged | RecordsSkipped | RecordsFailed | HttpRequests | HttpRetries | IssuesGenerated | RetryOfRunId |   CompletionReason   
+----+----------+---------------------+-------------------------------+-------------------------------+----------------+----------------+------------------+----------------+---------------+--------------+-------------+-----------------+--------------+----------------------
+  5 | expanded | Completed           | 2026-11-14 18:11:36.753097+00 | 2026-11-14 18:11:37.247179+00 |              0 |              0 |                0 |              0 |             0 |            0 |           0 |               0 |              | BoundedScopeComplete
+  4 | demo     | Completed           | 2026-11-14 18:11:34.345882+00 | 2026-11-14 18:11:34.807187+00 |              0 |              0 |                0 |              0 |             0 |            0 |           0 |               0 |              | BoundedScopeComplete
+  3 | expanded | CompletedWithIssues | 2026-11-14 17:51:06.982429+00 | 2026-11-14 18:10:51.043079+00 |           1350 |              0 |              147 |           1700 |             0 |         4504 |           0 |             361 |              | BoundedScopeComplete
+  2 | demo     | CompletedWithIssues | 2026-11-14 17:48:06.618494+00 | 2026-11-14 17:49:37.397063+00 |             61 |              1 |               68 |            180 |             0 |          332 |           0 |              17 |              | BoundedScopeComplete
+  1 |          | CompletedWithIssues | 2026-11-08 20:49:15.372089+00 | 2026-11-08 20:51:35.952714+00 |            126 |              0 |                0 |            114 |             0 |          551 |           0 |             114 |              | BoundedScopeComplete
+(5 rows)
+
+ CatalogSyncRunId |        IssueType        | Status | issues 
+------------------+-------------------------+--------+--------
+                3 | UnrecognizedAnimalGroup | Open   |    180
+                3 | RepeatedUsageKey        | Open   |    178
+                3 | InvalidCommonName       | Open   |      3
+                2 | RepeatedUsageKey        | Open   |     17
+                1 | RepeatedUsageKey        | Open   |     12
+                1 | UnrecognizedAnimalGroup | Open   |    102
+(6 rows)
+
+ Provider | DatasetIdentifier | ExternalIdentifier | count 
+----------+-------------------+--------------------+-------
+(0 rows)
+
+ AnimalGroupId | lower | count 
+---------------+-------+-------
+(0 rows)
+
+ Id |            Name             | SpeciesId |  ScientificName   | category | PreferredVariantType 
+----+-----------------------------+-----------+-------------------+----------+----------------------
+  1 | Catalog verification python |       149 | Python bivittatus | Reptile  | 
+(1 row)
+

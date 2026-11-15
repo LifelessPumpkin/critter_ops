@@ -19,7 +19,7 @@ public sealed class CatalogOperationRunner(ProviderRegistry providers, IConfigur
         ICatalogProvider? provider;
         try { provider = command.Provider is null ? null : providers.Resolve(command.Provider, command.Operation); }
         catch (ArgumentException error) { logger.LogError("{ProviderError}", error.Message); return 2; }
-        try { provider?.ValidateCommand(command); provider?.ValidateConfiguration(configuration.GetSection($"Providers:{provider.Name}")); }
+        try { provider?.ValidateCommand(command); provider?.ValidateConfiguration(command.DevelopmentProfile?.ProviderConfiguration(configuration) ?? configuration.GetSection($"Providers:{provider.Name}")); }
         catch (Exception) { logger.LogError("Invalid selected provider configuration; check Providers settings, identifiable UserAgent, and bounded command scope"); return 2; }
         string connectionString;
         try
@@ -64,7 +64,7 @@ public sealed class CatalogOperationRunner(ProviderRegistry providers, IConfigur
                 try
                 {
                     var original = JsonSerializer.Deserialize<CatalogCommand>(retry.Scope)!;
-                    if (original.Provider != command.Provider || original.Name != command.Name || original.RetryRun is not null || original.Limit is null or < 1 or > 1000)
+                    if (original.Provider != command.Provider || original.Name != command.Name || original.RetryRun is not null || original.Limit is null or < 1 || original.Limit > (original.Name == "dev-import" ? 20000 : 1000))
                         throw new ArgumentException();
                     provider.ValidateCommand(original);
                     if (retry.ReferenceIds is not null)
@@ -99,7 +99,7 @@ public sealed class CatalogOperationRunner(ProviderRegistry providers, IConfigur
             });
             logger.LogInformation(new EventId(101, "START"), "{Operation} provider={Provider} mode={Mode} scope={Scope} limit={Limit} retry-of={RetryRun}",
                 command.Name, provider.Name, command.DryRun ? "DRY RUN (no database writes)" : "WRITE",
-                command.Query is not null ? "query: " + command.Query : command.Taxon is not null ? "taxon: " + command.Taxon : "existing references",
+                command.Profile is not null ? "profile: " + command.Profile : command.Query is not null ? "query: " + command.Query : command.Taxon is not null ? "taxon: " + command.Taxon : "existing references",
                 command.Limit, command.RetryRun?.ToString() ?? "none");
             var status = CatalogSyncStatus.Completed;
             var exitCode = 0;
@@ -109,6 +109,11 @@ public sealed class CatalogOperationRunner(ProviderRegistry providers, IConfigur
             {
                 await provider.ExecuteAsync(command.Operation, context, token);
                 token.ThrowIfCancellationRequested();
+            }
+            catch (CatalogMinimumException)
+            {
+                status = CatalogSyncStatus.Partial; exitCode = 5; reason = "ProfileBelowMinimum";
+                error = "Configured scopes did not provide the required distinct eligible Species within the record limit.";
             }
             catch (CatalogPartialException exception)
             {

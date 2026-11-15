@@ -7,6 +7,8 @@ using skipper_api.Domain.Animals;
 
 namespace HowellSync.Execution;
 
+public sealed class CatalogMinimumException : Exception;
+
 public sealed class CatalogPartialException(string reason) : Exception(reason)
 {
     public string Reason { get; } = reason;

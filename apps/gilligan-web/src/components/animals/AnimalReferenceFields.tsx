@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Combobox, Select } from "@/components/ui";
 import { fetchAnimalGroups, searchSpecies, type AnimalGroup, type CatalogSpecies } from "@/lib/api/animalCatalog";
 import type { VariantAssignment } from "@/lib/api/animals";
+import { useCatalogSearch } from "./useCatalogSearch";
+import { CatalogNavigation } from "./CatalogNavigation";
 import { VariantPicker } from "./VariantPicker";
 
 export type AnimalReferences = {
@@ -49,26 +51,25 @@ export function AnimalReferenceFields({ value, onChange, speciesError }: { value
   </>;
 }
 
+export function speciesLabel(species: CatalogSpecies): string {
+  const common = species.commonName?.trim();
+  const scientific = species.scientificName.trim();
+  return common && scientific && common.toLowerCase() !== scientific.toLowerCase()
+    ? `${common} · ${scientific}`
+    : common || scientific;
+}
+
 function SpeciesSelector({ groupId, selected, custom, onChange, validationError }: { validationError?: string; groupId: string; selected: CatalogSpecies | null; custom: string; onChange: (value: CatalogSpecies | null, custom: string) => void }) {
   const [search, setSearch] = useState("");
-  const key = `${groupId}:${search}`;
-  const [result, setResult] = useState<{ key: string; items: CatalogSpecies[]; error: string }>({ key: "initial", items: [], error: "" });
-  const loading = result.key !== key;
-  const items = loading ? [] : result.items;
-  const error = loading ? "" : result.error;
-  useEffect(() => {
-    let active = true;
-    const controller = new AbortController();
-    searchSpecies(search, Number(groupId) || undefined, controller.signal)
-      .then((page) => { if (active) setResult({ key, items: page.items, error: "" }); })
-      .catch(() => { if (active) setResult({ key, items: [], error: "Catalog unavailable. Use a custom species." }); });
-    return () => { active = false; controller.abort(); };
-  }, [groupId, search, key]);
-  const options = items.map((item) => ({ value: String(item.id), label: `${item.commonName ?? item.scientificName} · ${item.scientificName}` }));
-  if (selected && !items.some((x) => x.id === selected.id)) options.unshift({ value: String(selected.id), label: `${selected.commonName ?? selected.scientificName} · ${selected.scientificName}` });
+  const [open, setOpen] = useState(false);
+  const fetchPage = useCallback((page: number, signal: AbortSignal) => searchSpecies(search, Number(groupId) || undefined, signal, page), [search, groupId]);
+  const catalog = useCatalogSearch(`${groupId}:${search}`, search, open, fetchPage, "Unable to load species. Please try again.");
+  const { items, loading, error } = catalog;
+  const options = items.map((item) => ({ value: String(item.id), label: speciesLabel(item) }));
+  if (selected && !items.some((x) => x.id === selected.id)) options.unshift({ value: String(selected.id), label: speciesLabel(selected) });
   if (!selected && custom) options.unshift({ value: "custom", label: `${custom} (custom)` });
   if (search.trim() && search.trim().length <= 100) options.push({ value: "use-custom", label: `Use "${search.trim()}" as custom species` });
-  return <Combobox allowSelectionWhileLoading label="Species" required value={selected ? String(selected.id) : custom ? "custom" : ""} options={options} loading={loading} error={validationError || error} emptyMessage="No species found. Type a name to use a custom species." searchPlaceholder="Search common or scientific name" onSearchChange={setSearch} onValueChange={(id) => {
+  return <Combobox debounceMs={0} onOpenChange={setOpen} footer={<CatalogNavigation catalog={catalog} noun="species" />} allowSelectionWhileLoading label="Species" required value={selected ? String(selected.id) : custom ? "custom" : ""} options={options} loading={loading} error={validationError || error} emptyMessage="No matching species found. Type a name to use a custom species." searchPlaceholder="Search common or scientific name" onSearchChange={setSearch} onValueChange={(id) => {
     if (id === "use-custom") onChange(null, search.trim());
     else if (id !== "custom") { const item = items.find((x) => String(x.id) === id); if (item) onChange(item, item.commonName ?? item.scientificName); }
   }} />;

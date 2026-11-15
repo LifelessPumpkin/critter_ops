@@ -1,4 +1,4 @@
-.PHONY: test test-gilligan test-skipper test-security
+.PHONY: test test-gilligan test-skipper test-security test-howell-script
 
 test:
 	./packages/mary-ann-tests/scripts/test-all.sh
@@ -11,3 +11,6 @@ test-skipper:
 
 test-security:
 	./packages/mary-ann-tests/scripts/test-security.sh
+
+test-howell-script:
+	./packages/mary-ann-tests/scripts/test-howell-script.sh
