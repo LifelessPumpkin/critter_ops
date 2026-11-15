@@ -1,9 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Button, Combobox, Input, type SelectionOption } from "@/components/ui";
-import { searchVariants, type AnimalVariant, type CatalogSpecies } from "@/lib/api/animalCatalog";
+import { searchVariants, type CatalogSpecies } from "@/lib/api/animalCatalog";
 import type { VariantAssignment } from "@/lib/api/animals";
+
+import { useCatalogSearch } from "./useCatalogSearch";
+import { CatalogNavigation } from "./CatalogNavigation";
 
 const preferredTypes = new Set(["Breed", "Morph", "Variety", "Strain", "Mutation", "Subspecies"]);
 const normalize = (value: string) => value.trim().replace(/\s+/g, " ").toLowerCase();
@@ -20,20 +23,11 @@ export function VariantPicker({ species, assignments, onChange }: {
   const [editing, setEditing] = useState<{ index: number; text: string } | null>(null);
   const [editError, setEditError] = useState("");
   const container = useRef<HTMLDivElement>(null);
-  const key = `${species?.id ?? "custom"}:${search}`;
-  const [result, setResult] = useState<{ key: string; items: AnimalVariant[]; error: string }>({ key: "", items: [], error: "" });
-  const loading = Boolean(species) && result.key !== key;
-  const items = !species || loading ? [] : result.items;
-  const error = !species || loading ? "" : result.error;
-  useEffect(() => {
-    if (!species) return;
-    let active = true;
-    const controller = new AbortController();
-    searchVariants(search, species.id, controller.signal)
-      .then(page => { if (active) setResult({ key, items: page.items, error: "" }); })
-      .catch(() => { if (active) setResult({ key, items: [], error: `Search unavailable. You can still add a custom ${label.toLowerCase()}.` }); });
-    return () => { active = false; controller.abort(); };
-  }, [species, search, key, label]);
+  const [open, setOpen] = useState(false);
+  const speciesId = species?.id;
+  const fetchPage = useCallback((page: number, signal: AbortSignal) => searchVariants(search, speciesId!, signal, page), [search, speciesId]);
+  const catalog = useCatalogSearch(`${speciesId}:${search}`, search, open && Boolean(speciesId), fetchPage, "Unable to load variants. Please try again.");
+  const { items, loading, error } = catalog;
 
   const duplicate = (text: string, variantType: string, except = -1) => assignments.some((item, index) => index !== except && item.isCustom && item.variantType === variantType && normalize(item.customValue ?? "") === normalize(text));
   const options: SelectionOption[] = items.filter(item => item.speciesId === species?.id).map(item => {
@@ -53,8 +47,8 @@ export function VariantPicker({ species, assignments, onChange }: {
     setEditing(null); setEditError(""); focusSelector();
   }
   return <div className="animal-variant-picker form-field-full" ref={container}>
-    <Combobox label={label} value="" placeholder={`Search or add ${label.toLowerCase()}…`} searchPlaceholder={`Search ${label.toLowerCase()}`} allowSelectionWhileLoading options={options} loading={loading}
-      emptyMessage={`No matches. Type a name to add a custom ${label.toLowerCase()}.`} onSearchChange={setSearch}
+    <Combobox debounceMs={0} onOpenChange={setOpen} footer={<CatalogNavigation catalog={catalog} noun="variants" />} label={label} value="" placeholder={`Search or add ${label.toLowerCase()}…`} searchPlaceholder={`Search ${label.toLowerCase()}`} allowSelectionWhileLoading options={options} loading={loading}
+      emptyMessage="No catalog variants found. You can add a custom value." onSearchChange={setSearch}
       onValueChange={id => {
         if (id === "custom") {
           if (duplicate(custom, type)) { setNotice("That value is already selected."); return; }

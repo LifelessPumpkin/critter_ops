@@ -11,7 +11,7 @@ function Harness({ initial = empty }: { initial?: AnimalReferences }) {
   const [value, setValue] = useState(initial);
   return <><AnimalReferenceFields value={value} onChange={setValue} /><output data-testid="value">{JSON.stringify(value)}</output></>;
 }
-function choose(label: RegExp, option: RegExp) { fireEvent.click(screen.getByRole("combobox", { name: label })); fireEvent.mouseDown(screen.getByRole("option", { name: option })); }
+async function choose(label: RegExp, option: RegExp) { fireEvent.click(screen.getByRole("combobox", { name: label })); fireEvent.mouseDown(await screen.findByRole("option", { name: option })); }
 beforeEach(() => {
   vi.mocked(fetchAnimalGroups).mockResolvedValue([{ id: 1, name: "Mammal", sortOrder: 10, legacyAnimalType: "Mammal" }, { id: 3, name: "Reptile", sortOrder: 30, legacyAnimalType: "Reptile" }]);
   vi.mocked(searchSpecies).mockResolvedValue({ items: [dog, python], page: 1, pageSize: 20, hasMore: false });
@@ -21,15 +21,17 @@ afterEach(() => { cleanup(); vi.clearAllMocks(); vi.useRealTimers(); });
 describe("adaptive animal references", () => {
   it("loads initial suggestions, narrows by group, selects species, adapts labels and filters variants", async () => {
     render(<Harness />);
-    await waitFor(() => expect(searchSpecies).toHaveBeenCalledWith("", undefined, expect.any(AbortSignal)));
+    expect(searchSpecies).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("combobox", { name: /^Species/ }));
+    await waitFor(() => expect(searchSpecies).toHaveBeenCalledWith("", undefined, expect.any(AbortSignal), 1));
+    fireEvent.keyDown(screen.getByRole("searchbox"), { key: "Escape" });
     await waitFor(() => expect(screen.queryByText("Loading options…")).not.toBeInTheDocument());
-    choose(/^Animal Category/, /^Mammal$/);
-    await waitFor(() => expect(searchSpecies).toHaveBeenCalledWith("", 1, expect.any(AbortSignal)));
-    await act(async () => {});
-    choose(/^Species/, /^Dog · Canis/);
-    await waitFor(() => expect(searchVariants).toHaveBeenCalledWith("", 1, expect.any(AbortSignal)));
+    await choose(/^Animal Category/, /^Mammal$/);
+    await choose(/^Species/, /^Dog · Canis/);
+    expect(searchSpecies).toHaveBeenCalledWith("", 1, expect.any(AbortSignal), 1);
+
     expect(screen.getByRole("combobox", { name: /^Breed/ })).toBeInTheDocument();
-    choose(/^Breed/, /^Poodle/);
+    await choose(/^Breed/, /^Poodle/);
     expect(screen.getByTestId("value")).toHaveTextContent('"animalVariantId":1');
     expect(screen.getByRole("combobox", { name: /^Animal Category/ })).toBeDisabled();
     expect(screen.getByRole("combobox", { name: /^Animal Category/ })).toHaveTextContent("Mammal");
@@ -38,7 +40,7 @@ describe("adaptive animal references", () => {
   it("preserves variants and requires explicit removal when species changes", async () => {
     render(<Harness initial={{ ...empty, species: "Dog", selectedSpecies: dog, variantAssignments: [{ animalVariantId: 1, speciesId: 1, displayName: "Poodle", variantType: "Breed", isCustom: false }] }} />);
     await act(async () => {});
-    choose(/^Species/, /^Ball python/);
+    await choose(/^Species/, /^Ball python/);
     expect(screen.getByRole("combobox", { name: /^Morph/ })).toBeInTheDocument();
     expect(screen.getByText("Incompatible with selected species")).toBeInTheDocument();
     expect(screen.getByTestId("value")).toHaveTextContent('"animalVariantId":1');
@@ -48,12 +50,13 @@ describe("adaptive animal references", () => {
     vi.mocked(searchSpecies).mockImplementationOnce(() => new Promise((resolve) => { finishOld = resolve; }));
     render(<Harness />);
     fireEvent.click(screen.getByRole("combobox", { name: /^Species/ }));
+    await waitFor(() => expect(searchSpecies).toHaveBeenCalledTimes(1));
     vi.useFakeTimers();
     fireEvent.change(screen.getByRole("searchbox"), { target: { value: "Python regius" } });
     await act(async () => { vi.advanceTimersByTime(299); });
     expect(searchSpecies).toHaveBeenCalledTimes(1);
     await act(async () => { vi.advanceTimersByTime(1); });
-    expect(searchSpecies).toHaveBeenLastCalledWith("Python regius", undefined, expect.any(AbortSignal));
+    expect(searchSpecies).toHaveBeenLastCalledWith("Python regius", undefined, expect.any(AbortSignal), 1);
     await act(async () => finishOld({ items: [{ ...dog, commonName: "Stale result" }], page: 1, pageSize: 20, hasMore: false }));
     expect(screen.queryByRole("option", { name: /Stale result/ })).not.toBeInTheDocument();
   });
@@ -78,6 +81,7 @@ it("supports keyboard selection, Escape, outside dismissal and custom values dur
   render(<Harness />);
   await act(async () => {});
   fireEvent.click(screen.getByRole("combobox", { name: /^Species/ }));
+  await screen.findByRole("option", { name: /^Dog · Canis/ });
   const input = screen.getByRole("searchbox");
   fireEvent.keyDown(input, { key: "ArrowDown" });
   fireEvent.keyDown(input, { key: "Enter" });
@@ -99,8 +103,8 @@ it("supports keyboard selection, Escape, outside dismissal and custom values dur
 it("adds mixed assignments, prevents duplicates, edits custom text and removes only one", async () => {
   render(<Harness initial={{ ...empty, selectedSpecies: dog, species: "Dog", variantAssignments: [{ customValue: "Local Line", displayName: "Local Line", variantType: "Breed", isCustom: true }] }} />);
   await act(async () => {});
-  choose(/^Breed/, /^Poodle/);
-  choose(/^Breed/, /^Poodle/);
+  await choose(/^Breed/, /^Poodle/);
+  await choose(/^Breed/, /^Poodle/);
   expect(screen.getByRole("option", { name: "Poodle — Selected" })).toHaveAttribute("aria-disabled", "true");
   fireEvent.keyDown(screen.getByRole("searchbox"), { key: "Escape" });
   fireEvent.click(screen.getByRole("button", { name: "Edit Local Line" }));
@@ -134,7 +138,7 @@ it("uses species preference for new custom values and preserves historical types
 it("shows normalized custom duplicate feedback beside the selector and allows manual custom-species category", async () => {
   render(<Harness initial={{ ...empty, species: "Hybrid", variantAssignments: [{ customValue: "Local  Line", displayName: "Local Line", variantType: "Other", isCustom: true }] }} />);
   await act(async () => {});
-  choose(/^Animal Category/, /^Reptile$/);
+  await choose(/^Animal Category/, /^Reptile$/);
   expect(screen.getByTestId("value")).toHaveTextContent('"animalGroupId":"3"');
   fireEvent.click(screen.getByRole("combobox", { name: /^Variant/ }));
   fireEvent.change(screen.getByRole("searchbox"), { target: { value: " local line " } });
@@ -150,13 +154,52 @@ it("selects multiple catalog values by keyboard and keeps custom values on speci
   await act(async () => {});
   for (const name of ["Poodle", "Labrador"]) {
     fireEvent.keyDown(screen.getByRole("combobox", { name: /^Breed/ }), { key: "Enter" });
+    await screen.findByRole("option", { name: new RegExp(`^${name}$`) });
     fireEvent.keyDown(screen.getByRole("searchbox"), { key: "Enter" });
     expect(screen.getByRole("button", { name: `Remove ${name}` })).toBeInTheDocument();
   }
-  choose(/^Species/, /^Ball python/);
+  await choose(/^Species/, /^Ball python/);
   expect(screen.getByRole("button", { name: "Edit Line" })).toBeInTheDocument();
   expect(screen.getAllByText("Incompatible with selected species")).toHaveLength(2);
   screen.getByRole("button", { name: "Remove Poodle" }).focus();
   fireEvent.click(screen.getByRole("button", { name: "Remove Poodle" }));
   await waitFor(() => expect(screen.getByRole("combobox", { name: /^Morph/ })).toHaveFocus());
+});
+
+it("pages species without losing selection and exposes retry and empty states", async () => {
+  vi.mocked(searchSpecies).mockResolvedValueOnce({ items: [dog], page: 1, pageSize: 25, hasMore: true })
+    .mockResolvedValueOnce({ items: [python], page: 2, pageSize: 25, hasMore: false });
+  render(<Harness initial={{ ...empty, selectedSpecies: dog }} />);
+  fireEvent.click(screen.getByRole("combobox", { name: /^Species/ }));
+  fireEvent.click(await screen.findByRole("button", { name: "Next page" }));
+  await screen.findByRole("option", { name: /^Ball python/ });
+  expect(screen.getByRole("option", { name: /^Dog/ })).toHaveAttribute("aria-selected", "true");
+  expect(searchSpecies).toHaveBeenLastCalledWith("", undefined, expect.any(AbortSignal), 2);
+  vi.mocked(searchSpecies).mockRejectedValueOnce(new Error("Offline"));
+  fireEvent.click(screen.getByRole("button", { name: "Previous page" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Retry" }));
+  await screen.findByRole("option", { name: /^Ball python/ });
+});
+
+it("debounces variant searches and aborts them when switching species without losing assignments", async () => {
+  let finish!: (value: Awaited<ReturnType<typeof searchVariants>>) => void;
+  vi.mocked(searchVariants).mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+  render(<Harness initial={{ ...empty, selectedSpecies: dog, variantAssignments: [{ animalVariantId: 1, speciesId: 1, displayName: "Poodle", variantType: "Breed", isCustom: false }] }} />);
+  fireEvent.click(screen.getByRole("combobox", { name: /^Breed/ }));
+  await waitFor(() => expect(searchVariants).toHaveBeenCalledTimes(1));
+  const signal = vi.mocked(searchVariants).mock.calls[0][2]!;
+  vi.useFakeTimers();
+  fireEvent.change(screen.getByRole("searchbox"), { target: { value: "Lab" } });
+  expect(signal.aborted).toBe(true);
+  await act(async () => { vi.advanceTimersByTime(299); });
+  expect(searchVariants).toHaveBeenCalledTimes(1);
+  await act(async () => { vi.advanceTimersByTime(1); });
+  expect(searchVariants).toHaveBeenLastCalledWith("Lab", 1, expect.any(AbortSignal), 1);
+  vi.useRealTimers();
+  fireEvent.keyDown(screen.getByRole("searchbox"), { key: "Escape" });
+  await choose(/^Species/, /^Ball python/);
+  await act(async () => finish({ items: [{ id: 1, speciesId: 1, name: "Stale breed", variantType: "Breed" }], page: 1, pageSize: 25, hasMore: false }));
+  expect(screen.queryByText("Stale breed")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Remove Poodle" })).toBeInTheDocument();
+  expect(screen.getByText("Incompatible with selected species")).toBeInTheDocument();
 });

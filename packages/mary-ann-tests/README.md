@@ -26,3 +26,7 @@ See [Testing and CI](../../documentation/testing-and-ci.md) for isolation, regre
 conventions, workflow triggers, and branch protection requirements.
 
 Howell Sync CLI/configuration tests run in the Skipper unit suite. Its lifecycle, advisory-lock, batch rollback, dry-run, cancellation, and process-crash tests run in the PostgreSQL integration suite. The process harness entry point exists only in the test assembly.
+
+## Development catalog script contracts
+
+`make test-howell-script` runs Python standard-library tests for profile/default argument forwarding, dry-run/retry flags, missing configuration and exit-code propagation. It is included in `make test`; the existing Skipper integration suite covers real PostgreSQL persistence with mocked GBIF, profile bounds, idempotency, expansion and recovery. See the [Local Catalog Setup guide](../../documentation/operations/local-catalog-setup.md) for bounded manual real-GBIF runs.

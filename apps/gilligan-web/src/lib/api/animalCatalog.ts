@@ -9,12 +9,12 @@ async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
   return response.json();
 }
 export function fetchAnimalGroups(signal?: AbortSignal) { return get<AnimalGroup[]>("animal-groups", signal); }
-export function searchSpecies(search: string, animalGroupId?: number, signal?: AbortSignal) {
-  const query = new URLSearchParams({ search, pageSize: "20" });
+export function searchSpecies(search: string, animalGroupId?: number, signal?: AbortSignal, page = 1) {
+  const query = new URLSearchParams({ search, pageSize: "25", page: String(page) });
   if (animalGroupId) query.set("animalGroupId", String(animalGroupId));
   return get<CatalogPage<CatalogSpecies>>(`species?${query}`, signal);
 }
-export function searchVariants(search: string, speciesId: number, signal?: AbortSignal) {
-  const query = new URLSearchParams({ search, speciesId: String(speciesId), pageSize: "20" });
+export function searchVariants(search: string, speciesId: number, signal?: AbortSignal, page = 1) {
+  const query = new URLSearchParams({ search, speciesId: String(speciesId), pageSize: "25", page: String(page) });
   return get<CatalogPage<AnimalVariant>>(`animal-variants?${query}`, signal);
 }

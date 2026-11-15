@@ -33,6 +33,7 @@ internal static class CatalogMapping
         b.Property<string>("SourceKey").HasComputedColumnSql("nullif(lower(btrim(\"Source\")), '')", stored: true);
         b.ToTable(table, t => t.HasCheckConstraint($"CK_{table}_Name", "length(btrim(\"Name\")) > 0"));
         b.HasIndex("NameKey");
+        b.HasIndex("Name").HasMethod("gin").HasOperators("gin_trgm_ops");
     }
 }
 

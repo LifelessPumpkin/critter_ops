@@ -35,8 +35,8 @@ public sealed class GbifApiClient : IDisposable
         return GetAsync<GbifTaxon>($"species/{key}", token);
     }
 
-    public Task<GbifPage<GbifTaxon>> SearchAsync(string query, int offset, int limit, CancellationToken token) =>
-        GetAsync<GbifPage<GbifTaxon>>($"species/search?q={Uri.EscapeDataString(query)}&datasetKey={options.DatasetIdentifier}&offset={offset}&limit={limit}", token);
+    public Task<GbifPage<GbifTaxon>> SearchAsync(string query, int offset, int limit, CancellationToken token, bool acceptedSpecies = false) =>
+        GetAsync<GbifPage<GbifTaxon>>($"species/search?q={Uri.EscapeDataString(query)}&datasetKey={options.DatasetIdentifier}&offset={offset}&limit={limit}{(acceptedSpecies ? "&rank=SPECIES&status=ACCEPTED" : "")}", token);
 
     public async Task<IReadOnlyList<GbifVernacularName>> NamesAsync(int key, CancellationToken token)
     {

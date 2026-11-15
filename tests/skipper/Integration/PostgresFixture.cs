@@ -15,7 +15,7 @@ public sealed class PostgresFixture : IAsyncLifetime
 
     public async Task<DbContextOptions<ProfessorDbContext>> CreateDatabaseAsync()
     {
-        var name = "test_" + Guid.NewGuid().ToString("N");
+        var name = "test_" + Guid.NewGuid().ToString("N") + "_test";
         await using var connection = new NpgsqlConnection(_container.GetConnectionString());
         await connection.OpenAsync();
         await using var command = new NpgsqlCommand($"CREATE DATABASE {name}", connection);

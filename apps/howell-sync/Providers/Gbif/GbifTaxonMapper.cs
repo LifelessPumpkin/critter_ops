@@ -12,7 +12,7 @@ public static class GbifTaxonMapper
         if (taxon.Kingdom != "Animalia") return null;
         return taxon.Class switch
         {
-            "Mammalia" => "Mammal", "Aves" => "Bird", "Reptilia" => "Reptile", "Amphibia" => "Amphibian",
+            "Mammalia" => "Mammal", "Aves" => "Bird", "Reptilia" or "Squamata" => "Reptile", "Amphibia" => "Amphibian",
             "Actinopterygii" or "Chondrichthyes" or "Dipnoi" or "Coelacanthi" or "Myxini" or "Cephalaspidomorphi" => "Fish",
             _ => taxon.Phylum is "Arthropoda" or "Mollusca" or "Annelida" or "Cnidaria" or "Echinodermata" or "Porifera" or "Nematoda" or "Platyhelminthes" ? "Invertebrate" : null
         };

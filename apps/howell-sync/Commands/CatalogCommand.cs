@@ -2,11 +2,11 @@ using skipper_api.Domain.Animals;
 
 namespace HowellSync.Commands;
 
-public sealed record CatalogCommand(string Name, string? Provider = null, bool DryRun = false, string? Query = null, int? Taxon = null, int? Limit = null, int? RetryRun = null)
+public sealed record CatalogCommand(string Name, string? Provider = null, bool DryRun = false, string? Query = null, int? Taxon = null, int? Limit = null, int? RetryRun = null, string? Profile = null, HowellSync.Execution.DevelopmentCatalogProfile? DevelopmentProfile = null)
 {
     public CatalogSyncOperation Operation => Name switch
     {
-        "import" => CatalogSyncOperation.Import,
+        "import" or "dev-import" => CatalogSyncOperation.Import,
         "sync" => CatalogSyncOperation.Synchronization,
         _ => CatalogSyncOperation.Validation
     };
@@ -14,15 +14,18 @@ public sealed record CatalogCommand(string Name, string? Provider = null, bool D
     public static CatalogCommand Parse(string[] args)
     {
         if (args.Length == 0 || args is ["help"] or ["--help"]) return new("help");
-        if (args[0] is not ("import" or "sync" or "validate"))
+        if (args[0] is not ("import" or "dev-import" or "verify-dev" or "sync" or "validate"))
             throw new ArgumentException("Unknown command. Use help for usage.");
-        string? provider = null, query = null;
+        string? provider = null, query = null, profile = null;
         int? taxon = null, limit = null, retryRun = null;
         bool dryRun = false, help = false;
         for (int i = 1; i < args.Length; i++)
         {
             switch (args[i])
             {
+                case "--profile" when profile is null:
+                    if (++i == args.Length || args[i] is not ("demo" or "expanded")) throw new ArgumentException("--profile must be demo or expanded.");
+                    profile = args[i]; break;
                 case "--help" when !help: help = true; break;
                 case "--dry-run" when !dryRun: dryRun = true; break;
                 case "--query" when query is null:
@@ -62,7 +65,11 @@ public sealed record CatalogCommand(string Name, string? Provider = null, bool D
             throw new ArgumentException("Text search expansion uses import. Sync refreshes existing references.");
         if (provider == "gbif" && args[0] == "import" && retryRun is null && (query is null) == (taxon is null))
             throw new ArgumentException("GBIF requires --query or --taxon.");
-        return new(args[0], provider, dryRun, query, taxon, limit, retryRun);
+        if (args[0] is "dev-import" or "verify-dev" && (provider != "gbif" || taxon is not null || query is not null || limit is not null))
+            throw new ArgumentException("Development profiles require gbif; configure scope and limits in DevelopmentCatalog:Profiles.");
+        if (profile is not null && args[0] is not ("dev-import" or "verify-dev")) throw new ArgumentException("--profile is only for development commands.");
+        if (args[0] == "verify-dev" && (dryRun || retryRun is not null)) throw new ArgumentException("verify-dev is read-only and accepts no run options.");
+        return new(args[0], provider, dryRun, query, taxon, limit, retryRun, args[0] is "dev-import" or "verify-dev" ? profile ?? "demo" : null);
     }
 
     public const string Help = """
@@ -71,6 +78,8 @@ public sealed record CatalogCommand(string Name, string? Provider = null, bool D
         sync --provider gbif [--taxon <existing-usage-key>] [--limit 1..1000] [--dry-run]
         (sync | import) --provider gbif --retry-run <run-id> [--dry-run]
         validate [--dry-run]
+        dev-import --provider gbif [--profile demo|expanded] [--dry-run] [--retry-run <run-id>]
+        verify-dev --provider gbif [--profile demo|expanded]
         help | <command> --help
         Configure ConnectionStrings__ProfessorDb via environment or appsettings.json.
         Configure Providers__gbif__UserAgent with a real project URL/contact. Dry runs and validation write no history or catalog data.

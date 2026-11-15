@@ -234,7 +234,7 @@ and dataset licensing/citation metadata before redistribution; stored provenance
 replace licence review.
 
 Ticket 6 must preserve Species identity while adding multiple variant assignments. Ticket 7
-can search the local common names/aliases without provider calls. Ticket 8 should document
+searches local common names/aliases without provider calls. Ticket 8 should document
 scheduler configuration, migrations, issue review, budget sizing, dataset licensing and future
 COL XR migration. None of those tickets is implemented here.
 
@@ -286,3 +286,7 @@ a later write failure emits an explicit console error and continues console-only
 logging-storage problem does not interrupt a catalog transaction. Auto-flush does not
 promise disk durability through host power loss. Log messages are single-line sanitized
 and long individual messages are truncated to fit the configured segment size.
+
+## Development catalog profiles
+
+`../../scripts/import-dev-catalog.sh [demo|expanded]` (from this directory) uses the same provider pipeline. From the repository root use `./scripts/import-dev-catalog.sh demo`. Profiles and their independent bounds are in appsettings.json; see [Local Catalog Setup](../../documentation/operations/local-catalog-setup.md) for safety, dry runs, resume, scope-specific verification and exact startup commands. `verify-dev --provider gbif --profile demo` verifies persisted data without GBIF access.

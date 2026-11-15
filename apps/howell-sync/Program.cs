@@ -34,7 +34,10 @@ try
     await host.StartAsync();
     var lifetime = host.Services.GetRequiredService<IHostApplicationLifetime>();
     await using var scope = host.Services.CreateAsyncScope();
-    var result = await scope.ServiceProvider.GetRequiredService<CatalogOperationRunner>().RunAsync(command, lifetime.ApplicationStopping);
+    var runner = scope.ServiceProvider.GetRequiredService<CatalogOperationRunner>();
+    var result = command.Name is "dev-import" or "verify-dev"
+        ? await new DevelopmentCatalogImport(builder.Configuration, runner, startupLogger).RunAsync(command, lifetime.ApplicationStopping)
+        : await runner.RunAsync(command, lifetime.ApplicationStopping);
     using var shutdown = new CancellationTokenSource(TimeSpan.FromSeconds(10));
     await host.StopAsync(shutdown.Token);
     return result;

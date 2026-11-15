@@ -40,6 +40,9 @@ type SelectProps = SharedSelectionProps & {
 
 type ComboboxProps = SelectProps & {
   allowSelectionWhileLoading?: boolean;
+  debounceMs?: number;
+  onOpenChange?: (open: boolean) => void;
+  footer?: React.ReactNode;
   onSearchChange?: (value: string) => void;
   searchPlaceholder?: string;
 };
@@ -132,7 +135,7 @@ export function Combobox(props: ComboboxProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
-  const debouncedSearch = useDebouncedValue(search, 300);
+  const debouncedSearch = useDebouncedValue(search, props.debounceMs ?? 300);
   const selected = options.find((option) => option.value === value);
   const filteredOptions = useMemo(() => {
     if (onSearchChange || !search.trim()) return options;
@@ -146,12 +149,14 @@ export function Combobox(props: ComboboxProps) {
   const position = useFloatingPosition(open, triggerRef);
 
   useDismiss(open, setOpen, triggerRef, contentRef);
-  useEffect(() => { if (onSearchChange) onSearchChange(debouncedSearch); }, [debouncedSearch, onSearchChange]);
+  useEffect(() => { if (onSearchChange) onSearchChange(props.debounceMs === 0 ? search : debouncedSearch); }, [debouncedSearch, search, props.debounceMs, onSearchChange]);
   useEffect(() => {
     if (!open) { setSearch(""); return; }
     setActiveIndex(firstEnabledIndex(filteredOptions));
     window.requestAnimationFrame(() => searchRef.current?.focus());
   }, [filteredOptions, open]);
+
+  useEffect(() => { props.onOpenChange?.(open); }, [open, props.onOpenChange]);
 
   function selectAt(index: number) {
     const option = filteredOptions[index];
@@ -189,6 +194,7 @@ export function Combobox(props: ComboboxProps) {
         <div ref={contentRef} className="selection-content" style={positionStyle(position)}>
           <label className="selection-search"><span className="visually-hidden">{searchPlaceholder}</span><span aria-hidden="true">⌕</span><input ref={searchRef} value={search} placeholder={searchPlaceholder} role="searchbox" aria-controls={ids.listboxId} aria-activedescendant={filteredOptions[activeIndex] ? `${ids.optionPrefix}-${activeIndex}` : undefined} onChange={(event) => setSearch(event.target.value)} onKeyDown={handleSearchKeyDown} /></label>
           <SelectionOptions ids={ids} options={filteredOptions} activeIndex={activeIndex} selectedValues={value ? [value] : []} loading={loading} allowSelectionWhileLoading={props.allowSelectionWhileLoading} emptyMessage={emptyMessage} onHover={setActiveIndex} onSelect={selectAt} />
+          {props.footer}
         </div>,
         getPortalRoot(triggerRef.current),
       ) : null}
