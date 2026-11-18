@@ -253,3 +253,68 @@ Their shared timestamps, titles, notes, performers, source metadata, animal asso
 `Note` and `General` are distinct activity event types but do not have dedicated detail tables because all of their current data is already represented by `ActivityEvent`.
 
 Task completion maps `Feeding`, `Medication`, `Cleaning`, `WaterChange`, `Inspection`, `Maintenance`, `Note`, and `General` tasks to their corresponding activity types. `Other` remains a generic `Task` activity. The completed task remains stored independently from its historical activity record.
+
+## Task completion consistency
+
+`TaskService.CompleteAsync` is the authoritative completion workflow. `POST
+/api/tasks/{id}/complete` returns HTTP 200 with the completed task for both the
+first completion and subsequent valid requests. A missing ID returns 404; request
+validation still applies. The first committed completion owns the timestamp,
+notes, and performer. Retries do not overwrite these fields or advance recurrence.
+
+A PostgreSQL `SELECT ... FOR UPDATE` locks the task row within a short transaction.
+The service reloads tracked state after obtaining the lock, so a previously loaded
+entity cannot bypass the completion check. Competing requests, including requests
+from separate Skipper instances, wait and then observe the committed completion.
+Task changes, the activity and its associations/details, and any recurring
+successor commit together. The response is constructed before commit and returned
+only after commit succeeds. Failed transactions and cancellation before commit
+roll back the writes and release the lock. Cancellation or lost response delivery
+after a successful commit does not undo completion; retrying the same ID is safe.
+If commit acknowledgement is lost, callers should retry rather than infer rollback.
+
+Recurrence continues from the previous due date: daily/custom intervals use days,
+weekly intervals use weeks, and monthly intervals use months. A recurring
+completion creates one incomplete successor, preserving title, description, type,
+interval, and animal/enclosure IDs. Its completion fields are empty. Activity
+associations retain the explicit task enclosure, or the animal's current enclosure
+when no explicit enclosure is supplied.
+
+No schema change is required. Tasks do not have a predecessor relationship, and
+activity task provenance is stored in JSON metadata. The completion transaction
+provides serialization without adding speculative relationships or restricting
+legitimate activities for the same animal/enclosure. This does not repair duplicate
+records created before the concurrency fix or constrain direct database writes.
+
+Gilligan's Tasks page acknowledges the successful mutation from the returned task,
+then reloads the collection in the background. Existing rows stay visible and the
+selected tab/date range remains unchanged. Server-generated successors appear only
+in the applicable date views. Mutation failures and refresh failures are separate;
+refresh failure preserves completion and offers **Retry refresh**, which only reads
+the collection. Completion controls are pending per task. Request generations
+prevent older reads from overwriting data refreshed after a newer mutation. The
+current dashboard has no live task summary, and animal/enclosure pages have no
+separate task collection or completion controls; their activity timelines use the
+existing activity APIs.
+
+## Disposition concurrency follow-up
+
+Confirmed by code inspection: `AnimalDispositionActivityService.CreateAsync` reads
+an animal and checks `IsTerminalStatus` without a row lock or concurrency token.
+Two independent transactions can both pass that check, insert disposition events,
+and overwrite the animal's terminal status with the later write. The explicit
+transaction protects each request from partial persistence, but does not serialize
+the check and transition. Historical enclosure associations are captured from the
+read animal; interaction with concurrent movement needs regression testing before
+claiming consistency. `UpdateAsync` and `DeleteAsync` likewise read lifecycle state
+before writing and need review in the same focused follow-up.
+
+Proposed follow-up: **Serialize disposition lifecycle transitions per animal**.
+Lock the animal row and reload authoritative state before validating terminal
+status/latest-disposition rules in create/update/delete. Define competing-operation
+results explicitly and preserve existing activity/relationship semantics. Use
+independent PostgreSQL contexts with controlled contention to test competing
+creates, conflicting terminal statuses, update/delete races, movement interaction,
+rollback, and cancellation. No shared locking framework is needed. These races
+were identified from the implementation, not reproduced in a disposition-specific
+concurrency test as part of the task completion work.

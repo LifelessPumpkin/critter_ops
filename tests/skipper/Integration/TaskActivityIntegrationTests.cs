@@ -62,7 +62,7 @@ public sealed class TaskActivityIntegrationTests : IClassFixture<PostgresFixture
         var activity = await fixture.Context.ActivityEvents.AsNoTracking().SingleAsync();
 
         Assert.Equal(CompleteTaskResultStatus.Completed, firstResult.Status);
-        Assert.Equal(CompleteTaskResultStatus.AlreadyCompleted, repeatedResult.Status);
+        Assert.Equal(CompleteTaskResultStatus.Completed, repeatedResult.Status);
         Assert.Equal(ActivityEventType.Task, activity.EventType);
         Assert.Equal($"Task completed: {task.Title}", activity.Title);
         Assert.Equal(1, await fixture.Context.ActivityEvents.CountAsync());

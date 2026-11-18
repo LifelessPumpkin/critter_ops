@@ -115,12 +115,12 @@ public class TasksController : ControllerBase
     }
 
     /// <summary>
-    /// Completes a task occurrence, records activity history, and creates the next recurring occurrence when needed.
+    /// Idempotently completes a task occurrence. Repeated requests return its original completion.
+    /// Activity history and the next recurring occurrence are committed atomically.
     /// </summary>
     [HttpPost("{id:int}/complete")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(TaskResponseDto))]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<TaskResponseDto>> Complete(
         int id,
         CompleteTaskRequestDto request,
@@ -132,10 +132,6 @@ public class TasksController : ControllerBase
         {
             CompleteTaskResultStatus.Completed => Ok(result.Task),
             CompleteTaskResultStatus.NotFound => NotFound(),
-            CompleteTaskResultStatus.AlreadyCompleted => Conflict(new
-            {
-                message = "The task has already been completed.",
-            }),
             _ => StatusCode(StatusCodes.Status500InternalServerError),
         };
     }

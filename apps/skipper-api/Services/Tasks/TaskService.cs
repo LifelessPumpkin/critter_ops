@@ -161,18 +161,26 @@ public class TaskService : ITaskService
     {
         await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
 
+        // Lock only the task row, before reading completion state or creating side effects.
         var task = await _dbContext.Tasks
-            .Include(task => task.Animal)
-            .SingleOrDefaultAsync(task => task.Id == id, cancellationToken);
+            .FromSqlInterpolated($"SELECT * FROM \"Tasks\" WHERE \"Id\" = {id} FOR UPDATE")
+            .SingleOrDefaultAsync(cancellationToken);
 
         if (task is null)
         {
             return CompleteTaskResult.NotFound();
         }
 
+        // EF identity resolution may return an entity tracked before the lock was acquired.
+        await _dbContext.Entry(task).ReloadAsync(cancellationToken);
+        await _dbContext.Entry(task).Reference(item => item.Animal).LoadAsync(cancellationToken);
+        await _dbContext.Entry(task).Reference(item => item.Enclosure).LoadAsync(cancellationToken);
+
         if (task.IsCompleted)
         {
-            return CompleteTaskResult.AlreadyCompleted();
+            var existingCompletion = ToDto(task, DateTime.UtcNow);
+            await transaction.CommitAsync(cancellationToken);
+            return CompleteTaskResult.Completed(existingCompletion);
         }
 
         var now = DateTime.UtcNow;
@@ -203,11 +211,10 @@ public class TaskService : ITaskService
         }
 
         await _dbContext.SaveChangesAsync(cancellationToken);
+        var completedTask = ToDto(task, now);
         await transaction.CommitAsync(cancellationToken);
 
-        var completedTask = await GetByIdAsync(id, cancellationToken);
-
-        return CompleteTaskResult.Completed(completedTask!);
+        return CompleteTaskResult.Completed(completedTask);
     }
 
     public async System.Threading.Tasks.Task<DeleteTaskResult> DeleteAsync(
