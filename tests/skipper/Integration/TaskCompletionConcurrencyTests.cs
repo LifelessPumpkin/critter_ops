@@ -47,13 +47,20 @@ public sealed class TaskCompletionConcurrencyTests(PostgresFixture database) : I
         }
         var results = await Task.WhenAll(first, second).WaitAsync(token);
         Assert.All(results, result => Assert.Equal(CompleteTaskResultStatus.Completed, result.Status));
-        Assert.Equal(results[0].Task!.CompletedAt, results[1].Task!.CompletedAt);
+        var firstCompletedAt = Assert.IsType<DateTime>(results[0].Task!.CompletedAt);
+        // The first response uses .NET ticks; PostgreSQL persists whole microseconds.
+        var persistedCompletedAt = firstCompletedAt.AddTicks(
+            -(firstCompletedAt.Ticks % TimeSpan.TicksPerMicrosecond));
+        Assert.Equal(persistedCompletedAt, results[1].Task!.CompletedAt);
         Assert.All(results, result => Assert.Equal("First notes", result.Task!.CompletionNotes));
 
         await using var retryContext = new ProfessorDbContext(options);
         var retry = await new TaskService(retryContext).CompleteAsync(original.Id,
             new CompleteTaskRequestDto { CompletionNotes = "Retry notes", CompletedBy = "Retry keeper" }, token);
-        Assert.Equal(results[0].Task!.CompletedAt, retry.Task!.CompletedAt);
+        Assert.Equal(persistedCompletedAt, retry.Task!.CompletedAt);
+        var persistedTask = await retryContext.Tasks.AsNoTracking()
+            .SingleAsync(task => task.Id == original.Id, token);
+        Assert.Equal(persistedCompletedAt, persistedTask.CompletedAt);
         Assert.Equal("First keeper", retry.Task.CompletedBy);
         await AssertCompletedAsync(options, original, recurrence, "First notes");
     }
