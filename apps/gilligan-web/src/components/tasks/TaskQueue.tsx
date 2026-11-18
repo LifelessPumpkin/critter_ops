@@ -1,15 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Button, Input } from "@/components/ui";
 import { TaskCreateDialog } from "@/components/tasks/TaskCreateDialog";
 import { TaskQueueSkeleton } from "@/components/tasks/TaskQueueSkeleton";
 import { TaskRow } from "@/components/tasks/TaskRow";
 import { TaskSection } from "@/components/tasks/TaskSection";
 import { type TaskTab, TaskTabs } from "@/components/tasks/TaskTabs";
-import { type HusbandryTask, completeTask, fetchTasks } from "@/lib/api/tasks";
+import { type HusbandryTask } from "@/lib/api/tasks";
 
-type LoadState = "loading" | "loaded" | "error";
+import { useTaskQueue } from "./useTaskQueue";
 
 type TaskGroups = {
   completed: HusbandryTask[];
@@ -22,66 +22,15 @@ const todayInputValue = formatDateInputValue(new Date());
 export function TaskQueue() {
   const addTaskButtonRef = useRef<HTMLButtonElement>(null);
   const [activeTab, setActiveTab] = useState<TaskTab>("today");
-  const [tasks, setTasks] = useState<HusbandryTask[]>([]);
-  const [loadState, setLoadState] = useState<LoadState>("loading");
-  const [completingTaskId, setCompletingTaskId] = useState<number | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
+  const { tasks, loadState, completingTaskIds, actionError, refreshError, refreshTasks,
+    handleCompleteTask, handleTaskCreated } = useTaskQueue();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [customFrom, setCustomFrom] = useState(todayInputValue);
   const [customTo, setCustomTo] = useState(todayInputValue);
 
-  useEffect(() => {
-    let isMounted = true;
-
-    async function loadTasks() {
-      try {
-        const taskData = await fetchTasks();
-
-        if (isMounted) {
-          setTasks(taskData);
-          setLoadState("loaded");
-        }
-      } catch (error) {
-        console.error(error);
-
-        if (isMounted) {
-          setLoadState("error");
-        }
-      }
-    }
-
-    loadTasks();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
   const todayGroups = useMemo(() => getTodayGroups(tasks), [tasks]);
   const weekGroups = useMemo(() => getWeekGroups(tasks), [tasks]);
   const customTasks = useMemo(() => getCustomTasks(tasks, customFrom, customTo), [customFrom, customTo, tasks]);
-
-  async function handleCompleteTask(task: HusbandryTask) {
-    setCompletingTaskId(task.id);
-    setActionError(null);
-
-    try {
-      const completedTask = await completeTask(task.id);
-      setTasks((currentTasks) =>
-        currentTasks.map((currentTask) => (currentTask.id === completedTask.id ? completedTask : currentTask)),
-      );
-    } catch (error) {
-      console.error(error);
-      setActionError("Unable to complete task. Please try again.");
-    } finally {
-      setCompletingTaskId(null);
-    }
-  }
-
-  function handleTaskCreated(task: HusbandryTask) {
-    setTasks((currentTasks) => [task, ...currentTasks]);
-    setActionError(null);
-  }
 
   function handleCloseCreateDialog() {
     setIsCreateDialogOpen(false);
@@ -116,6 +65,13 @@ export function TaskQueue() {
         onCreated={handleTaskCreated}
       />
 
+      {refreshError ? (
+        <div className="form-error-panel" role="alert">
+          <p>{refreshError}</p>
+          <Button type="button" onClick={() => void refreshTasks()}>Retry refresh</Button>
+        </div>
+      ) : null}
+
       {actionError ? (
         <div className="form-error-panel" role="alert">
           <p>{actionError}</p>
@@ -123,16 +79,16 @@ export function TaskQueue() {
       ) : null}
 
       {activeTab === "today" ? (
-        <TodayQueue groups={todayGroups} completingTaskId={completingTaskId} onCompleteTask={handleCompleteTask} />
+        <TodayQueue groups={todayGroups} completingTaskIds={completingTaskIds} onCompleteTask={handleCompleteTask} />
       ) : null}
 
       {activeTab === "week" ? (
-        <WeekQueue groups={weekGroups} completingTaskId={completingTaskId} onCompleteTask={handleCompleteTask} />
+        <WeekQueue groups={weekGroups} completingTaskIds={completingTaskIds} onCompleteTask={handleCompleteTask} />
       ) : null}
 
       {activeTab === "custom" ? (
         <CustomQueue
-          completingTaskId={completingTaskId}
+          completingTaskIds={completingTaskIds}
           customFrom={customFrom}
           customTasks={customTasks}
           customTo={customTo}
@@ -146,11 +102,11 @@ export function TaskQueue() {
 }
 
 function TodayQueue({
-  completingTaskId,
+  completingTaskIds,
   groups,
   onCompleteTask,
 }: {
-  completingTaskId: number | null;
+  completingTaskIds: ReadonlySet<number>;
   groups: TaskGroups;
   onCompleteTask: (task: HusbandryTask) => void;
 }) {
@@ -170,7 +126,7 @@ function TodayQueue({
       <TaskSection title="Overdue" count={groups.overdue.length}>
         {groups.overdue.length > 0 ? (
           groups.overdue.map((task) => (
-            <TaskRow key={task.id} task={task} isCompleting={completingTaskId === task.id} onComplete={onCompleteTask} />
+            <TaskRow key={task.id} task={task} isCompleting={completingTaskIds.has(task.id)} onComplete={onCompleteTask} />
           ))
         ) : (
           <p className="task-empty-message">No overdue tasks.</p>
@@ -180,7 +136,7 @@ function TodayQueue({
       <TaskSection title="Today" count={groups.today.length}>
         {groups.today.length > 0 ? (
           groups.today.map((task) => (
-            <TaskRow key={task.id} task={task} isCompleting={completingTaskId === task.id} onComplete={onCompleteTask} />
+            <TaskRow key={task.id} task={task} isCompleting={completingTaskIds.has(task.id)} onComplete={onCompleteTask} />
           ))
         ) : (
           <p className="task-empty-message">No remaining tasks due today.</p>
@@ -201,11 +157,11 @@ function TodayQueue({
 }
 
 function WeekQueue({
-  completingTaskId,
+  completingTaskIds,
   groups,
   onCompleteTask,
 }: {
-  completingTaskId: number | null;
+  completingTaskIds: ReadonlySet<number>;
   groups: Array<{ date: Date; label: string; tasks: HusbandryTask[] }>;
   onCompleteTask: (task: HusbandryTask) => void;
 }) {
@@ -225,7 +181,7 @@ function WeekQueue({
         group.tasks.length > 0 ? (
           <TaskSection key={group.label} title={group.label} count={group.tasks.length}>
             {group.tasks.map((task) => (
-              <TaskRow key={task.id} task={task} isCompleting={completingTaskId === task.id} onComplete={onCompleteTask} />
+              <TaskRow key={task.id} task={task} isCompleting={completingTaskIds.has(task.id)} onComplete={onCompleteTask} />
             ))}
           </TaskSection>
         ) : null,
@@ -235,7 +191,7 @@ function WeekQueue({
 }
 
 function CustomQueue({
-  completingTaskId,
+  completingTaskIds,
   customFrom,
   customTasks,
   customTo,
@@ -243,7 +199,7 @@ function CustomQueue({
   onChangeTo,
   onCompleteTask,
 }: {
-  completingTaskId: number | null;
+  completingTaskIds: ReadonlySet<number>;
   customFrom: string;
   customTasks: HusbandryTask[];
   customTo: string;
@@ -261,7 +217,7 @@ function CustomQueue({
       {customTasks.length > 0 ? (
         <TaskSection title="Custom Range" count={customTasks.length}>
           {customTasks.map((task) => (
-            <TaskRow key={task.id} task={task} isCompleting={completingTaskId === task.id} onComplete={onCompleteTask} />
+            <TaskRow key={task.id} task={task} isCompleting={completingTaskIds.has(task.id)} onComplete={onCompleteTask} />
           ))}
         </TaskSection>
       ) : (

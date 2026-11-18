@@ -6,7 +6,6 @@ public enum CompleteTaskResultStatus
 {
     Completed,
     NotFound,
-    AlreadyCompleted,
 }
 
 public sealed class CompleteTaskResult
@@ -24,6 +23,4 @@ public sealed class CompleteTaskResult
     public static CompleteTaskResult Completed(TaskResponseDto task) => new(CompleteTaskResultStatus.Completed, task);
 
     public static CompleteTaskResult NotFound() => new(CompleteTaskResultStatus.NotFound);
-
-    public static CompleteTaskResult AlreadyCompleted() => new(CompleteTaskResultStatus.AlreadyCompleted);
 }

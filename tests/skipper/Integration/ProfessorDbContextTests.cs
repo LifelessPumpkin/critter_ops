@@ -66,7 +66,7 @@ public class ProfessorDbContextTests : IClassFixture<PostgresFixture>
         var result = await service.CompleteAsync(task.Id, new skipper_api.Dtos.Tasks.CompleteTaskRequestDto());
         var repeated = await service.CompleteAsync(task.Id, new skipper_api.Dtos.Tasks.CompleteTaskRequestDto());
         Assert.Equal(skipper_api.Services.Tasks.CompleteTaskResultStatus.Completed, result.Status);
-        Assert.Equal(skipper_api.Services.Tasks.CompleteTaskResultStatus.AlreadyCompleted, repeated.Status);
+        Assert.Equal(skipper_api.Services.Tasks.CompleteTaskResultStatus.Completed, repeated.Status);
         context.ChangeTracker.Clear();
         Assert.True((await context.Tasks.SingleAsync(item => item.Id == task.Id)).IsCompleted);
         var next = await context.Tasks.SingleAsync(item => !item.IsCompleted);
