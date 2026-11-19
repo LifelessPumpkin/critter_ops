@@ -84,7 +84,7 @@ jobs:
           mkdir -p artifacts/security
           python3 -m venv "$RUNNER_TEMP/security-policy"
           "$RUNNER_TEMP/security-policy/bin/pip" install -r security/requirements.txt
-          SECURITY_PYTHON="$RUNNER_TEMP/security-policy/bin/python" ./packages/mary-ann-tests/scripts/test-security.sh
+          SECURITY_PYTHON="$RUNNER_TEMP/security-policy/bin/python" ./scripts/test-security.sh
           "$RUNNER_TEMP/security-policy/bin/python" security/evaluate.py validate \
             --vex-output artifacts/security/critterops.openvex.json
           if [ -s artifacts/security/critterops.openvex.json ]; then

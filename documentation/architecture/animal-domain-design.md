@@ -36,9 +36,9 @@ Every animal has a stable identity consisting of:
 Field Purpose
 Id Primary key
 Name Display name
-Species Biological species
-SubspeciesOrMorph Morph, locality, or subspecies information
-AnimalType Broad biological grouping
+SpeciesId / custom Species text Catalog identity or permanent custom description
+VariantAssignments Multiple structured/custom characteristics
+AnimalGroupId / AnimalType Catalog category and retained operational classification
 Sex Biological sex
 Status Current operational status
 Notes General descriptive information
@@ -62,52 +62,30 @@ An enclosure may contain many animals.
 
 An animal always has one assigned enclosure.
 
-Future transfers between enclosures should be recorded using movement history rather than overwriting historical information.
+Transfers use structured movement activities in the [activity ledger](activity-ledger-domain-design.md#animal-movement), updating current enclosure and recording history together.
 
 ⸻
 
-## Species
+## Species and variants
 
-Species is intentionally stored as descriptive text.
+An Animal optionally references a catalog Species by internal ID. Without it, `Animals.Species`
+implements permanent custom species storage. On migrated structured animals that column retains
+exact historical descriptions. Catalog Species scientific/common names and provenance are separate;
+[animal reference catalog](animal-reference-catalog.md) describes identity, writes and display.
 
-Examples:
-
-* Ball Python
-* Red Kangaroo
-* Leopard Gecko
-* Axolotl
-* Domestic Rabbit
-
-Using free text avoids requiring software updates whenever a new species is introduced.
-
-Future taxonomy support may normalize species into dedicated reference tables.
-
-⸻
-
-## Morph / Subspecies
-
-Many animals require additional identification beyond species.
-
-Examples include:
-
-* Pastel
-* Albino
-* Super Mojave
-* Western
-* High Red
-
-This field supports:
-
-* Reptile morphs
-* Bird mutations
-* Fish strains
-* Mammal subspecies
+`Animal.VariantAssignments` is the authoritative collection for breeds, morphs, strains and other
+characteristics. Each row has either a catalog variant ID or custom value/type, plus identity/order.
+Custom assignments are supported independently of external taxonomy. Legacy `AnimalVariantId` and
+`SubspeciesOrMorph` fields remain migration evidence. See [assignments](../animal-variant-assignments.md)
+for constraints, API preservation, migration and rollback rules.
 
 ⸻
 
 ## Animal Type
 
-AnimalType provides broad categorization used throughout the application.
+AnimalGroupId is the authoritative catalog category when present. AnimalType preserves operational
+classification and legacy filters, including ambiguous Herptile/Aquatic values that cannot safely
+be guessed into another group.
 
 Initial categories include:
 
@@ -271,15 +249,18 @@ These timestamps provide basic auditing while avoiding unnecessary complexity.
 
 ⸻
 
-Future Architecture
+## Extension ideas and implemented history
 
-The following capabilities should be implemented as separate entities rather than additional nullable columns.
+The following sections retain extension ideas; named future entities are not shipped models.
+Feeding, treatment/medication and movement activities already use the shared activity ledger,
+as linked below. Other proposed specialized records remain future work.
 
 ⸻
 
 ## Medical
 
-Future entities:
+Treatment and medication activities are implemented in the [activity ledger](activity-ledger-domain-design.md#animal-medical-activity). Broader clinical records remain future ideas:
+
 
 * AnimalMedicalRecord
 * AnimalTreatment
@@ -293,7 +274,8 @@ Medical history is operational data, not identity data.
 
 ## Feeding
 
-Future entities:
+Feeding activities are implemented in the [activity ledger](activity-ledger-domain-design.md#animal-feeding). Plans and dedicated feeding schedules remain future ideas:
+
 
 * DietPlan
 * FeedingSchedule
@@ -347,21 +329,9 @@ These systems are expected to become complex enough to warrant dedicated models.
 
 ## Movement History
 
-Rather than overwriting enclosure assignments, future movement should be recorded.
-
-Example:
-
-AnimalMovement
-
---------------
-AnimalId
-FromEnclosureId
-ToEnclosureId
-MovedDate
-Reason
-MovedBy
-
-This preserves a complete history of enclosure transfers.
+Structured movement activities update current enclosure and retain source/destination history.
+See the [activity ledger](activity-ledger-domain-design.md#animal-movement) for correction/delete
+constraints and transaction behavior. There is no separate proposed AnimalMovement history table.
 
 ⸻
 

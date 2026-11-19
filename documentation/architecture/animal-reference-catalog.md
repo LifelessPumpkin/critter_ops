@@ -1,53 +1,88 @@
 # Animal reference catalog and enclosure return workflow
 
-Animal Group is a business category, not a formal biological taxonomic class. Professor owns the catalog; ordinary entry queries only Skipper. No external taxonomy integration or reference administration UI is implemented.
+Animal Group (shown as Animal Category in Gilligan) is a business category, not a formal biological
+class. Professor owns catalog persistence. Howell Sync imports and refreshes external taxonomy;
+ordinary application requests query local data through Skipper. No catalog administration UI exists.
 
-## Persistence and compatibility
+## Persistence and identity
 
-- `AnimalGroups`: stable ID, name, sort order, active flag, and legacy AnimalType mapping. Initial groups are Mammal, Bird, Reptile, Amphibian, Fish, Invertebrate, Other. Bird maps to the existing Avian enum for older API consumers.
-- `Species`: nullable common name, required scientific name, group FK, active flag, optional preferred variant type. Common names are deliberately not unique. A scientific name alone can identify an option; common-name-only or unidentified animals use animal-local custom text.
-- `AnimalVariants`: species FK, name, variant type, optional description, active flag. Types: Breed, Morph, Variety, Strain, Mutation, Subspecies, Other. Uniqueness is scoped to species + type + name.
-- `Animals`: nullable AnimalGroupId, SpeciesId, AnimalVariantId. Existing Species, SubspeciesOrMorph, AnimalType columns remain. Referential deletes are restricted.
+- AnimalGroups have stable IDs, name, sort order, active flag, and an explicit legacy AnimalType
+  mapping. Groups are Mammal, Bird, Reptile, Amphibian, Fish, Invertebrate, Other; Bird maps to Avian.
+- Species have a required scientific name, optional primary common name, group, active flag, and
+  optional preferred variant type. Names are not globally unique identifiers.
+- AnimalVariants define a species-specific name/type, optional description, and active flag.
+  Types include Breed, Morph, Variety, Strain, Mutation, Subspecies and Other.
+- Animals have optional group/Species IDs and permanent custom species text. Multiple
+  `AnimalVariantAssignment` rows are authoritative for structured and custom characteristics.
+  Legacy single-variant columns remain historical evidence, not live assignment storage.
 
-Structured IDs are authoritative. Reads resolve names through joins; without IDs, the existing text is authoritative. Species/variant text fields are snapshots when catalog references are assigned and remain usable by older consumers. Supplying both an ID and text resolves to the catalog value. Custom text never creates a global catalog entry. Species determines its group if a group is omitted. A custom species without a group uses the existing Other enum without inventing a catalog classification.
+Internal IDs remain authoritative across provider changes. Selecting a catalog species never creates
+another global row. Custom species and custom variants remain supported without provider recognition.
+See [catalog metadata](animal-catalog-metadata.md) for provenance/ownership/constraints and
+[variant assignments](../animal-variant-assignments.md) for collection integrity and lifecycle.
 
-Create/update reject unavailable IDs, cross-species variants, group/species mismatches, blank required species, custom values longer than 100 characters, and nonblank-but-whitespace-only custom variants. A variant is optional. Existing inactive references may be retained during unrelated edits, but cannot be newly assigned. Normal DTO validation still requires name, enclosure, status, sex, and acquisition date. The UI also enforces reference text length limits.
+## Write and read contracts
 
-PUT remains a full update. Older clients omitting reference-ID properties preserve existing links when they round-trip unchanged resolved text and AnimalType. Modern clients send explicit null to clear an ID; changing species clears its structured variant. Explicitly changing classification replaces the animal's text snapshots. Migration itself never changes those snapshots.
+Create/PUT use `speciesId` or `customSpeciesName`, optional `animalGroupId` and operational
+`animalType`, plus `variantAssignments`. A structured species supplies its group if omitted.
+New animals require a catalog or nonblank custom species. Conflicting IDs/custom values,
+incompatible group/species/variants, unavailable new selections, and oversized custom text are
+rejected. Existing inactive references can be retained on unchanged records. Custom text is
+preserved exactly; it does not create global catalog values.
 
-Animal responses retain `species`, `subspeciesOrMorph`, `animalType`, and add group/species/variant IDs, `animalGroupName`, `speciesScientificName`, `variantType`, `preferredVariantType`, and resolved `speciesName`/`variantName` aliases. List and detail projections resolve names server-side without per-row queries.
+Animal PUT still requires the normal animal fields. Omitting its reference section preserves
+historical/incomplete values; explicit changes have validation and null-clearing rules. Assignment
+omission/null preserves the collection; `[]` clears it. Species changes require explicit resolution
+of incompatible structured assignments and never discard custom values. See the
+[assignment API](../animal-variant-assignments.md#api) for full replacement and identity semantics.
+Deprecated single-variant request adapters cannot be combined with the collection.
+
+Reads resolve catalog display names server-side and return IDs, scientific names, preferred type,
+custom/original species text and the assignment collection. Legacy single-variant aliases derive
+from the first assignment. The old `species` and `subspeciesOrMorph` request fields are rejected;
+resolved response strings are display values, not write fields. Preserved operational AnimalType
+values, including ambiguous Herptile/Aquatic, are not guessed into catalog groups.
 
 ## Migrations and seeds
 
-Apply `20261017170530_AddAnimalReferenceCatalog`, then `20261017170959_AddAnimalCatalogSearchIndexes` with the established EF migration process. Never point development verification at production. These additive migrations create catalog tables, relationships, indexes, seven groups, sixteen species and four variants; they leave every existing Animal row and text column intact. No mapping is attempted, including unambiguous-looking values. Herptile and Aquatic remain exactly as recorded; they require an informed user decision before reclassification.
+Professor owns the complete ordered migration history. Apply migrations through Skipper's
+[EF instructions](../../apps/skipper-api/README.md#ef-core-migrations), not a hand-selected initial pair.
+The initial catalog migrations add seven groups, sixteen species and four variants with stable IDs.
+They preserve existing Animals/text and add pg_trgm search indexes. The migration role must be able
+to install that extension, or an administrator must preinstall it. Index rollback retains the extension.
 
-EF `HasData` uses fixed IDs and the migration history supplies repeatability; there are no catalog writes in application startup. Reapplying the migration process does not duplicate seeds. The search migration requires PostgreSQL `pg_trgm` to be available and a migration role permitted to install it, or an administrator to preinstall it. Its rollback removes the new indexes but intentionally retains the shared extension. Rolling back the catalog migration removes catalog links/tables; normal forward deployment preserves legacy data.
+The [legacy-reference migration](legacy-animal-reference-migration.md) subsequently performs exact,
+conservative matching with retained audit data. The [assignment migration](../animal-variant-assignments.md#migration-and-verification)
+backfills multiple values without deleting original animal fields. Populated rollback has explicit
+safeguards; audit snapshots do not replace backups. No column cleanup is authorized by a successful
+migration. Preserve internal/seed IDs, custom values and ambiguous original classifications.
 
-Initial species: domestic dog, domestic cat, domestic ferret, ball python, bearded dragon, leopard gecko, corn snake, axolotl, goldfish, betta, budgerigar, cockatiel, guinea pig, rabbit, Madagascar hissing cockroach, Mexican red-knee tarantula. Variants: Labrador Retriever and Poodle for dog; Albino and Pastel for ball python. The curated scientific strings include domestic forms below species rank: Canis lupus familiaris and Mustela putorius furo. The operational Species catalog intentionally accommodates these familiar husbandry labels rather than asserting a formal rank hierarchy. These names are documented by [GBIF](https://www.gbif.org/es/taxon/5G6ZJ) and [NCBI](https://www.ncbi.nlm.nih.gov/bioproject/78213).
-
-To expand the catalog, add reviewed records through a migration (small curated additions) or a future controlled offline importer. Reserve existing IDs, advance identity sequences after explicit-ID bulk imports, validate group/type relationships, retain source attribution and release metadata, and deactivate records rather than deleting referenced rows. Import and admin tooling are follow-up work.
+For catalog expansion use [Howell Sync](../../apps/howell-sync/README.md) and the
+[local catalog guide](../operations/local-catalog-setup.md). The curated seed catalog includes
+husbandry labels below formal species rank; it does not assert a full biological rank hierarchy.
+Howell's GBIF mapper conservatively accepts its documented provider ranks/classifications.
 
 ## Read APIs and search
 
-| Endpoint | Query parameters | Response |
-| --- | --- | --- |
-| GET /api/animal-groups | none | Active groups ordered by SortOrder, Id; Id, Name, SortOrder, LegacyAnimalType |
-| GET /api/species | search, animalGroupId, page, pageSize | items with Id, CommonName, ScientificName, AnimalGroupId, AnimalGroupName, PreferredVariantType; page, pageSize, hasMore |
-| GET /api/animal-variants | speciesId, search, page, pageSize | items with Id, SpeciesId, Name, VariantType; page, pageSize, hasMore |
+`GET /api/animal-groups` returns active groups ordered by SortOrder/ID. Species and variant searches
+return bounded pages with `hasMore`. [Catalog search](catalog-search.md) owns query parameters,
+25-row defaults, required Species scope for variants, ranking, alias/common-name matching,
+limits, index behavior and display-name fallback. Do not load the entire catalog into Gilligan.
 
-Both searches accept empty text, default to 20 items, and cap at 100. Pages start at 1 (maximum 1,000,000); invalid values return HTTP 400 through model validation. Species sorts by common-name-or-scientific-name, scientific name, ID; variants by name, ID. Queries apply ILIKE filters and pagination in PostgreSQL and read one extra row to calculate hasMore. User `%`, `_`, and backslash are escaped as literal search text. Species searches match common and scientific names. Inactive records/groups are excluded from suggestions, without removing existing animal display values. Variant queries from the form always include SpeciesId.
-
-B-tree indexes support group/species scope; GIN trigram indexes support substring ILIKE on common/scientific/variant names. Very short terms can still require scans; bounded results prevent a catalog download. Deep offset pagination and high-write imports should be measured before significantly larger catalog deployments; no Elasticsearch is required.
-
-GET /api/animals/search also accepts `animalGroupIds` alongside legacy `animalTypes`. Filters combine their matches. A catalog-group filter includes unclassified legacy records only when their original AnimalType equals that group's explicit legacy mapping. Reptile/Fish filters do not guess that Herptile/Aquatic belong to them. All records remain accessible through All and explicit legacy filters.
+Animal search supports both `animalGroupIds` and legacy `animalTypes`. Group filtering includes
+unclassified legacy animals only when their original AnimalType exactly matches the group's
+explicit mapping. Reptile/Fish filters do not assume Herptile/Aquatic identity. All and legacy
+filters retain access to historical animals.
 
 ## Gilligan workflow
 
-The shared Add/Edit form loads group options from Skipper and uses Ginger Select/Combobox. Species and variant searches reuse the combobox's approximately 300 ms debounce. Each request has an AbortController and an active guard; results from superseded requests cannot overwrite the current result. Selected options retain their labels even outside the current result page. Initial, loading, empty and error states are provided. Catalog selectors allow the explicit custom-value action while a search is still pending.
-
-Species displays common and scientific names. Type text then select `Use "…" as custom species` or the corresponding custom variant action. Selected custom options are labeled `(custom)`. With a custom species, variants remain custom and no global variant query is made. PreferredVariantType controls Breed/Morph/Variety/etc. labels centrally through catalog metadata; the fallback label is Variant. Selecting another incompatible group clears structured species and variant selections. Changing species clears variants; reselecting the same species retains them. Other form fields stay intact.
-
-The repository previously had no Edit Animal route. `/animals/[id]/edit` now reuses the form and is linked from animal activity. It loads legacy or structured references and retains all existing optional fields, including fields not displayed in the compact form. The Animals list keeps its existing layout and supports both catalog groups and explicitly labeled legacy type filters. List/detail responses provide common display values for existing consumers.
+Add/Edit share bounded species/variant selectors with loading, empty, retry and paging feedback.
+Requests are protected against stale responses; selected values survive paging and search changes.
+Structured species determines/locks category. A manually selected category can constrain initial
+species search. Custom species allow manual classification. Variants appear as removable/editable
+chips; labels/new custom types follow Species.PreferredVariantType with Variant/Other fallback.
+Species changes preserve selections and flag incompatibilities for explicit resolution. See the
+[assignment UI contract](../animal-variant-assignments.md#gilligan) for accessibility, errors and drafts.
 
 ### Create enclosure during Add Animal
 
@@ -71,4 +106,4 @@ Session storage isolates normal tabs; multiple workflows have separate UUID keys
 
 Sources: [COL downloads and release policy](https://www.catalogueoflife.org/data/download), [COL content license](https://www.catalogueoflife.org/), [GBIF Species API](https://techdocs.gbif.org/en/openapi/v1/species), [GBIF checklist requirements](https://www.gbif.org/uk/data-quality-requirements-checklists), [GBIF terms](https://www.gbif.org/terms?preview=true), [NCBI Taxonomy](https://www.ncbi.nlm.nih.gov/guide/taxonomy/), [NCBI nomenclature disclaimer](https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi), [NCBI policies](https://www.ncbi.nlm.nih.gov/home/about/policies/), [iNaturalist developer exports](https://www.inaturalist.org/pages/developers), [iNaturalist licensing](https://help.inaturalist.org/en/support/solutions/articles/151000175695).
 
-Recommendation (engineering judgment): start with a reviewed, versioned COL Base subset, then consider licensed GBIF/iNaturalist common-name enrichment. Keep source, release, identifiers, license and attribution alongside an offline staging import; review ambiguities before promotion. Taxonomy changes require local ID reconciliation rather than replacing existing animal references. Breed/morph/variety/strain records need separate curated husbandry sources and rights checks; general taxonomy is insufficient. Future external-service outages must never block Add Animal. No importer, synchronizer, live external lookup or external ID schema is implemented in this ticket.
+Recommendation (engineering judgment): start with a reviewed, versioned COL Base subset, then consider licensed GBIF/iNaturalist common-name enrichment. Keep source, release, identifiers, license and attribution alongside an offline staging import; review ambiguities before promotion. Taxonomy changes require local ID reconciliation rather than replacing existing animal references. Breed/morph/variety/strain records need separate curated husbandry sources and rights checks; general taxonomy is insufficient. Future external-service outages must never block Add Animal. This assessment predates the GBIF implementation. Howell now supplies offline import/synchronization and provenance; see its runbook above. COL, NCBI, and iNaturalist adapters remain unimplemented. Licensing statements here are dated research, not a current redistribution approval.

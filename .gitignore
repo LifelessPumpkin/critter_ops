@@ -26,7 +26,19 @@ bld/
 # .NET Core
 project.lock.json
 project.fragment.lock.json
-artifacts/
+/artifacts/build/
+/artifacts/test-results/
+# Generated scanner reports; any intentionally tracked evidence remains tracked.
+/artifacts/security/semgrep.json
+/artifacts/security/semgrep.sarif
+/artifacts/security/semgrep-status.json
+/artifacts/security/trivy.json
+/artifacts/security/trivy.sarif
+/artifacts/security/trufflehog-status.json
+/artifacts/security/evaluation.json
+/artifacts/security/summary.md
+/artifacts/security/critterops.openvex.json
+/artifacts/security/run.*/
 
 # ASP.NET Scaffolding
 ScaffoldingReadMe.txt
@@ -61,11 +73,11 @@ nunit-*.xml
 ####### Next.js #######
 
 # Dependencies
-/node_modules
+node_modules/
 /.pnpm-store
 
 # Next.js Build Output
-/.next/
+.next/
 /out/
 
 # Production Build Artifacts
@@ -85,7 +97,7 @@ yarn-error.log*
 pnpm-debug.log*
 
 # Testing & Coverage Data
-/coverage
+coverage/
 /.nyc_output
 
 # Vercel Deployment Previews
@@ -96,3 +108,7 @@ pnpm-debug.log*
 *.local
 /.idea
 /.vscode
+
+# TypeScript incremental build state and temporary logs
+*.tsbuildinfo
+*.log

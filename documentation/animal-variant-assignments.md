@@ -1,4 +1,4 @@
-# Multiple animal variant assignments (Ticket 6)
+# Multiple animal variant assignments
 
 `Animal.VariantAssignments` is the authoritative characteristic collection. An animal has zero or more `AnimalVariantAssignment` rows, each with its own generated integer identity, animal FK, display order and UTC timestamps. It contains exactly one catalog `AnimalVariantId` or permanent `CustomValue`. Custom variants never require a catalog record or external provider recognition. This is descriptive metadata; genetic calculations are out of scope.
 
@@ -73,6 +73,10 @@ Detail displays all assignments and custom/type metadata, including inactive cat
 
 ## Limits and follow-ups
 
-Historical invalid references and distinct legacy text require operator review; retained columns are intentional. No genetics, imports, catalog administration, Howell Sync changes or deployment changes were introduced. Updates use normal aggregate replacement semantics, without a new optimistic-concurrency/version API. A concurrent constraint conflict requires refresh and retry.
+Historical invalid references and distinct legacy text require operator review; retained columns are intentional. Genetics, catalog administration and deployment automation are not implemented. Howell imports
+taxonomy independently; it does not import characteristic assignments. Updates use normal aggregate replacement semantics, without a new optimistic-concurrency/version API. A concurrent constraint conflict requires refresh and retry.
 
-Ticket 7 should measure collection projection/query plans with large animal datasets before adding catalog search features. Preserve pagination and use `Any` for any future assignment filter. Ticket 8 should document operator audit review, backup/rollback procedures, coordinated retirement of deprecated API aliases, and a separately validated legacy-column cleanup.
+Measure collection projections against representative animal datasets before adding new assignment
+filters; preserve pagination and use `Any` for collection predicates. A production operator runbook,
+coordinated retirement of deprecated API aliases and separately validated legacy-column cleanup
+remain future work. Current search behavior is documented in [catalog search](architecture/catalog-search.md).

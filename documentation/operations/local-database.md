@@ -1,6 +1,6 @@
-# Professor DB (PostgreSQL Local Database)
+# Local PostgreSQL database
 
-This package contains assets, documentation, and tools related to the PostgreSQL database for the CritterOps application.
+Professor uses PostgreSQL 16. EF Core entities, mappings and migrations live in `packages/professor-persistence`; Skipper and Howell Sync share that library. See [local development](../local-development.md) for connection configuration and migrations.
 
 Local development database services are managed via Docker Compose at the root of the repository.
 
@@ -34,7 +34,7 @@ All Docker Compose commands should be run from the **root directory** of the rep
 To start the PostgreSQL container in the background (detached mode):
 
 ```bash
-docker compose up -d
+docker compose up -d db
 ```
 
 To verify that the database is running and check its logs:
@@ -59,10 +59,10 @@ To completely erase the local database and start fresh (this deletes the persist
 docker compose down -v
 ```
 
-Then rebuild and start the database again:
+Reset only disposable data you intend to erase. Changing `.env` does not reinitialize an existing volume or change its original credentials. Then start the database again:
 
 ```bash
-docker compose up -d
+docker compose up -d db
 ```
 
 ---
@@ -99,8 +99,8 @@ Using `psql` from the command line:
 psql "postgresql://postgres:postgres@localhost:5432/critterops_dev"
 ```
 
-See [Animal reference catalog and enclosure return workflow](../../documentation/architecture/animal-reference-catalog.md) for schema, compatibility, API contracts, draft behavior, and verification guidance.
+See [Animal reference catalog and enclosure return workflow](../architecture/animal-reference-catalog.md) for schema, compatibility, API contracts, draft behavior, and verification guidance.
 
-See [Animal catalog metadata](../../documentation/architecture/animal-catalog-metadata.md)
+See [Animal catalog metadata](../architecture/animal-catalog-metadata.md)
 for provider-neutral taxonomy references, names, synchronization history, constraints,
 curation policy, and migration/rollback behavior.

@@ -1,5 +1,10 @@
 # CritterOps UI Structure & Navigation Specification
 
+Status: retained design intent, including proposed screens and workflows. This is not a shipped
+feature inventory. Use the [design-system guide](gilligan-design-system.md) for maintained components,
+[animal workflow](architecture/animal-reference-catalog.md) for current entry, and
+[system architecture](architecture/README.md) for implementation boundaries.
+
 ## Design Philosophy
 
 CritterOps should feel like software built specifically for managing animals—not a generic CRUD admin panel.

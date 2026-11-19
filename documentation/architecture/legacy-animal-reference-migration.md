@@ -1,4 +1,10 @@
-# Ticket 2: legacy animal reference migration
+# Legacy animal reference migration
+
+This guide preserves migration `20261017210000` rationale and its original single-variant
+model/write behavior. Those historical sections are not the current variant contract:
+[variant assignments](../animal-variant-assignments.md) now owns structured/custom variant storage,
+and [animal catalog](animal-reference-catalog.md) describes current entry. The migration matching
+rules, exact-original audit, validation SQL and populated rollback restrictions remain relevant.
 
 ## Status and scope
 

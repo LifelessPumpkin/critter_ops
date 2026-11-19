@@ -6,6 +6,7 @@ The backend API for the CritterOps application, built using ASP.NET Core 10.
 
 ### Prerequisites
 
+Run the commands in this section from `apps/skipper-api`.
 Ensure you have the .NET SDK (version 10.0) installed. You can verify this by running:
 
 ```bash
@@ -46,23 +47,12 @@ dotnet run --launch-profile http
 
 Skipper API uses **Entity Framework Core 10** with the **Npgsql** PostgreSQL provider. The `ProfessorDbContext` is the primary DbContext and is registered with the ASP.NET Core DI container.
 
-### Local Prerequisites
+### Local prerequisites
 
-1. Start the PostgreSQL container from the repo root:
-
-   ```bash
-   docker compose up -d
-   ```
-
-   This starts `postgres:16-alpine` on port **5433** (see `.env`).
-
-2. Ensure `appsettings.Development.json` contains the correct connection string (already pre-configured for local development):
-
-   ```json
-   "ConnectionStrings": {
-     "ProfessorDb": "Host=localhost;Port=5433;Database=critterops_dev;Username=postgres;Password=postgres"
-   }
-   ```
+Follow [local development](../../documentation/local-development.md) for database startup and
+connection environment. Compose defaults to host port 5432 from `.env.example`; the checked-in
+Skipper Development fallback uses 5433. Export `ConnectionStrings__ProfessorDb` with the actual
+credentials/port. Compose `.env` is not automatically loaded by .NET.
 
 ### EF Core Migrations
 
@@ -81,25 +71,25 @@ dotnet tool install --global dotnet-ef --version 10.0.12
 #### Apply migrations to the local database
 
 ```bash
-dotnet ef database update --project ../../packages/professor-persistence --startup-project .
+CRITTEROPS_EF_DESIGN_TIME=true dotnet ef database update --project ../../packages/professor-persistence --startup-project .
 ```
 
 #### Create a new migration
 
 ```bash
-dotnet ef migrations add <MigrationName> --project ../../packages/professor-persistence --startup-project . --output-dir Data/Migrations
+CRITTEROPS_EF_DESIGN_TIME=true dotnet ef migrations add <MigrationName> --project ../../packages/professor-persistence --startup-project . --output-dir Data/Migrations
 ```
 
 #### Remove the last unapplied migration
 
 ```bash
-dotnet ef migrations remove --project ../../packages/professor-persistence --startup-project .
+CRITTEROPS_EF_DESIGN_TIME=true dotnet ef migrations remove --project ../../packages/professor-persistence --startup-project .
 ```
 
 ### Health Endpoints
 
 | Endpoint | Purpose | Fails when |
-|---|---|---|
+| --- | --- | --- |
 | `GET /health` | API liveness | Never — returns `200 Healthy` as long as the process is up |
 | `GET /health/db` | PostgreSQL connectivity | DB is unreachable → `503 Unhealthy` |
 
@@ -120,9 +110,9 @@ docker build -f apps/skipper-api/Dockerfile -t critterops/skipper:local .
 Replace `/path/to/critter_ops` with your checkout's path. `-f` selects the
 Dockerfile; `-t` names the resulting local image; the final `.` supplies the
 current directory as the build context. Keep that final dot, and do not run
-this command from `apps/skipper-api`. The build only copies Skipper. If shared
-project references or root-level NuGet/MSBuild configuration are introduced,
-include their restore inputs before restore and their sources before publish.
+this command from `apps/skipper-api`. The build copies Skipper and its shared Professor Persistence project. If further shared
+projects or root-level NuGet/MSBuild configuration are introduced, include their restore inputs
+before restore and their sources before publish.
 
 Start the image and check the API:
 
@@ -210,3 +200,19 @@ health monitoring are follow-up work.
 
 Mary Ann's existing pre-merge Skipper unit job builds this Dockerfile using
 .NET 10. It does not publish or deploy the image.
+
+## API conventions
+
+Controllers use `/api/...` routes and JSON DTOs; enum values serialize as strings. Swagger is
+available in Development. Existing controllers generally return 200 for reads/updates, 201 with
+a resource location for creates, 204 for successful deletes, 404 for missing resources and 400
+for invalid requests/domain references. Model-binding validation uses ASP.NET validation responses;
+service-level errors can use `{ "message": "..." }`. Error shape is not yet globally uniform.
+
+Use explicit request DTOs rather than EF entities, and keep business behavior in services. Animal
+requests reject unmapped JSON members. Animal PUT still requires its normal required fields;
+reference omission/null and assignment collection semantics have specific preservation rules. See
+[animal catalog](../../documentation/architecture/animal-reference-catalog.md),
+[variant assignments](../../documentation/animal-variant-assignments.md#api), and
+[catalog search](../../documentation/architecture/catalog-search.md) for those contracts and
+bounded pagination. Do not infer PATCH semantics or a uniform page envelope across all endpoints.

@@ -45,12 +45,13 @@ a taxonomy branch is complete. `validate` reads Professor mappings and writes no
 Unsupported providers and unsafe scopes are rejected. `help` needs no configuration.
 
 | Exit | Meaning |
-|---|---|
+| --- | --- |
 | 0 | Bounded scope complete, possibly with record-level review issues |
 | 1 | Execution/database/provider failure; committed batches may remain |
 | 2 | Invalid arguments/configuration/provider/retry scope |
 | 3 | Another catalog operation owns the PostgreSQL execution lock |
 | 4 | Partial: request budget exhausted before the requested scope completed |
+| 5 | Development profile below its required minimum eligible Species |
 | 130 | Cancelled; committed batches may remain |
 
 ## Configuration and provider protections
@@ -60,7 +61,7 @@ the executable's appsettings.json followed by environment configuration. Only th
 provider is validated. No connection string or raw provider error body is logged.
 
 | Setting | Default | Bounds/purpose |
-|---|---|---|
+| --- | --- | --- |
 | BaseUrl | `https://api.gbif.org/v1/` | HTTPS base ending in `/`, no credentials/query/fragment |
 | UserAgent | empty | Required CritterOps identity with real operator-supplied contact |
 | DatasetIdentifier | `d7dddbf4-2cf0-4f39-9b2a-bb099caae36c` | Explicit v1 Backbone compatibility strategy |
@@ -233,10 +234,10 @@ Existing CI builds Howell/Skipper and executes these suites. Consult [GBIF terms
 and dataset licensing/citation metadata before redistribution; stored provenance does not
 replace licence review.
 
-Ticket 6 must preserve Species identity while adding multiple variant assignments. Ticket 7
-searches local common names/aliases without provider calls. Ticket 8 should document
-scheduler configuration, migrations, issue review, budget sizing, dataset licensing and future
-COL XR migration. None of those tickets is implemented here.
+Current [variant assignments](../../documentation/animal-variant-assignments.md) and
+[catalog search](../../documentation/architecture/catalog-search.md) preserve Species identity
+and query local data. Scheduler deployment, a production backup/restore and issue-review runbook,
+dataset licensing review, and a future COL XR adapter remain separate operational work.
 
 ## Human-readable execution logs
 
@@ -262,7 +263,7 @@ visible. No serialized command/scope JSON or raw exception stack is appended.
 These lines are illustrative, not a live import result.
 
 | Environment setting | Default | Purpose |
-|---|---|---|
+| --- | --- | --- |
 | `HowellLog__Directory` | `logs/howell-sync` | Use an absolute writable path for scheduled/container runs |
 | `HowellLog__RetentionDays` | `30` | Delete matching expired log files at startup; range 1–3650 days |
 | `HowellLog__MaxFileBytes` | `10485760` | Rotate into a new numbered segment; range 1 KiB–100 MiB |
