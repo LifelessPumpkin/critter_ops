@@ -210,7 +210,8 @@ curl --fail 'http://127.0.0.1:5199/api/species?page=2&pageSize=25'
 
 See [search contracts](../architecture/catalog-search.md),
 [performance measurements](../performance/catalog-search.md), and
-[implementation/verification report](../catalog-search-implementation-report.md) for actual executed results.
+[retained verification output](catalog-verification-results.txt) for the dated isolated run.
+These results describe that development instance, not the current contents of a contributor database.
 
 ## Executed results (November 14, 2026)
 
@@ -227,3 +228,11 @@ common/scientific searches, derived category, Variant fallback, and bounded page
 The optional 2500-Species override and changes to the user's separate existing Compose database
 were NOT RUN. Fresh database migrations and empty-catalog imports were covered with disposable
 PostgreSQL and mocked GBIF in automated tests.
+
+The retained output came from container `critterops-ticket7-db`, database
+`critterops_catalog_dev`, host port 55439. It records 1538 distinct accepted GBIF-backed Species
+overall, including 38 outside expanded scopes from an earlier bounded run; unlinked seeds do not
+count toward profile minimums. Expanded recorded 180 UnrecognizedAnimalGroup, 178 RepeatedUsageKey
+and 3 InvalidCommonName issues. The two Fish rows remained seeds because sampled provider records
+lacked classification. No missing taxonomy was invented. The saved verification output is evidence
+from that date; this cleanup did not rerun imports or query the development database.

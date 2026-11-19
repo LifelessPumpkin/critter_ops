@@ -1,9 +1,9 @@
 # Animal reference catalog metadata
 
-Ticket 1 extends Professor in place. External providers supply data; CritterOps owns
-Species identity. `Species.Id` remains an integer primary key, independent of every
-provider's string identifiers. Existing Animal, AnimalGroup, AnimalVariant, DTOs,
-endpoints, legacy text and fixed catalog seeds are unchanged.
+Professor owns Species identity independently of provider identifiers. Names, aliases, external
+references, execution history and review issues extend the local catalog without replacing
+internal IDs. [Howell Sync](../../apps/howell-sync/README.md) owns import/reconciliation behavior;
+[assignments](../animal-variant-assignments.md) owns animal characteristics.
 
 ```mermaid
 erDiagram
@@ -26,18 +26,18 @@ Internal enums are persisted as bounded strings. Existing records default to
 Unresolved and manually managed, without reclassification. Historical creation and
 modification timestamps remain null because their actual values are unknown.
 
-IsManuallyManaged is conservative record-level protection: future writers must not
+IsManuallyManaged is conservative record-level protection: writers must not
 replace curated core values on protected species. Imported species explicitly set
 it false; a manual core edit must set it true. Mixed ownership is represented by a
-protected core record and separately retained provider observations. No field-level
-merge or enforcement service is introduced. Future writers own this policy.
+protected core record and separately retained provider observations. Howell also uses last-applied scientific-name ownership to protect unknown or locally edited
+values; see its runbook for rename/conflict rules.
 
 All timestamps use PostgreSQL timestamptz and UTC DateTime values. New name, alias,
 reference and issue CreatedAt values default to CURRENT_TIMESTAMP. Species dates
 are writer-supplied; LastSyncedAt means the last successful species synchronization.
 ExternalReference.LastCheckedAt records an attempted check, even without changes;
 UpdatedAt records the last change to the provider observation, not each check.
-There is no automatic timestamp update or synchronization logic.
+Writers maintain timestamps; there is no database trigger that automatically refreshes them.
 
 ## Names, synonyms and provenance
 
@@ -46,7 +46,9 @@ stores additional names with optional language and source attribution. No prefer
 flag or cache duplicates that authority. Promoting an additional name is a future
 writer operation: update CommonName explicitly, optionally retain the former display
 name as an additional name, and remove a redundant additional entry in the same
-transaction. Existing APIs continue to use CommonName; migration does not copy it.
+transaction. API display prefers curated CommonName, then a stored English common name, then
+the first stored name, ordered by ID. See [search contracts](catalog-search.md) for fallback behavior.
+Migration does not copy the primary name.
 
 SpeciesAlias associates an alternate, historical, synonym or deprecated scientific
 name with the internal species it resolves to. It does not create another Species.
@@ -88,11 +90,13 @@ may reuse identifiers. This requires PostgreSQL 15+; the repository uses Postgre
 
 CatalogSyncRun records provider/dataset, operation (Import, Synchronization,
 Validation, CatalogExpansion), lifecycle status (Pending, Running, Completed,
-CompletedWithIssues, Failed, Cancelled), nullable StartedAt/CompletedAt, nonnegative
+CompletedWithIssues, Partial, Failed, Cancelled), nullable StartedAt/CompletedAt, nonnegative
 processed/created/updated/skipped/failed counts and optional bounded ErrorMessage.
 Pending runs can exist before starting. Completion cannot precede starting.
 Counts are writer-maintained summaries, not constrained to sum during incremental
-updates. Retry attempts can use new runs; no checkpoint/resume protocol is defined.
+updates. Runs also retain bounded scope, retry linkage, selected reference IDs, last committed checkpoint,
+completion reason, unchanged/issue counts and HTTP attempts/retries. Sync retries resume the stored
+selection; import retries replay bounded scopes. See the Howell runbook for exact recovery semantics.
 
 CatalogSyncIssue records extensible IssueType (100), severity (Information, Warning,
 Error), status (Open, Investigating, Resolved, Ignored), Description (4000), CreatedAt
@@ -101,7 +105,8 @@ records and manually discovered issues are representable. Provider, dataset and
 external identifier preserve issue provenance after metadata removal. Writers must
 copy consistent provenance when linking a run/reference and maintain lifecycle
 transitions/resolution times; those cross-record policies are not automated here.
-No raw API response, credential storage, reconciliation or retry workflow is added.
+Open/investigating issues use a fingerprint plus filtered unique index for deduplication.
+Resolution history remains preserved. Raw API bodies and credentials are not stored in issues.
 
 ## Relationships, deletion and indexes
 
@@ -116,7 +121,7 @@ New name-key indexes support exact normalized lookup; species-leading unique ind
 also support collection lookup. References have the provider/dataset/identifier
 unique index and a SpeciesId FK index. Runs index (Provider, StartedAt) and
 (Status, StartedAt). Issues index each FK and (Status, IssueType) for review queues.
-No low-selectivity standalone taxonomy-status index or new search service is added.
+Additional trigram indexes on alternate names and aliases support [catalog search](catalog-search.md).
 
 ## Migration and verification
 
@@ -137,16 +142,9 @@ and migration/down/reapply with structured, custom and legacy Animals. Its snaps
 compares every old Animal, group, variant and Species field across migration stages.
 Existing catalog tests continue to validate API compatibility and seeded behavior.
 
-## Follow-up boundaries
+## Operational boundaries
 
-- Ticket 2: migrate legacy Animals using stable internal IDs; preserve custom text.
-- Ticket 3: worker writes this schema and enforces curation, provenance and timestamps.
-- Ticket 4: GBIF adapter maps opaque IDs/datasets and preserves raw provider statuses.
-- Ticket 5: synchronization establishes merge, retry/checkpoint and issue policies;
-  checkpoint persistence may need a later schema addition once the protocol is known.
-- Ticket 6: multiple variant assignments remain a separate relationship migration.
-- Ticket 7: extend search to names/aliases and measure indexes against actual queries.
-- Ticket 8: document operational retention, provider slug registry, backup and recovery.
-
-No worker, external calls, scheduler, API/frontend changes or deployment changes are
-part of this ticket.
+Retain metadata and issue history according to reviewed operational policy. Automatic catalog
+administration, issue resolution UI, scheduler deployment, production backup/restore procedures,
+and additional provider adapters remain future work. Current CLI, ownership, request budgets,
+logging, locking and recovery are maintained in the Howell runbook.

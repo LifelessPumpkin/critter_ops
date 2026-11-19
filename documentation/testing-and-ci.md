@@ -1,6 +1,6 @@
 # Testing and CI
 
-Mary Ann (`packages/mary-ann-tests`) orchestrates tests; application test implementations
+Mary Ann test entry points in `scripts/` orchestrate tests; application test implementations
 belong to their application. Skipper production code lives in `apps/skipper-api`,
 xUnit projects in `tests/skipper/Unit` and `tests/skipper/Integration`, and Gilligan
 Vitest/React Testing Library tests remain within `apps/gilligan-web`.
@@ -14,11 +14,17 @@ Install .NET SDK 10, Node.js 22, and Gilligan dependencies (`npm ci` in
 make test
 make test-skipper
 make test-gilligan
-./packages/mary-ann-tests/scripts/test-skipper.sh unit
-./packages/mary-ann-tests/scripts/test-skipper.sh integration --configuration Release
+make test-security
+make test-howell-script
+./scripts/test-skipper.sh unit
+./scripts/test-skipper.sh integration --configuration Release
 ```
 
-`test-all.sh` attempts both applications and returns nonzero if either fails.
+`test-all.sh` attempts security policy, Skipper, Gilligan and Howell script suites and returns
+nonzero if any fails. Security tests require Python 3.10+ and `security/requirements.txt`;
+use a virtual environment and set `SECURITY_PYTHON` to its executable. See
+[security test setup](../security/README.md) before running `make test` or `make test-security`.
+`HOWELL_TEST_PYTHON` optionally selects Python for Howell script contracts.
 Skipper validates expected projects before running; it never tests the production
 project as a fallback. Missing tooling, missing dependencies, failed containers,
 failed migrations, builds, and test failures cause unsuccessful execution.
@@ -27,7 +33,7 @@ failed migrations, builds, and test failures cause unsuccessful execution.
 
 Integration tests use Testcontainers.PostgreSql with `postgres:16-alpine`, matching
 Professor. Each test receives a randomly named database within a disposable container
-with a random host port. Tests apply the real Skipper EF Core migrations and use the
+with a random host port. Tests apply the real Professor EF Core migrations and use the
 production context without SQLite-specific model overrides. They construct connections
 exclusively from the container, never from appsettings, `.env`, or production secrets.
 Class fixtures dispose containers, and Testcontainers resource cleanup covers abandoned
@@ -36,11 +42,12 @@ databases. Docker and image-pull access are prerequisites; failures are never sk
 See [Testcontainers PostgreSQL documentation](https://dotnet.testcontainers.org/modules/postgres/).
 
 Unit tests require no database or Docker. Add regression tests for actual business rules,
-request validation, and application results. Future LanguageExt Option/Fin/domain-error
-coverage belongs here when that migration lands. Integration coverage protects persistence,
+request validation, and application results. LanguageExt is optional; test meaningful domain
+outcomes if adopted, without requiring a conversion. Integration coverage protects persistence,
 relationships, constraints, and transactional workflows. Gilligan tests should protect
-critical user behavior, loading/errors, filters, forms, navigation, and timelines rather
-than duplicate presentation markup. The existing enclosure-name regression is retained.
+API request contracts, failures/recovery, forms, custom-value preservation, complex async
+behavior, and keyboard accessibility. Avoid presentation/layout tests and duplicated coverage.
+See [application testing standards](engineering-standards.md#testing-by-application).
 
 ## GitHub Actions and required checks
 
@@ -64,14 +71,12 @@ Require these exact job names in branch protection or repository rulesets:
 `Mary Ann - Security Scanning` runs independently on the same PR targets and supports
 manual execution. Require `Mary Ann Security Scanning`, `Semgrep SAST`,
 `Trivy Dependency Scan`, and `TruffleHog Secret Scan` alongside the three regression
-checks above. Workflow display names are not status-check names. Builds and existing
-regression coverage remain unchanged; no existing lint job was present to migrate.
+checks above. Workflow display names are not status-check names. The workflows build and test applications; frontend lint is currently a local check, not a CI job.
 
 Branch protection was not changed remotely. See
 [Security scanning](security-scanning.md#required-checks-and-protected-branches)
 for exact ruleset settings, reporting permissions, fork behavior and hosted validation.
-Neither workflow reruns automatically after merge. A future separate deployment
-pipeline is outside this ticket.
+Neither workflow reruns automatically after merge. Deployment automation is not implemented.
 
 ## Task activity coverage
 
@@ -88,3 +93,15 @@ failing test must fail its job; security failures must remain separately visible
 not introduce intentionally failing commits on shared protected branches to validate CI.
 
 See [Animal reference catalog and enclosure return workflow](architecture/animal-reference-catalog.md) for schema, compatibility, API contracts, draft behavior, and verification guidance.
+
+## Howell and script contracts
+
+Howell CLI/configuration/provider tests run in the Skipper unit project. PostgreSQL integration
+tests cover import correctness, idempotency, lifecycle, advisory locking, retries, batch rollback,
+dry runs, cancellation, and process crashes. The process harness lives only in the test assembly.
+
+`make test-howell-script` runs standard-library Python contracts for profile/default forwarding,
+dry-run/retry flags, missing configuration and exit propagation. It is included in `make test`.
+Real-provider manual runs are separate, bounded operations described in
+[local catalog setup](operations/local-catalog-setup.md). Security scanning remains an independent
+CI gate; policy unit tests are not substitutes for running scanners.

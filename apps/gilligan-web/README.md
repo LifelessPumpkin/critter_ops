@@ -10,7 +10,7 @@ npm ci
 npm run dev
 ```
 
-Open http://localhost:3000. In development only, Skipper defaults to its existing HTTP launch-profile address, `http://localhost:5198`. Override it with `SKIPPER_API_URL` in the process environment or `apps/gilligan-web/.env.local`. Restart the development server after changing environment configuration. Docker is not required for Gilligan development.
+Open <http://localhost:3000>. In development only, Skipper defaults to its existing HTTP launch-profile address, `http://localhost:5198`. Override it with `SKIPPER_API_URL` in the process environment or `apps/gilligan-web/.env.local`. Restart the development server after changing environment configuration. Docker is not required for Gilligan development.
 
 `NEXT_PUBLIC_API_URL` is no longer used. Migrate existing settings to server-only `SKIPPER_API_URL`. Browser requests use relative `/api/skipper/api/...` paths, including animals, enclosures, activity and tasks. The dashboard's existing Skipper Swagger and health links also pass through `/api/skipper`; these are Skipper resources, not Gilligan health endpoints. Skipper only enables Swagger in its Development environment.
 
@@ -76,4 +76,4 @@ npm test
 npm run build
 ```
 
-The existing Mary Ann wrapper is `./packages/mary-ann-tests/scripts/test-gilligan.sh` from the monorepo root. Its tests include runtime proxy regression coverage. Pre-merge Mary Ann CI also builds the Gilligan Docker image; it does not publish it or deploy anything.
+The existing Mary Ann wrapper is `./scripts/test-gilligan.sh` from the monorepo root. Its tests include runtime proxy regression coverage. Pre-merge Mary Ann CI also builds the Gilligan Docker image; it does not publish it or deploy anything.

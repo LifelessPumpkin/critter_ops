@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 set -eu
-repo_root="$(CDPATH= cd -- "$(dirname -- "$0")/../../.." && pwd)"
+repo_root="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 if ! command -v dotnet >/dev/null 2>&1; then
   echo "The .NET 10 SDK is required to run Skipper tests." >&2
   exit 1

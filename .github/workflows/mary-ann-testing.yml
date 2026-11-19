@@ -21,7 +21,7 @@ jobs:
       - name: Build Howell Sync independently
         run: dotnet build apps/howell-sync/howell-sync.csproj --configuration Release
       - name: Skipper unit tests
-        run: ./packages/mary-ann-tests/scripts/test-skipper.sh unit --configuration Release
+        run: ./scripts/test-skipper.sh unit --configuration Release
       - name: Build Skipper Docker image
         run: docker build -f apps/skipper-api/Dockerfile -t critterops/skipper:ci .
 
@@ -34,7 +34,7 @@ jobs:
         with:
           dotnet-version: 10.0.x
       - name: Skipper PostgreSQL integration tests
-        run: ./packages/mary-ann-tests/scripts/test-skipper.sh integration --configuration Release
+        run: ./scripts/test-skipper.sh integration --configuration Release
 
   gilligan:
     name: Gilligan Build / Regression Tests
@@ -53,6 +53,6 @@ jobs:
         working-directory: apps/gilligan-web
         run: npm run build
       - name: Gilligan regression tests
-        run: ./packages/mary-ann-tests/scripts/test-gilligan.sh
+        run: ./scripts/test-gilligan.sh
       - name: Build Gilligan Docker image
         run: docker build -f apps/gilligan-web/Dockerfile -t critterops/gilligan:ci .
