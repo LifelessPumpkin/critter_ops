@@ -79,7 +79,7 @@ public class AnimalFeedingActivityService : IAnimalFeedingActivityService
         var activityEvent = new ActivityEvent
         {
             EventType = ActivityEventType.Feeding,
-            OccurredAt = request.OccurredAt!.Value,
+            OccurredAt = request.OccurredAt!.Value.ToUniversalTime(),
             Title = ToAnimalTimelineTitle(request.Quantity!.Value, request.Unit!.Value, request.Food!, request.Result!.Value),
             Notes = request.Notes,
             PerformedBy = request.PerformedBy,
@@ -146,7 +146,7 @@ public class AnimalFeedingActivityService : IAnimalFeedingActivityService
             return UpdateAnimalFeedingActivityResult.NotFound();
         }
 
-        feedingEvent.OccurredAt = request.OccurredAt!.Value;
+        feedingEvent.OccurredAt = request.OccurredAt!.Value.ToUniversalTime();
         feedingEvent.Notes = request.Notes;
         feedingEvent.PerformedBy = request.PerformedBy;
         feedingEvent.Title = ToAnimalTimelineTitle(

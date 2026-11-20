@@ -50,7 +50,7 @@ export function AnimalOverview({ initialState = {} }: { initialState?: AnimalOve
   const [enclosures, setEnclosures] = useState<Enclosure[]>([]);
   const [enclosuresLoading, setEnclosuresLoading] = useState(true);
   const [animalPage, setAnimalPage] = useState(defaultPage);
-  const [loadState, setLoadState] = useState<LoadState>("loading");
+  const [requestState, setRequestState] = useState<{ key: string; status: LoadState }>({ key: "", status: "loading" });
   const [additionalLoadState, setAdditionalLoadState] = useState<AdditionalLoadState>("idle");
   const [reloadKey, setReloadKey] = useState(0);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -70,29 +70,30 @@ export function AnimalOverview({ initialState = {} }: { initialState?: AnimalOve
   }), [animalTypes, deferredSearch, enclosureId, lifecycle, statuses]);
   const requestKey = useMemo(() => `${JSON.stringify(query)}:${reloadKey}`, [query, reloadKey]);
 
+  const loadState = requestState.key === requestKey ? requestState.status : "loading";
+
   useEffect(() => {
     const controller = new AbortController();
     activeRequestKeyRef.current = requestKey;
     loadMoreAbortRef.current?.abort();
     loadMoreAbortRef.current = null;
     inFlightPageRef.current = null;
-    setAdditionalLoadState("idle");
-    setLoadState("loading");
 
     searchAnimals({ ...query, page: 1 }, controller.signal)
       .then((response) => {
-        if (activeRequestKeyRef.current !== requestKey) return;
+        if (controller.signal.aborted || activeRequestKeyRef.current !== requestKey) return;
         setAnimalPage({ ...response, items: deduplicateAnimals(response.items) });
-        setLoadState("loaded");
+        setRequestState({ key: requestKey, status: "loaded" });
+        setAdditionalLoadState("idle");
       })
       .catch((error: unknown) => {
         if (error instanceof DOMException && error.name === "AbortError") return;
-        if (activeRequestKeyRef.current !== requestKey) return;
+        if (controller.signal.aborted || activeRequestKeyRef.current !== requestKey) return;
         console.error(error);
-        setLoadState("error");
+        setRequestState({ key: requestKey, status: "error" });
       });
 
-    return () => controller.abort();
+    return () => { controller.abort(); loadMoreAbortRef.current?.abort(); };
   }, [query, requestKey]);
 
   useEffect(() => {
@@ -133,7 +134,7 @@ export function AnimalOverview({ initialState = {} }: { initialState?: AnimalOve
 
     searchAnimals({ ...query, page: nextPage }, controller.signal)
       .then((response) => {
-        if (activeRequestKeyRef.current !== requestKey || inFlightPageRef.current !== nextPage) return;
+        if (controller.signal.aborted || loadMoreAbortRef.current !== controller) return;
         setAnimalPage((current) => ({
           ...response,
           page: Math.max(current.page, response.page),
@@ -143,12 +144,12 @@ export function AnimalOverview({ initialState = {} }: { initialState?: AnimalOve
       })
       .catch((error: unknown) => {
         if (error instanceof DOMException && error.name === "AbortError") return;
-        if (activeRequestKeyRef.current !== requestKey) return;
+        if (controller.signal.aborted || activeRequestKeyRef.current !== requestKey) return;
         console.error(error);
         setAdditionalLoadState("error");
       })
       .finally(() => {
-        if (inFlightPageRef.current === nextPage) inFlightPageRef.current = null;
+        if (loadMoreAbortRef.current === controller) inFlightPageRef.current = null;
       });
   }, [additionalLoadState, animalPage.page, hasMore, loadState, query, requestKey]);
 

@@ -1,3 +1,4 @@
+import { isTimelineDate } from "./timelineDateUtils";
 import { activityEventTypes, activitySortOptions, type ActivityEventType } from "@/lib/api/activity";
 import type { RangeGroupBy, TimelineInitialState, TimelineView } from "@/components/activity/timelineTypes";
 
@@ -36,7 +37,7 @@ function parseView(value?: string): TimelineView | undefined {
 }
 
 function parseDate(value?: string) {
-  return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : undefined;
+  return isTimelineDate(value) ? value : undefined;
 }
 
 function parsePositiveInteger(value?: string) {
