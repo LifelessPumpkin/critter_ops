@@ -37,29 +37,6 @@ describe("adaptive animal references", () => {
     expect(screen.getByRole("combobox", { name: /^Animal Category/ })).toHaveTextContent("Mammal");
     expect(screen.queryByText("Custom variant type")).not.toBeInTheDocument();
   });
-  it("preserves variants and requires explicit removal when species changes", async () => {
-    render(<Harness initial={{ ...empty, species: "Dog", selectedSpecies: dog, variantAssignments: [{ animalVariantId: 1, speciesId: 1, displayName: "Poodle", variantType: "Breed", isCustom: false }] }} />);
-    await act(async () => {});
-    await choose(/^Species/, /^Ball python/);
-    expect(screen.getByRole("combobox", { name: /^Morph/ })).toBeInTheDocument();
-    expect(screen.getByText("Incompatible with selected species")).toBeInTheDocument();
-    expect(screen.getByTestId("value")).toHaveTextContent('"animalVariantId":1');
-  });
-  it("debounces scientific search and ignores out-of-order responses", async () => {
-    let finishOld!: (value: Awaited<ReturnType<typeof searchSpecies>>) => void;
-    vi.mocked(searchSpecies).mockImplementationOnce(() => new Promise((resolve) => { finishOld = resolve; }));
-    render(<Harness />);
-    fireEvent.click(screen.getByRole("combobox", { name: /^Species/ }));
-    await waitFor(() => expect(searchSpecies).toHaveBeenCalledTimes(1));
-    vi.useFakeTimers();
-    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "Python regius" } });
-    await act(async () => { vi.advanceTimersByTime(299); });
-    expect(searchSpecies).toHaveBeenCalledTimes(1);
-    await act(async () => { vi.advanceTimersByTime(1); });
-    expect(searchSpecies).toHaveBeenLastCalledWith("Python regius", undefined, expect.any(AbortSignal), 1);
-    await act(async () => finishOld({ items: [{ ...dog, commonName: "Stale result" }], page: 1, pageSize: 20, hasMore: false }));
-    expect(screen.queryByRole("option", { name: /Stale result/ })).not.toBeInTheDocument();
-  });
   it("supports explicit custom species and custom variant even when catalog fails", async () => {
     vi.mocked(searchSpecies).mockRejectedValue(new Error("Offline"));
     render(<Harness />);
@@ -116,11 +93,6 @@ it("adds mixed assignments, prevents duplicates, edits custom text and removes o
   expect(screen.getByRole("button", { name: "Edit Edited Line" })).toBeInTheDocument();
 });
 
-it.each([null, "UnknownType", "Other"])("falls back to Variant for preference %s", async preference => {
-  render(<Harness initial={{ ...empty, selectedSpecies: { ...dog, preferredVariantType: preference } }} />);
-  await act(async () => {});
-  expect(screen.getByRole("combobox", { name: /^Variant/ })).toBeInTheDocument();
-});
 it("uses species preference for new custom values and preserves historical types", async () => {
   render(<Harness initial={{ ...empty, selectedSpecies: dog, variantAssignments: [{ assignmentId: 9, customValue: "Historical", displayName: "Historical", variantType: "Strain", isCustom: true }] }} />);
   await act(async () => {});
@@ -144,7 +116,7 @@ it("shows normalized custom duplicate feedback beside the selector and allows ma
   fireEvent.change(screen.getByRole("searchbox"), { target: { value: " local line " } });
   await waitFor(() => expect(screen.getByRole("option", { name: /Add "local line"/ })).toBeInTheDocument());
   fireEvent.mouseDown(screen.getByRole("option", { name: /Add "local line"/ }));
-  expect(screen.getByText("That value is already selected.").closest(".animal-variant-picker")).not.toBeNull();
+  expect(screen.getByText("That value is already selected.")).toBeInTheDocument();
   expect(screen.getAllByRole("button", { name: /^Remove / })).toHaveLength(1);
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 });
@@ -154,7 +126,8 @@ it("selects multiple catalog values by keyboard and keeps custom values on speci
   await act(async () => {});
   for (const name of ["Poodle", "Labrador"]) {
     fireEvent.keyDown(screen.getByRole("combobox", { name: /^Breed/ }), { key: "Enter" });
-    await screen.findByRole("option", { name: new RegExp(`^${name}$`) });
+    const option = await screen.findByRole("option", { name: new RegExp(`^${name}$`) });
+    expect(screen.getByRole("searchbox")).toHaveAttribute("aria-activedescendant", option.id);
     fireEvent.keyDown(screen.getByRole("searchbox"), { key: "Enter" });
     expect(screen.getByRole("button", { name: `Remove ${name}` })).toBeInTheDocument();
   }

@@ -66,6 +66,14 @@ docker restart critterops-gilligan
 
 For runtime configuration validation, remove and recreate the container from the same image with a different `SKIPPER_API_URL`, then repeat an API request. A dedicated Gilligan health endpoint is optional future monitoring work.
 
+## Activity timeline state
+
+`ActivityTimeline` owns filters, view controls, selection and rendering. Page URL parameters initialize those controls; subsequent edits replace the current URL, and browser history navigation restores controls through `timelineUrlState`. Saved views apply to the same component state. Invalid calendar dates are ignored before building API requests.
+
+`useActivityPages` owns bounded activity requests, cancellation, retry and page merging. Query changes cancel pending pages; controller identity checks prevent old page completions or cleanup from affecting a newer request. Failed additional pages preserve loaded results and retry the same page. Selection stays across appended pages; explicit filter/date changes and applying saved views clear it. Search and sort retain the existing selection behavior.
+
+`timelineStorage` validates saved views and preferences using the existing version-one storage keys, including the legacy preset fallback. Reads do not rewrite stored views. Invalid entries are ignored while recoverable fields remain available; unavailable storage leaves the timeline usable.
+
 ## Validation
 
 ```sh

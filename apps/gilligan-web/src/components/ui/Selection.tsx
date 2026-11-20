@@ -2,6 +2,7 @@
 
 import { createPortal } from "react-dom";
 import {
+  useCallback,
   useEffect,
   useId,
   useLayoutEffect,
@@ -56,19 +57,23 @@ type Position = { above: boolean; left: number; top: number; width: number; maxH
 
 export function Select(props: SelectProps) {
   const { disabled = false, emptyMessage = "No options available.", error, label, labelHidden = false, loading = false, name, onValueChange, options, placeholder = "Select an option", required = false, value } = props;
-  const [open, setOpen] = useState(false);
+  const [portalRoot, setPortalRoot] = useState<Element | null>(null);
+  const open = portalRoot !== null;
   const selectedIndex = options.findIndex((option) => option.value === value);
-  const [activeIndex, setActiveIndex] = useState(Math.max(selectedIndex, firstEnabledIndex(options)));
+  const [activeValue, setActiveValue] = useState<string | null>(null);
+  const activeIndex = enabledIndex(options, activeValue ?? value);
+  function setActiveIndex(index: number) { setActiveValue(options[index]?.value ?? null); }
   const selected = selectedIndex >= 0 ? options[selectedIndex] : undefined;
   const ids = useSelectionIds();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const position = useFloatingPosition(open, triggerRef);
+  const setOpen = useCallback((nextOpen: boolean) => {
+    setActiveValue(null);
+    setPortalRoot(nextOpen ? getPortalRoot(triggerRef.current) : null);
+  }, []);
 
   useDismiss(open, setOpen, triggerRef, contentRef);
-  useEffect(() => {
-    if (open) setActiveIndex(selectedIndex >= 0 ? selectedIndex : firstEnabledIndex(options));
-  }, [open, options, selectedIndex]);
 
   function selectAt(index: number) {
     const option = options[index];
@@ -88,7 +93,7 @@ export function Select(props: SelectProps) {
     if (!open) return;
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       event.preventDefault();
-      setActiveIndex((current) => nextEnabledIndex(options, current, event.key === "ArrowDown" ? 1 : -1));
+      setActiveIndex(nextEnabledIndex(options, activeIndex, event.key === "ArrowDown" ? 1 : -1));
     } else if (event.key === "Home" || event.key === "End") {
       event.preventDefault();
       setActiveIndex(event.key === "Home" ? firstEnabledIndex(options) : lastEnabledIndex(options));
@@ -116,25 +121,26 @@ export function Select(props: SelectProps) {
         aria-labelledby={`${ids.labelId} ${ids.valueId}`}
         aria-required={required}
         disabled={disabled}
-        onClick={() => setOpen((current) => !current)}
+        onClick={() => setOpen(!open)}
         onKeyDown={handleKeyDown}
       >
         <span id={ids.valueId} className={selected ? undefined : "selection-placeholder"}>{selected?.label ?? placeholder}</span>
         <Chevron open={open} />
       </button>
-      {open ? createPortal(
+      {portalRoot ? createPortal(
         <SelectionListbox ids={ids} options={options} activeIndex={activeIndex} selectedValues={value ? [value] : []} position={position} contentRef={contentRef} loading={loading} emptyMessage={emptyMessage} onHover={setActiveIndex} onSelect={selectAt} />,
-        getPortalRoot(triggerRef.current),
+        portalRoot,
       ) : null}
     </SelectionField>
   );
 }
 
 export function Combobox(props: ComboboxProps) {
-  const { disabled = false, emptyMessage = "No matches found.", error, label, labelHidden = false, loading = false, name, onSearchChange, onValueChange, options, placeholder = "Search or select...", required = false, searchPlaceholder = "Search...", value } = props;
-  const [open, setOpen] = useState(false);
+  const { disabled = false, emptyMessage = "No matches found.", error, label, labelHidden = false, loading = false, name, onSearchChange, onValueChange, options, placeholder = "Search or select...", required = false, searchPlaceholder = "Search...", onOpenChange, value } = props;
+  const [portalRoot, setPortalRoot] = useState<Element | null>(null);
+  const open = portalRoot !== null;
   const [search, setSearch] = useState("");
-  const [activeIndex, setActiveIndex] = useState(0);
+  const [activeValue, setActiveValue] = useState<string | null>(null);
   const debouncedSearch = useDebouncedValue(search, props.debounceMs ?? 300);
   const selected = options.find((option) => option.value === value);
   const filteredOptions = useMemo(() => {
@@ -142,21 +148,28 @@ export function Combobox(props: ComboboxProps) {
     const term = search.trim().toLocaleLowerCase();
     return options.filter((option) => option.label.toLocaleLowerCase().includes(term));
   }, [onSearchChange, options, search]);
+  const activeIndex = enabledIndex(filteredOptions, activeValue);
+  function setActiveIndex(index: number) { setActiveValue(filteredOptions[index]?.value ?? null); }
   const ids = useSelectionIds();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const position = useFloatingPosition(open, triggerRef);
+  const setOpen = useCallback((nextOpen: boolean) => {
+    setActiveValue(null);
+    if (!nextOpen) setSearch("");
+    setPortalRoot(nextOpen ? getPortalRoot(triggerRef.current) : null);
+  }, []);
 
   useDismiss(open, setOpen, triggerRef, contentRef);
   useEffect(() => { if (onSearchChange) onSearchChange(props.debounceMs === 0 ? search : debouncedSearch); }, [debouncedSearch, search, props.debounceMs, onSearchChange]);
   useEffect(() => {
-    if (!open) { setSearch(""); return; }
-    setActiveIndex(firstEnabledIndex(filteredOptions));
-    window.requestAnimationFrame(() => searchRef.current?.focus());
-  }, [filteredOptions, open]);
+    if (!open) return;
+    const frame = window.requestAnimationFrame(() => searchRef.current?.focus());
+    return () => window.cancelAnimationFrame(frame);
+  }, [open]);
 
-  useEffect(() => { props.onOpenChange?.(open); }, [open, props.onOpenChange]);
+  useEffect(() => { onOpenChange?.(open); }, [open, onOpenChange]);
 
   function selectAt(index: number) {
     const option = filteredOptions[index];
@@ -169,7 +182,7 @@ export function Combobox(props: ComboboxProps) {
   function handleSearchKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       event.preventDefault();
-      setActiveIndex((current) => nextEnabledIndex(filteredOptions, current, event.key === "ArrowDown" ? 1 : -1));
+      setActiveIndex(nextEnabledIndex(filteredOptions, activeIndex, event.key === "ArrowDown" ? 1 : -1));
     } else if (event.key === "Enter") {
       event.preventDefault();
       selectAt(activeIndex);
@@ -187,16 +200,16 @@ export function Combobox(props: ComboboxProps) {
   return (
     <SelectionField label={label} labelHidden={labelHidden} required={required} error={error} ids={ids}>
       {name ? <input type="hidden" name={name} value={value} /> : null}
-      <button ref={triggerRef} id={ids.controlId} type="button" className={triggerClassName(props.className, error, open)} role="combobox" aria-controls={ids.listboxId} aria-describedby={error ? ids.errorId : undefined} aria-expanded={open} aria-haspopup="listbox" aria-invalid={Boolean(error)} aria-labelledby={`${ids.labelId} ${ids.valueId}`} aria-required={required} disabled={disabled} onClick={() => setOpen((current) => !current)} onKeyDown={(event) => { if (["Enter", " ", "ArrowDown", "ArrowUp"].includes(event.key)) { event.preventDefault(); setOpen(true); } }}>
+      <button ref={triggerRef} id={ids.controlId} type="button" className={triggerClassName(props.className, error, open)} role="combobox" aria-controls={ids.listboxId} aria-describedby={error ? ids.errorId : undefined} aria-expanded={open} aria-haspopup="listbox" aria-invalid={Boolean(error)} aria-labelledby={`${ids.labelId} ${ids.valueId}`} aria-required={required} disabled={disabled} onClick={() => setOpen(!open)} onKeyDown={(event) => { if (["Enter", " ", "ArrowDown", "ArrowUp"].includes(event.key)) { event.preventDefault(); setOpen(true); } }}>
         <span id={ids.valueId} className={selected ? undefined : "selection-placeholder"}>{selected?.label ?? placeholder}</span><Chevron open={open} />
       </button>
-      {open ? createPortal(
+      {portalRoot ? createPortal(
         <div ref={contentRef} className="selection-content" style={positionStyle(position)}>
-          <label className="selection-search"><span className="visually-hidden">{searchPlaceholder}</span><span aria-hidden="true">⌕</span><input ref={searchRef} value={search} placeholder={searchPlaceholder} role="searchbox" aria-controls={ids.listboxId} aria-activedescendant={filteredOptions[activeIndex] ? `${ids.optionPrefix}-${activeIndex}` : undefined} onChange={(event) => setSearch(event.target.value)} onKeyDown={handleSearchKeyDown} /></label>
+          <label className="selection-search"><span className="visually-hidden">{searchPlaceholder}</span><span aria-hidden="true">⌕</span><input ref={searchRef} value={search} placeholder={searchPlaceholder} role="searchbox" aria-controls={ids.listboxId} aria-activedescendant={filteredOptions[activeIndex] ? `${ids.optionPrefix}-${activeIndex}` : undefined} onChange={(event) => { setSearch(event.target.value); setActiveValue(null); }} onKeyDown={handleSearchKeyDown} /></label>
           <SelectionOptions ids={ids} options={filteredOptions} activeIndex={activeIndex} selectedValues={value ? [value] : []} loading={loading} allowSelectionWhileLoading={props.allowSelectionWhileLoading} emptyMessage={emptyMessage} onHover={setActiveIndex} onSelect={selectAt} />
           {props.footer}
         </div>,
-        getPortalRoot(triggerRef.current),
+        portalRoot,
       ) : null}
     </SelectionField>
   );
@@ -204,12 +217,19 @@ export function Combobox(props: ComboboxProps) {
 
 export function MultiSelect(props: MultiSelectProps) {
   const { disabled = false, emptyMessage = "No options available.", error, label, labelHidden = false, loading = false, onValueChange, options, placeholder, required = false, value } = props;
-  const [open, setOpen] = useState(false);
-  const [activeIndex, setActiveIndex] = useState(firstEnabledIndex(options));
+  const [portalRoot, setPortalRoot] = useState<Element | null>(null);
+  const open = portalRoot !== null;
+  const [activeValue, setActiveValue] = useState<string | null>(null);
+  const activeIndex = enabledIndex(options, activeValue);
+  function setActiveIndex(index: number) { setActiveValue(options[index]?.value ?? null); }
   const ids = useSelectionIds();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const position = useFloatingPosition(open, triggerRef);
+  const setOpen = useCallback((nextOpen: boolean) => {
+    setActiveValue(null);
+    setPortalRoot(nextOpen ? getPortalRoot(triggerRef.current) : null);
+  }, []);
   useDismiss(open, setOpen, triggerRef, contentRef);
 
   function toggleAt(index: number) {
@@ -221,7 +241,7 @@ export function MultiSelect(props: MultiSelectProps) {
   function handleKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
     if (!open && ["Enter", " ", "ArrowDown", "ArrowUp"].includes(event.key)) { event.preventDefault(); setOpen(true); return; }
     if (!open) return;
-    if (event.key === "ArrowDown" || event.key === "ArrowUp") { event.preventDefault(); setActiveIndex((current) => nextEnabledIndex(options, current, event.key === "ArrowDown" ? 1 : -1)); }
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") { event.preventDefault(); setActiveIndex(nextEnabledIndex(options, activeIndex, event.key === "ArrowDown" ? 1 : -1)); }
     else if (event.key === "Enter" || event.key === " ") { event.preventDefault(); toggleAt(activeIndex); }
     else if (event.key === "Home" || event.key === "End") { event.preventDefault(); setActiveIndex(event.key === "Home" ? firstEnabledIndex(options) : lastEnabledIndex(options)); }
   }
@@ -229,10 +249,10 @@ export function MultiSelect(props: MultiSelectProps) {
   const displayValue = value.length ? `${label} (${value.length})` : placeholder ?? label;
   return (
     <SelectionField label={label} labelHidden={labelHidden} required={required} error={error} ids={ids} compact>
-      <button ref={triggerRef} id={ids.controlId} type="button" className={triggerClassName(props.className, error, open)} role="combobox" aria-activedescendant={open && options[activeIndex] ? `${ids.optionPrefix}-${activeIndex}` : undefined} aria-controls={ids.listboxId} aria-describedby={error ? ids.errorId : undefined} aria-expanded={open} aria-haspopup="listbox" aria-invalid={Boolean(error)} aria-labelledby={`${ids.labelId} ${ids.valueId}`} disabled={disabled} onClick={() => setOpen((current) => !current)} onKeyDown={handleKeyDown}>
+      <button ref={triggerRef} id={ids.controlId} type="button" className={triggerClassName(props.className, error, open)} role="combobox" aria-activedescendant={open && options[activeIndex] ? `${ids.optionPrefix}-${activeIndex}` : undefined} aria-controls={ids.listboxId} aria-describedby={error ? ids.errorId : undefined} aria-expanded={open} aria-haspopup="listbox" aria-invalid={Boolean(error)} aria-labelledby={`${ids.labelId} ${ids.valueId}`} disabled={disabled} onClick={() => setOpen(!open)} onKeyDown={handleKeyDown}>
         <span id={ids.valueId}>{displayValue}</span><Chevron open={open} />
       </button>
-      {open ? createPortal(<SelectionListbox ids={ids} options={options} activeIndex={activeIndex} selectedValues={value} position={position} contentRef={contentRef} loading={loading} emptyMessage={emptyMessage} onHover={setActiveIndex} onSelect={toggleAt} multi />, getPortalRoot(triggerRef.current)) : null}
+      {portalRoot ? createPortal(<SelectionListbox ids={ids} options={options} activeIndex={activeIndex} selectedValues={value} position={position} contentRef={contentRef} loading={loading} emptyMessage={emptyMessage} onHover={setActiveIndex} onSelect={toggleAt} multi />, portalRoot) : null}
     </SelectionField>
   );
 }
@@ -304,3 +324,8 @@ function lastEnabledIndex(options: SelectionOption[]) { for (let index = options
 function nextEnabledIndex(options: SelectionOption[], current: number, direction: 1 | -1) { if (!options.length) return 0; let index = current; for (let attempts = 0; attempts < options.length; attempts += 1) { index = (index + direction + options.length) % options.length; if (!options[index].disabled) return index; } return current; }
 function focusAdjacent(trigger: HTMLElement | null, direction: 1 | -1) { if (!trigger) return; const focusable = Array.from(document.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])')).filter((element) => element.offsetParent !== null && !element.closest(".selection-content")); const index = focusable.indexOf(trigger); focusable[index + direction]?.focus(); }
 function getPortalRoot(trigger: HTMLElement | null) { return trigger?.closest("dialog") ?? document.body; }
+
+function enabledIndex(options: SelectionOption[], value: string | null) {
+  const index = options.findIndex(option => option.value === value && !option.disabled);
+  return index >= 0 ? index : firstEnabledIndex(options);
+}

@@ -7,7 +7,7 @@ afterEach(() => { cleanup(); vi.useRealTimers(); });
 it("debounces immediately invalidated queries, aborts old requests and rejects out-of-order completions", async () => {
   vi.useFakeTimers();
   const resolves: ((page: CatalogPage<number>) => void)[] = [];
-  const fetchPage = vi.fn((_page: number, _signal: AbortSignal) => new Promise<CatalogPage<number>>(resolve => resolves.push(resolve)));
+  const fetchPage = vi.fn<(page: number, signal: AbortSignal) => Promise<CatalogPage<number>>>(() => new Promise<CatalogPage<number>>(resolve => resolves.push(resolve)));
   const { result, rerender, unmount } = renderHook(({ key }) => useCatalogSearch(key, key, true, fetchPage, "Failed"), { initialProps: { key: "python" } });
   await act(async () => { vi.advanceTimersByTime(299); });
   expect(fetchPage).not.toHaveBeenCalled();
@@ -26,7 +26,7 @@ it("debounces immediately invalidated queries, aborts old requests and rejects o
 });
 it("keeps one bounded page, resets on category/species/term change, and cancels on close", async () => {
   vi.useFakeTimers();
-  const fetchPage = vi.fn(async (n: number, _signal: AbortSignal) => page([n], true));
+  const fetchPage = vi.fn<(page: number, signal: AbortSignal) => Promise<CatalogPage<number>>>(async (n) => page([n], true));
   const { result, rerender } = renderHook(({ key, enabled }) => useCatalogSearch(key, "", enabled, fetchPage, "Failed"), { initialProps: { key: "species:1", enabled: true } });
   await act(async () => { vi.runOnlyPendingTimers(); });
   expect(result.current.items).toEqual([1]);

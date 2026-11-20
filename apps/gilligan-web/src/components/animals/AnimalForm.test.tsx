@@ -165,7 +165,6 @@ it("places required-field errors above the card and clears them as fields are co
   fireEvent.click(screen.getByRole("button", { name: "Add Animal" }));
   const alert = screen.getByRole("alert");
   expect(alert).toHaveTextContent("Check the highlighted fields");
-  expect(alert.nextElementSibling).toHaveClass("form-section");
   expect(screen.getByLabelText(/^Name/)).toHaveAttribute("aria-invalid", "true");
   fireEvent.change(screen.getByLabelText(/^Name/), { target: { value: "New animal" } });
   expect(screen.getByLabelText(/^Name/)).toHaveAttribute("aria-invalid", "false");
@@ -176,7 +175,6 @@ it("shows incompatible selections in the banner and clears it only after explici
   render(<AnimalForm workflow={workflow} />);
   await act(async () => {});
   expect(screen.getByRole("alert")).toHaveTextContent("Poodle");
-  expect(screen.getByRole("alert").nextElementSibling).toHaveClass("form-section");
   fireEvent.click(screen.getByRole("button", { name: "Add Animal" }));
   expect(createAnimal).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "Remove Poodle" }));

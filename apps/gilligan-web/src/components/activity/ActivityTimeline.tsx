@@ -31,24 +31,18 @@ import {
   type TimelineSavedView,
   type TimelineView,
 } from "@/components/activity/timelineTypes";
+import { parseTimelineInitialState } from "./timelineUrlState";
+import { useActivityPages, type AdditionalLoadState } from "./useActivityPages";
+import { readPreferences, writePreferences, readSavedViews, writeSavedViews, sanitizeFiltersForContext, sanitizeColumnsForContext } from "./timelineStorage";
 import { Button, Skeleton, SkeletonText } from "@/components/ui";
-import { activityEventTypes, activityPageSize, activitySortOptions, fetchActivities, formatEnumLabel, type ActivityEventType, type ActivityRecord, type ActivitySortDirection } from "@/lib/api/activity";
+import { activityPageSize, formatEnumLabel, type ActivityRecord, type ActivitySortDirection } from "@/lib/api/activity";
 import { fetchAnimals, type Animal } from "@/lib/api/animals";
 import { fetchEnclosures, type Enclosure } from "@/lib/api/enclosures";
-
-type LoadState = "loading" | "loaded" | "error";
-type RequestState = { key: string; status: LoadState };
-type AdditionalLoadState = "idle" | "loading" | "error";
 
 type ActivityTimelineProps = {
   context: TimelineContext;
   initialState?: TimelineInitialState;
 };
-
-const defaultActivityPage = { page: 0, pageSize: activityPageSize, totalCount: 0, totalPages: 0, items: [] as ActivityRecord[] };
-const preferencesKey = "critterops.activityTimeline.preferences.v1";
-const savedViewsKey = "critterops.activityTimeline.savedViews.v1";
-const legacyPresetsKey = "critterops.activityTimeline.filterPresets.v1";
 
 export function ActivityTimeline({ context, initialState = {} }: ActivityTimelineProps) {
   const initialFilters: TimelineFilters = {
@@ -59,10 +53,8 @@ export function ActivityTimeline({ context, initialState = {} }: ActivityTimelin
     from: initialState.filters?.from ?? "",
     to: initialState.filters?.to ?? "",
   };
-  const [activityPage, setActivityPage] = useState(defaultActivityPage);
   const [animals, setAnimals] = useState<Animal[]>([]);
   const [enclosures, setEnclosures] = useState<Enclosure[]>([]);
-  const [performers, setPerformers] = useState<string[]>([]);
   const [columns, setColumns] = useState<TimelineColumnId[]>(() => getDefaultColumns(context));
   const [filters, setFilters] = useState<TimelineFilters>(initialFilters);
   const [search, setSearch] = useState(initialState.search ?? "");
@@ -75,18 +67,11 @@ export function ActivityTimeline({ context, initialState = {} }: ActivityTimelin
   const [selectedActivityIds, setSelectedActivityIds] = useState<Set<number>>(() => new Set());
   const [savedViews, setSavedViews] = useState<TimelineSavedView[]>([]);
   const [savedViewsError, setSavedViewsError] = useState("");
-  const [requestState, setRequestState] = useState<RequestState>({ key: "", status: "loading" });
-  const [additionalLoadState, setAdditionalLoadState] = useState<AdditionalLoadState>("idle");
-  const [reloadKey, setReloadKey] = useState(0);
   const preferencesReadyRef = useRef(false);
   const drawerTriggerRef = useRef<HTMLElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const lastSelectedIndexRef = useRef<number | null>(null);
   const loadingSentinelRef = useRef<HTMLDivElement>(null);
-  const loadMoreAbortRef = useRef<AbortController | null>(null);
-  const inFlightPageRef = useRef<number | null>(null);
-  const loadedPagesRef = useRef(new Set<number>());
-  const activeRequestKeyRef = useRef("");
   const deferredSearch = useDebouncedValue(search.trim(), 300);
   const deferredPerformer = useDebouncedValue(filters.performer.trim(), 300);
   const viewWindow = useMemo(
@@ -108,8 +93,23 @@ export function ActivityTimeline({ context, initialState = {} }: ActivityTimelin
     }),
     [context, deferredPerformer, deferredSearch, filters.animalId, filters.enclosureId, filters.eventTypes, sort, viewWindow.from, viewWindow.to],
   );
-  const requestKey = useMemo(() => `${JSON.stringify(query)}:${reloadKey}`, [query, reloadKey]);
-  const loadState: LoadState = requestState.key === requestKey ? requestState.status : "loading";
+  const { activityPage, performers, loadState, additionalLoadState, hasMore, loadNextPage, retry } = useActivityPages(query);
+
+  // Component state owns edits; browser history restores it through the same URL parser as the page.
+  useEffect(() => {
+    function restoreUrlState() {
+      const state = parseTimelineInitialState(Object.fromEntries(new URLSearchParams(window.location.search)));
+      setFilters(sanitizeFiltersForContext({ ...defaultTimelineFilters, ...state.filters }, context));
+      setSearch(state.search ?? "");
+      setSort(state.sort ?? "Newest");
+      setView(state.view ?? "list");
+      setGroupBy(state.groupBy ?? "type");
+      setSelectedDate(state.date ?? toDateInputValue(new Date()));
+      setSelectedActivityIds(new Set());
+    }
+    window.addEventListener("popstate", restoreUrlState);
+    return () => window.removeEventListener("popstate", restoreUrlState);
+  }, [context]);
 
   useEffect(() => {
     const url = new URL(window.location.href);
@@ -149,19 +149,8 @@ export function ActivityTimeline({ context, initialState = {} }: ActivityTimelin
 
   useEffect(() => {
     if (!preferencesReadyRef.current) return;
-    const current = readPreferences();
-    try {
-      window.localStorage.setItem(preferencesKey, JSON.stringify({
-        ...current,
-        columns: { ...current.columns, [context.kind]: columns },
-        view,
-        sort,
-        groupBy,
-      }));
-    } catch {
-      // The timeline remains usable when storage is unavailable.
-    }
-  }, [columns, context.kind, groupBy, sort, view]);
+    writePreferences(context, columns, view, sort, groupBy);
+  }, [columns, context, groupBy, sort, view]);
 
   useEffect(() => {
     let isMounted = true;
@@ -176,91 +165,16 @@ export function ActivityTimeline({ context, initialState = {} }: ActivityTimelin
     return () => { isMounted = false; };
   }, []);
 
-  useEffect(() => {
-    const abortController = new AbortController();
-    let isActive = true;
-    loadMoreAbortRef.current?.abort();
-    loadMoreAbortRef.current = null;
-    inFlightPageRef.current = null;
-    loadedPagesRef.current = new Set();
-    activeRequestKeyRef.current = requestKey;
-
-    fetchActivities({ ...query, page: 1 }, abortController.signal)
-      .then((response) => {
-        if (!isActive || activeRequestKeyRef.current !== requestKey) return;
-        loadedPagesRef.current.add(1);
-        setPerformers((current) => mergePerformers(
-          current,
-          response.items.map((activity) => activity.performer?.trim()).filter((performer): performer is string => Boolean(performer)),
-        ));
-        setActivityPage({ ...response, items: deduplicateActivities(response.items) });
-        setAdditionalLoadState("idle");
-        setRequestState({ key: requestKey, status: "loaded" });
-      })
-      .catch((error: unknown) => {
-        if (error instanceof DOMException && error.name === "AbortError") {
-          return;
-        }
-        if (!isActive) return;
-        console.error(error);
-        setRequestState({ key: requestKey, status: "error" });
-      });
-
-    return () => {
-      isActive = false;
-      abortController.abort();
-      loadMoreAbortRef.current?.abort();
-    };
-  }, [query, requestKey]);
-
   const isFiltered = Boolean(deferredSearch.trim() || hasActiveFilters(filters));
   const visibleActivities = useMemo(
     () => activityPage.items.filter((activity) => matchesDateFilter(activity, filters)),
     [activityPage.items, filters],
   );
-  const hasMore = activityPage.page > 0 && activityPage.page < activityPage.totalPages;
   const resultsComplete = loadState === "loaded" && !hasMore;
   const automaticallyLoadMore = view === "list" || view === "day";
   const selectedActivityIndex = visibleActivities.findIndex((activity) => activity.id === selectedActivityId);
   const selectedActivity = selectedActivityIndex >= 0 ? visibleActivities[selectedActivityIndex] : undefined;
   const isInitialLoading = loadState === "loading";
-
-  const loadNextPage = useCallback(() => {
-    if (loadState !== "loaded" || !hasMore || additionalLoadState === "loading") return;
-    const nextPage = activityPage.page + 1;
-    if (loadedPagesRef.current.has(nextPage) || inFlightPageRef.current === nextPage) return;
-
-    const abortController = new AbortController();
-    loadMoreAbortRef.current?.abort();
-    loadMoreAbortRef.current = abortController;
-    inFlightPageRef.current = nextPage;
-    setAdditionalLoadState("loading");
-
-    fetchActivities({ ...query, page: nextPage }, abortController.signal)
-      .then((response) => {
-        if (activeRequestKeyRef.current !== requestKey || inFlightPageRef.current !== nextPage) return;
-        loadedPagesRef.current.add(nextPage);
-        setPerformers((current) => mergePerformers(
-          current,
-          response.items.map((activity) => activity.performer?.trim()).filter((performer): performer is string => Boolean(performer)),
-        ));
-        setActivityPage((current) => ({
-          ...response,
-          page: Math.max(current.page, response.page),
-          items: mergeActivityPages(current.items, response.items),
-        }));
-        setAdditionalLoadState("idle");
-      })
-      .catch((error: unknown) => {
-        if (error instanceof DOMException && error.name === "AbortError") return;
-        if (activeRequestKeyRef.current !== requestKey) return;
-        console.error(error);
-        setAdditionalLoadState("error");
-      })
-      .finally(() => {
-        if (inFlightPageRef.current === nextPage) inFlightPageRef.current = null;
-      });
-  }, [activityPage.page, additionalLoadState, hasMore, loadState, query, requestKey]);
 
   useEffect(() => {
     const sentinel = loadingSentinelRef.current;
@@ -490,7 +404,7 @@ export function ActivityTimeline({ context, initialState = {} }: ActivityTimelin
         <div className="timeline-state" role="alert">
           <strong>Unable to load activity.</strong>
           <span>Your search and filter selections have been preserved.</span>
-          <Button variant="secondary" onClick={() => setReloadKey((value) => value + 1)}>Retry</Button>
+          <Button variant="secondary" onClick={retry}>Retry</Button>
         </div>
       ) : null}
       {loadState === "loaded" ? (
@@ -702,120 +616,6 @@ function matchesDateFilter(activity: ActivityRecord, filters: TimelineFilters) {
 function setUrlParameter(url: URL, key: string, value: string | number | undefined) {
   if (value === undefined || value === "") url.searchParams.delete(key);
   else url.searchParams.set(key, String(value));
-}
-
-type TimelinePreferences = {
-  columns?: Partial<Record<TimelineContext["kind"], TimelineColumnId[]>>;
-  view?: TimelineView;
-  sort?: ActivitySortDirection;
-  groupBy?: RangeGroupBy;
-};
-
-function readPreferences(): TimelinePreferences {
-  try {
-    const value = JSON.parse(window.localStorage.getItem(preferencesKey) ?? "{}") as TimelinePreferences;
-    const validColumnIds = ["time", "type", "animal", "enclosure", "details", "performer", "activityId", "createdAt"];
-    const columns = Object.fromEntries(
-      Object.entries(value.columns ?? {}).map(([key, columnIds]) => [
-        key,
-        columnIds?.filter((column): column is TimelineColumnId => validColumnIds.includes(column)),
-      ]),
-    ) as TimelinePreferences["columns"];
-    return {
-      columns,
-      view: value.view && ["list", "day", "week", "range"].includes(value.view) ? value.view : undefined,
-      sort: isActivitySort(value.sort) ? value.sort : undefined,
-      groupBy: value.groupBy && ["type", "animal", "enclosure"].includes(value.groupBy) ? value.groupBy : undefined,
-    };
-  } catch {
-    return {};
-  }
-}
-
-function isActivitySort(value: unknown): value is ActivitySortDirection {
-  return typeof value === "string" && activitySortOptions.some((option) => option.value === value);
-}
-
-function isTimelineView(value: unknown): value is TimelineView {
-  return typeof value === "string" && ["list", "day", "week", "range"].includes(value);
-}
-
-function isRangeGroupBy(value: unknown): value is RangeGroupBy {
-  return typeof value === "string" && ["type", "animal", "enclosure"].includes(value);
-}
-
-function sanitizeFiltersForContext(filters: TimelineFilters, context: TimelineContext): TimelineFilters {
-  return {
-    eventTypes: filters.eventTypes.filter((type): type is ActivityEventType => activityEventTypes.includes(type)),
-    animalId: context.kind === "animal" ? undefined : Number.isInteger(filters.animalId) ? filters.animalId : undefined,
-    enclosureId: context.kind === "enclosure" ? undefined : Number.isInteger(filters.enclosureId) ? filters.enclosureId : undefined,
-    performer: typeof filters.performer === "string" ? filters.performer : "",
-    from: /^\d{4}-\d{2}-\d{2}$/.test(filters.from) ? filters.from : "",
-    to: /^\d{4}-\d{2}-\d{2}$/.test(filters.to) ? filters.to : "",
-  };
-}
-
-function sanitizeColumnsForContext(columns: TimelineColumnId[], context: TimelineContext) {
-  const visibleColumns = columns
-    .filter((column) => !(context.kind === "animal" && column === "animal"))
-    .filter((column) => !(context.kind === "enclosure" && column === "enclosure"));
-  return visibleColumns.length ? visibleColumns : getDefaultColumns(context);
-}
-
-function readSavedViews(): TimelineSavedView[] | null {
-  try {
-    const savedValue = window.localStorage.getItem(savedViewsKey);
-    const value = JSON.parse(savedValue ?? window.localStorage.getItem(legacyPresetsKey) ?? "[]") as unknown;
-    if (!Array.isArray(value)) return [];
-    return value.flatMap((item): TimelineSavedView[] => {
-      if (!item || typeof item !== "object") return [];
-      const candidate = item as Partial<TimelineSavedView>;
-      if (typeof candidate.id !== "string" || typeof candidate.name !== "string" || !candidate.name.trim()) return [];
-      if (!candidate.filters || !isActivitySort(candidate.sort) || !isRangeGroupBy(candidate.groupBy) || !isTimelineView(candidate.view)) return [];
-      const validColumnIds: TimelineColumnId[] = ["time", "type", "animal", "enclosure", "details", "performer", "activityId", "createdAt"];
-      return [{
-        id: candidate.id,
-        name: candidate.name.trim(),
-        filters: sanitizeFiltersForContext(candidate.filters, { kind: "global" }),
-        sort: candidate.sort,
-        groupBy: candidate.groupBy,
-        view: candidate.view,
-        columns: candidate.columns?.filter((column): column is TimelineColumnId => validColumnIds.includes(column)),
-        search: typeof candidate.search === "string" ? candidate.search : "",
-        pinned: candidate.pinned === true,
-      }];
-    });
-  } catch {
-    return null;
-  }
-}
-
-function writeSavedViews(savedViews: TimelineSavedView[]) {
-  try {
-    window.localStorage.setItem(savedViewsKey, JSON.stringify(savedViews));
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function mergePerformers(current: string[], incoming: string[]) {
-  const performers = new Map<string, string>();
-  [...current, ...incoming].forEach((performer) => {
-    const key = performer.toLocaleLowerCase();
-    if (!performers.has(key)) performers.set(key, performer);
-  });
-  return Array.from(performers.values()).sort((first, second) => first.localeCompare(second, undefined, { sensitivity: "base" }));
-}
-
-function deduplicateActivities(activities: ActivityRecord[]) {
-  return mergeActivityPages([], activities);
-}
-
-function mergeActivityPages(current: ActivityRecord[], incoming: ActivityRecord[]) {
-  const activities = new Map(current.map((activity) => [activity.id, activity]));
-  incoming.forEach((activity) => activities.set(activity.id, activity));
-  return Array.from(activities.values());
 }
 
 function getFilteredEmptyMessage(filters: TimelineFilters, search: string) {
